@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local config and secrets
+.env
+.env.*
+*.pem
+*.key
+*.token
+github-token*
+
+# Generated reports and logs
+reports/
+output/
+*.log
+*.sarif
+junit/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/

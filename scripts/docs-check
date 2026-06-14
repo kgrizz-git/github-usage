@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+required=(
+  README.md
+  CHANGELOG.md
+  LICENSE
+  AGENTS.md
+  docs/repo-harness-guidance.md
+)
+
+for path in "${required[@]}"; do
+  test -f "$path" || {
+    echo "Missing required doc: $path"
+    exit 1
+  }
+done
+
+PYTHONPATH=src python3 -m github_usage --help | grep -q "GITHUB_TOKEN"
+grep -q "github-usage" README.md
+
+echo "docs check passed"

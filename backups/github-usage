@@ -1,0 +1,473 @@
+#!/usr/bin/env python3
+"""
+github-usage.py — Check GitHub monthly usage (Actions minutes, storage, API)
+
+Usage:
+    ./github-usage.py [GITHUB_TOKEN]
+    python3 github-usage.py [GITHUB_TOKEN]
+
+Token resolution (first match wins):
+    1. Command-line argument
+    2. GITHUB_TOKEN environment variable
+    3. `gh auth token` output
+    4. ~/.config/github-cli/github.yaml (oauth_token field)
+"""
+
+import subprocess
+import sys
+import json
+import os
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+# ── Token Resolution ────────────────────────────────────────────────────
+
+def resolve_token():
+    # 1. CLI arg
+    if len(sys.argv) > 1:
+        return sys.argv[1]
+
+    # 2. Env var
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if token:
+        return token
+
+    # 3. gh CLI
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "token"], capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # 4. gh CLI config file
+    config = Path.home() / ".config" / "github-cli" / "github.yaml"
+    if config.exists():
+        content = config.read_text()
+        for line in content.splitlines():
+            line = line.strip()
+            if line.startswith("oauth_token:"):
+                token = line.split(":", 1)[1].strip().strip("'\"")
+                if token:
+                    return token
+
+    return None
+
+
+# ── GitHub API Helper ───────────────────────────────────────────────────
+
+class GitHubAPI:
+    def __init__(self, token):
+        self.token = token
+        self.base = "https://api.github.com"
+        self.headers = {
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "github-usage-report",
+        }
+        self._session = None
+
+    def _get_session(self):
+        import http.client
+        self._session = http.client.HTTPSConnection("api.github.com")
+        return self._session
+
+    def request(self, method, path, params=None):
+        """Make an API request and return parsed JSON."""
+        import http.client
+        url = f"{self.base}{path}"
+        if params:
+            query = "&".join(f"{k}={v}" for k, v in params.items())
+            url += f"?{query}"
+
+        conn = http.client.HTTPSConnection("api.github.com")
+        req_headers = {**self.headers}
+        conn.request(method, url, headers=req_headers)
+        resp = conn.getresponse()
+        data = resp.read().decode("utf-8")
+
+        if resp.status in (200, 201, 202, 204):
+            if data:
+                try:
+                    return json.loads(data)
+                except json.JSONDecodeError:
+                    return {}
+            return {}
+        elif resp.status == 403:
+            # Check rate limit
+            try:
+                body = json.loads(data) if data else {}
+            except json.JSONDecodeError:
+                body = {}
+            reset = int(body.get("retry-after", 0) or 0)
+            if reset > 0:
+                time.sleep(reset + 1)
+                return self.request(method, path, params)
+            raise RuntimeError(f"API error 403: {data[:200]}")
+        else:
+            raise RuntimeError(f"API error {resp.status}: {data[:200]}")
+
+    def get_all_pages(self, path, params=None):
+        """Fetch all pages of a paginated endpoint."""
+        all_items = []
+        page = 1
+        per_page = 100
+        while True:
+            result = self.request("GET", path, {**(params or {}), "page": page, "per_page": per_page})
+            if not result:
+                break
+            if isinstance(result, list):
+                all_items.extend(result)
+                if len(result) < per_page:
+                    break
+                page += 1
+            else:
+                break
+        return all_items
+
+
+# ── Report Generation ───────────────────────────────────────────────────
+
+def print_header():
+    print("=" * 60)
+    print("          GitHub Monthly Usage Report")
+    print("=" * 60)
+    print()
+
+
+def print_separator(title):
+    print(f"── {title} ──────────────────────────────────────")
+
+
+def get_rate_limit(api):
+    print_header()
+    print_separator("API Rate Limit")
+    data = api.request("GET", "/rate_limit")
+    core = data.get("resources", {}).get("core", {})
+    graphql = data.get("resources", {}).get("graphql", {})
+    actions_reg = data.get("resources", {}).get("action_runner_registration", {})
+
+    print(f"  Core API:     {core.get('remaining', '?')} / {core.get('limit', '?')} remaining")
+    reset_ts = core.get("reset", 0)
+    if reset_ts:
+        reset_date = datetime.fromtimestamp(reset_ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        print(f"  Resets at:    {reset_date}")
+    print(f"  GraphQL API:  {graphql.get('remaining', '?')} / {graphql.get('limit', '?')} remaining")
+    print(
+        f"  Actions (runner registration):  "
+        f"{actions_reg.get('remaining', '?')} / {actions_reg.get('limit', '?')} remaining"
+    )
+    print()
+
+    # Premium / high-tier usage
+    print("  Premium API requests (high-rate tier):")
+    for name, res in data.get("resources", {}).items():
+        limit = res.get("limit", 0)
+        used = res.get("used", 0)
+        if limit > 5000:
+            print(f"    {name}: {used} used / {limit} limit")
+    print()
+
+
+def get_user_info(api):
+    print_separator("Account Info")
+    user = api.request("GET", "/user")
+    username = user.get("login", "?")
+    user_type = user.get("type", "?")
+    print(f"  Username:   {username}")
+    print(f"  Account:    {user_type}")
+
+    limits = {
+        "User": {"minutes": 2000, "storage_mb": 500, "plan": "Personal (free: 2000 min, 500 MB)"},
+        "Organization": {"minutes": None, "storage_mb": None, "plan": "Organization (org-dependent)"},
+        "Enterprise": {"minutes": None, "storage_mb": None, "plan": "Enterprise (org-dependent)"},
+    }
+    info = limits.get(user_type, {"minutes": 2000, "storage_mb": 500, "plan": "Unknown"})
+    print(f"  Plan:       {info['plan']}")
+    print()
+    return username, user_type, info
+
+
+def get_user_actions_billing(api, username):
+    """Get user-level Actions billing via new usage summary API. Returns (total_minutes, storage_bytes)."""
+    try:
+        billing = api.request("GET", f"/users/{username}/settings/billing/usage/summary", {"product": "Actions"})
+    except RuntimeError:
+        return None, None
+
+    if not billing:
+        return None, None
+
+    total_minutes = 0.0
+    total_storage_gb_hours = 0.0
+
+    for item in billing.get("usageItems", []):
+        product = item.get("product", "")
+        unit_type = item.get("unitType", "")
+        quantity = item.get("grossQuantity", 0)
+
+        if product == "Actions" and unit_type == "minutes":
+            total_minutes += quantity
+        elif product == "Actions" and unit_type == "gigabyte-hours":
+            total_storage_gb_hours += quantity
+
+    # Convert gigabyte-hours to average MB for the month
+    from datetime import date, timedelta
+    today = date.today()
+    first_day = today.replace(day=1)
+    last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    hours_in_month = (last_day - first_day).days * 24 + 1
+    avg_storage_mb = (total_storage_gb_hours / hours_in_month) * 1024 if hours_in_month > 0 else 0
+
+    return total_minutes, avg_storage_mb
+
+
+def get_actions_billing_per_repo(api, owner, repo):
+    """Get per-repo Actions billing via new usage summary API. Returns (minutes, storage_mb)."""
+    try:
+        billing = api.request("GET", f"/users/{owner}/settings/billing/usage/summary", {
+            "product": "Actions",
+            "repository": f"{owner}/{repo}"
+        })
+    except RuntimeError:
+        return 0.0, 0
+
+    if not billing:
+        return 0.0, 0
+
+    total_minutes = 0.0
+    total_storage_gb_hours = 0.0
+
+    for item in billing.get("usageItems", []):
+        product = item.get("product", "")
+        unit_type = item.get("unitType", "")
+        quantity = item.get("grossQuantity", 0)
+
+        if product == "Actions" and unit_type == "minutes":
+            total_minutes += quantity
+        elif product == "Actions" and unit_type == "gigabyte-hours":
+            total_storage_gb_hours += quantity
+
+    from datetime import date, timedelta
+    today = date.today()
+    first_day = today.replace(day=1)
+    last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    hours_in_month = (last_day - first_day).days * 24 + 1
+    avg_storage_mb = (total_storage_gb_hours / hours_in_month) * 1024 if hours_in_month > 0 else 0
+
+    return total_minutes, avg_storage_mb
+
+
+def get_actions_billing_from_runs(api, owner, repo):
+    """Fallback: calculate minutes from workflow runs. May not have billable data for free accounts."""
+    from datetime import date, timedelta
+    today = date.today()
+    first_day = today.replace(day=1)
+    last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    created_range = f"{first_day.isoformat()}..{last_day.isoformat()}"
+    runs = api.get_all_pages(
+        f"/repos/{owner}/{repo}/actions/runs",
+        {"created": created_range, "per_page": 100},
+    )
+    total_minutes = 0.0
+    workflow_minutes = {}
+
+    for run in runs:
+        billable = run.get("billable") or {}
+        millis = (
+            billable.get("UBUNTU", {}).get("millis", 0)
+            + billable.get("WINDOWS", {}).get("millis", 0)
+            + billable.get("MACOS", {}).get("millis", 0)
+        )
+        minutes = millis / 60000
+        total_minutes += minutes
+
+        wf_name = run.get("workflow_name", "Unknown")
+        workflow_minutes[wf_name] = workflow_minutes.get(wf_name, 0) + minutes
+
+    return round(total_minutes, 1), 0, workflow_minutes
+
+
+def get_all_repos(api):
+    """Fetch all repos for the authenticated user."""
+    repos = api.get_all_pages("/user/repos", {"type": "all"})
+    return repos
+
+
+def print_actions_usage(api, repos, username, user_minutes=None, user_storage=None):
+    print_header()
+    print_separator("GitHub Actions Usage")
+    print()
+    print(f"  Total repos: {len(repos)}")
+    print()
+
+    # Show user-level billing totals if available
+    if user_minutes is not None:
+        print(f"  Total Actions Minutes (all repos): {user_minutes:.1f} min")
+        if user_storage:
+            print(f"  Total Storage Used: {user_storage:.1f} MB")
+        print()
+
+    # Per-repo breakdown
+    print("── Per-Repository Actions Minutes ───────────────────────")
+    print(f"  {'REPO':<45} {'MINUTES':>12} {'STORAGE (MB)':>14}")
+    print(f"  {'-'*45} {'-'*12} {'-'*14}")
+
+    repo_data = {}  # full_name -> {minutes, storage, workflows}
+
+    for repo in repos:
+        owner = repo["owner"]["login"]
+        name = repo["name"]
+        full = f"{owner}/{name}"
+
+        # Try new usage summary API first
+        minutes, storage_mb = get_actions_billing_per_repo(api, owner, name)
+        if minutes == 0 and storage_mb == 0:
+            # Fallback to workflow runs calculation
+            minutes, storage_mb, workflows = get_actions_billing_from_runs(api, owner, name)
+        else:
+            workflows = {}
+
+        repo_data[full] = {"minutes": minutes, "storage": storage_mb, "workflows": workflows}
+
+        print(f"  {full:<45} {minutes:>12.1f} {storage_mb:>14.1f}")
+
+    print()
+
+    # Summary
+    print_separator("Actions Summary")
+    print()
+    if user_minutes is not None:
+        total_minutes = user_minutes
+        total_storage = user_storage if user_storage else 0
+        print(f"  Total Actions Minutes Used: {total_minutes:.1f} min")
+        print(f"  Total Storage Used: {total_storage:.1f} MB")
+    else:
+        total_minutes = sum(d["minutes"] for d in repo_data.values())
+        total_storage = sum(d["storage"] for d in repo_data.values())
+        print(f"  Total Actions Minutes Used: {total_minutes:.1f} min")
+        print(f"  Total Storage Used: {total_storage:.1f} MB")
+        if total_minutes == 0:
+            print(f"  Note: Actions billing data not available (requires 'user' scope)")
+    print()
+
+    return repo_data, total_minutes, total_storage
+
+
+def print_top_consumers(repo_data):
+    print_separator("Top Repos by Actions Minutes")
+    print()
+
+    sorted_repos = sorted(repo_data.items(), key=lambda x: x[1]["minutes"], reverse=True)
+    for full, data in sorted_repos[:10]:
+        print(f"  {data['minutes']:>8.1f} min | {full}")
+    print()
+
+    return sorted_repos
+
+
+def print_workflow_breakdown(api, top_repo):
+    print_separator("Top Workflow Breakdown")
+    print()
+
+    if not top_repo or top_repo[1]["minutes"] == 0:
+        print("  No repos with Actions usage found.")
+        print()
+        return
+
+    owner, repo = top_repo[0].split("/", 1)
+    _, _, workflows = get_actions_billing_from_runs(api, owner, repo)
+
+    if not workflows:
+        print("  No detailed workflow data available.")
+        print()
+        return
+
+    print(f"  Detailed breakdown for: {top_repo[0]}")
+    print()
+
+    total = sum(workflows.values())
+    print(f"  {'WORKFLOW':<45} {'MINUTES':>10} {'SHARE':>8}")
+    print(f"  {'-'*45} {'-'*10} {'-'*8}")
+    for wf, mins in sorted(workflows.items(), key=lambda x: x[1], reverse=True)[:15]:
+        share = (mins / total * 100) if total > 0 else 0
+        print(f"  {wf:<45} {mins:>10.2f} {share:>7.1f}%")
+    print(f"  {'-'*45} {'-'*10} {'-'*8}")
+    print(f"  {'TOTAL':<45} {total:>10.2f}")
+    print()
+
+
+def print_limits_summary(repo_data, user_type, user_minutes=None, user_storage=None):
+    print_separator("Limits Summary")
+    print()
+
+    if user_minutes is not None:
+        total_minutes = user_minutes
+        total_storage = user_storage if user_storage else 0
+    else:
+        total_minutes = sum(d["minutes"] for d in repo_data.values())
+        total_storage = sum(d["storage"] for d in repo_data.values())
+
+    if user_type == "User":
+        min_limit = 2000
+        storage_limit = 500
+        remaining_min = max(0, min_limit - total_minutes)
+        pct_min = (total_minutes / min_limit * 100) if min_limit else 0
+        remaining_st = max(0, storage_limit - total_storage)
+        pct_st = (total_storage / storage_limit * 100) if storage_limit else 0
+
+        print(f"  Actions Minutes:")
+        print(f"    Used:         {total_minutes:.1f} / {min_limit} min")
+        print(f"    Remaining:    {remaining_min:.1f} min ({pct_min:.1f}% used)")
+        print()
+        print(f"  Storage:")
+        print(f"    Used:         {total_storage:.1f} / {storage_limit} MB")
+        print(f"    Remaining:    {remaining_st:.1f} MB ({pct_st:.1f}% used)")
+    else:
+        print(f"  Actions Minutes: {total_minutes:.1f} min (org/enterprise limit)")
+        print(f"  Storage: {total_storage:.1f} MB (org/enterprise limit)")
+        print()
+
+    print("=" * 60)
+    print("  End of Report")
+    print("=" * 60)
+
+
+# ── Main ────────────────────────────────────────────────────────────────
+
+def main():
+    token = resolve_token()
+    if not token:
+        print("Error: No GitHub token found.")
+        print("  Usage: ./github-usage.py <token>")
+        print("  Or set GITHUB_TOKEN env var.")
+        print("  Or run: gh auth login")
+        sys.exit(1)
+
+    try:
+        api = GitHubAPI(token)
+
+        get_rate_limit(api)
+        username, user_type, limits = get_user_info(api)
+        repos = get_all_repos(api)
+        user_minutes, user_storage = get_user_actions_billing(api, username)
+        repo_data, total_minutes, total_storage = print_actions_usage(api, repos, username, user_minutes, user_storage)
+        sorted_repos = print_top_consumers(repo_data)
+        top_repo = sorted_repos[0] if sorted_repos else None
+        print_workflow_breakdown(api, top_repo)
+        print_limits_summary(repo_data, user_type, user_minutes, user_storage)
+
+    except RuntimeError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

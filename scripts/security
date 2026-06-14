@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+missing=0
+
+if command -v gitleaks >/dev/null 2>&1; then
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git rev-parse --verify HEAD >/dev/null 2>&1; then
+    gitleaks detect --source . --redact
+  else
+    gitleaks detect --source . --redact --no-git
+  fi
+else
+  echo "Missing gitleaks. Install it to run secret scanning locally."
+  missing=1
+fi
+
+has_runtime_deps="$(python3 - <<'PY'
+import tomllib
+from pathlib import Path
+
+data = tomllib.loads(Path("pyproject.toml").read_text())
+deps = data.get("project", {}).get("dependencies", [])
+print("yes" if deps else "no")
+PY
+)"
+
+if [ "$has_runtime_deps" = "no" ]; then
+  echo "No runtime dependencies declared; skipping pip-audit."
+elif command -v pip-audit >/dev/null 2>&1; then
+  pip-audit --progress-spinner off .
+else
+  echo "Missing pip-audit. Install dev tools with: python3 -m pip install -e '.[dev]'"
+  missing=1
+fi
+
+if command -v bandit >/dev/null 2>&1; then
+  bandit -r src
+else
+  echo "Missing bandit. Install dev tools with: python3 -m pip install -e '.[dev]'"
+  missing=1
+fi
+
+exit "$missing"
