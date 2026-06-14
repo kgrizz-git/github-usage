@@ -124,7 +124,7 @@ Security workflow:
 - `.github/workflows/security.yml` should run on pull requests, pushes to main, and a scheduled cadence.
 - Run `scripts/security`, including at least Gitleaks, `pip-audit`, and Bandit once the package exists.
 - Enable GitHub secret scanning and push protection in repository settings when available.
-- Enable CodeQL code scanning for Python.
+- Enable CodeQL code scanning for Python when code scanning is available for the repository. Do not make CodeQL a required workflow job on private repos where SARIF uploads fail because code scanning is unavailable or disabled.
 - Add Dependabot config for both Python dependencies and GitHub Actions.
 - Consider an Actions workflow linter such as `zizmor` once workflows become non-trivial.
 
