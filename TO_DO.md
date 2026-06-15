@@ -21,3 +21,4 @@
 - [ ] Add optional CC/BCC delivery fields for team and finance distribution.
 - [ ] Add default GitHub API and Resend timeout/retry behavior, then consider `--timeout SECONDS` and `--max-retries N` flags if users need control.
 - [ ] Evaluate report retention destinations such as GitHub Releases, S3, or shared drives after export/output support exists.
+- [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.

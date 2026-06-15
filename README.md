@@ -46,7 +46,7 @@ PYTHONPATH=src python3 -m github_usage --help
 PYTHONPATH=src python3 -m github_usage
 ```
 
-The root-level `github-usage-v3` file is a compatibility wrapper for the packaged CLI.
+The root-level `github-usage` file is a compatibility wrapper for the packaged CLI.
 
 ## Authentication
 

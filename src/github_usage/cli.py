@@ -5,15 +5,12 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 
-from . import __version__
-from . import legacy
-
+from . import __version__, legacy
 
 HELP = """GitHub Monthly Usage Report
 
 Usage:
   github-usage [GITHUB_TOKEN]
-  github-usage-v3 [GITHUB_TOKEN]
 
 Token resolution:
   1. Command-line argument
