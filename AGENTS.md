@@ -15,6 +15,13 @@
 
 A change is done when relevant tests pass, the CLI still starts, docs are updated for user-visible behavior changes, and no secrets or generated reports were added.
 
+## Code Style
+
+- Keep files and functions small. If a file exceeds ~300 lines or a function exceeds ~50 lines, split it.
+- Favor composition and small, focused modules over monolithic classes or functions.
+- Avoid unnecessary complexity: prefer readable, straightforward code over clever or overly generic solutions.
+- When adding a feature that touches many areas, extract shared logic into its own module rather than duplicating or inflating existing ones.
+
 ## Maintainer References
 
 - Repo harness guidance: `docs/repo-harness-guidance.md`
