@@ -1,10 +1,22 @@
 # github-usage
 
-`github-usage` is a Python CLI for generating a GitHub monthly usage and billing report. It reports GitHub Actions usage, repository-level Actions usage, Copilot premium requests, Git LFS usage, billing history, limits, and a final summary of the largest consumers.
+[![CI](https://github.com/kgrizz-git/github-usage/actions/workflows/ci.yml/badge.svg)](https://github.com/kgrizz-git/github-usage/actions/workflows/ci.yml)
+[![Security](https://github.com/kgrizz-git/github-usage/actions/workflows/security.yml/badge.svg)](https://github.com/kgrizz-git/github-usage/actions/workflows/security.yml)
 
-## Current Status
+`github-usage` is a Python command-line tool for reviewing GitHub billing and usage data from your account. It reports GitHub Actions minutes and storage, repository-level Actions usage, Copilot premium requests, Git LFS usage, billing history, limits, and the largest current-month resource consumers.
 
-This repo is being converted from standalone scripts into a reusable Python package. The current packaged entry point wraps the v3 script behavior while the implementation is split into smaller modules over time.
+The project started as a personal reporting script and is being shaped into a reusable Python package. The packaged CLI currently preserves the v3 report behavior while the internals are split into smaller, testable modules.
+
+## Features
+
+- Account and plan summary
+- GitHub Actions minutes, storage, and per-SKU cost breakdown
+- Per-repository Actions usage
+- Copilot premium request usage by model
+- Git LFS usage
+- Current-month net/gross cost estimate
+- Full billing history summary from the GitHub billing API
+- Local smoke, security, and documentation checks for maintainers
 
 ## Requirements
 
@@ -12,55 +24,67 @@ This repo is being converted from standalone scripts into a reusable Python pack
 - A GitHub token with the `user` scope for billing endpoints
 - Optional: GitHub CLI (`gh`) for token discovery
 
-## Run
+## Install
 
-From a source checkout:
+From a checkout:
+
+```sh
+python3 -m pip install -e .
+```
+
+Then run:
+
+```sh
+github-usage --help
+github-usage
+```
+
+You can also run without installing:
 
 ```sh
 PYTHONPATH=src python3 -m github_usage --help
 PYTHONPATH=src python3 -m github_usage
 ```
 
-Compatibility wrapper:
-
-```sh
-PYTHONPATH=src ./github-usage-v3
-```
-
-After installing the package:
-
-```sh
-python3 -m pip install -e .
-github-usage
-```
+The root-level `github-usage-v3` file is a compatibility wrapper for the packaged CLI.
 
 ## Authentication
 
-Token resolution order:
+The CLI resolves a token in this order:
 
 1. Command-line argument
 2. `GITHUB_TOKEN` environment variable
 3. `gh auth token`
 4. `~/.config/github-cli/github.yaml`
 
-Examples:
+Recommended setup:
 
 ```sh
-GITHUB_TOKEN=ghp_example github-usage
-github-usage ghp_example
+gh auth login -h github.com -s user
+github-usage
 ```
 
-If `gh auth token` works in your terminal but not in a sandboxed agent session, rerun through an approved elevated command or pass `GITHUB_TOKEN` explicitly.
+You can also pass a token through the environment:
+
+```sh
+GITHUB_TOKEN="<token>" github-usage
+```
+
+Passing a token as a command-line argument is supported, but it can expose the token through shell history or process listings. Prefer `gh auth login` or `GITHUB_TOKEN`.
+
+## Privacy
+
+This tool prints account, repository, billing, and usage details to stdout. Treat generated output as sensitive unless you have reviewed and redacted it. Do not commit tokens, raw private API responses, generated billing reports, or local environment files.
 
 ## Development
 
-Run the standard checks:
+Run the main verification script:
 
 ```sh
 scripts/check
 ```
 
-Run smoke checks:
+Run CLI smoke checks:
 
 ```sh
 scripts/smoke
@@ -73,20 +97,28 @@ python3 -m pip install -e '.[dev]'
 pre-commit install
 ```
 
-Run optional security checks:
+Run local security checks:
 
 ```sh
 scripts/security
 ```
 
+The public GitHub repository also uses GitHub code scanning with CodeQL default setup. The local `Security` workflow covers repository-level checks that can run without uploading SARIF: Gitleaks, `pip-audit`, and Bandit.
+
+Run documentation checks:
+
+```sh
+scripts/docs-check
+```
+
 ## Repository Layout
 
-- `src/github_usage/`: package source
+- `src/github_usage/`: active package source
 - `tests/`: unit tests and future fixtures
 - `scripts/`: canonical local automation commands
 - `docs/`: maintainer guidance
 - `backups/`: historical script versions, not active code
 
-## Safety Notes
+## Roadmap
 
-Do not commit tokens, raw private API responses, generated billing reports, or local environment files. Tests should use fake tokens and fixtures.
+See [TO_DO.md](TO_DO.md) for planned work, including export formats, JSON output, report fixtures, and modularizing the current legacy implementation.
