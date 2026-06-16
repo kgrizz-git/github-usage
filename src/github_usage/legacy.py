@@ -28,6 +28,18 @@ import time
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from .report_helpers import (
+    fmt_price as shared_fmt_price,
+)
+from .report_helpers import (
+    gb_hours_to_avg_mb as shared_gb_hours_to_avg_mb,
+)
+from .report_helpers import (
+    hours_in_month,
+)
+
+UTC = UTC
+
 # ── Token Resolution ────────────────────────────────────────────────────
 
 
@@ -151,19 +163,15 @@ class GitHubAPI:
 
 
 def hours_in_current_month():
-    today = date.today()
-    first_day = today.replace(day=1)
-    last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-    return (last_day - first_day).days * 24 + 1
+    return hours_in_month()
 
 
 def gb_hours_to_avg_mb(gb_hours):
-    h = hours_in_current_month()
-    return (gb_hours / h) * 1024 if h > 0 else 0
+    return shared_gb_hours_to_avg_mb(gb_hours)
 
 
 def fmt_price(v):
-    return f"${v:.4f}"
+    return shared_fmt_price(v)
 
 
 # ── Billing Data Collectors ─────────────────────────────────────────────
