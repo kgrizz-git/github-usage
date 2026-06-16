@@ -60,8 +60,11 @@ def show_account_info(api):
         private_repos = plan.get("private_repos", "?")
         print(f"  Plan:       {plan_name}")
         if space and space != 0:
-            space_gb = space / (1024 * 1024 * 1024) if isinstance(space, int | float) else space
-            print(f"  Space:      {space_gb:.1f} GB available")
+            if isinstance(space, int | float):
+                space_gb = space / (1024 * 1024 * 1024)
+                print(f"  Space:      {space_gb:.1f} GB available")
+            else:
+                print(f"  Space:      {space} available")
         if collaborators:
             print(f"  Collaborators: {collaborators}")
         if private_repos:

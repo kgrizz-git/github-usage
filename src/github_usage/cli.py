@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
+from typing import Any
 
 from . import __version__, email_report, report_data
 from .api import GitHubAPI
@@ -74,12 +75,19 @@ def _confirm_release_assets(args: argparse.Namespace) -> bool:
     return answer in {"y", "yes"}
 
 
+def _safe_exit_code(code: Any) -> int:
+    try:
+        return int(code or 0)
+    except (ValueError, TypeError):
+        return 1
+
+
 def _run_email_report(argv: Sequence[str]) -> int:
     parser = _email_parser()
     try:
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
-        return int(exc.code or 0)
+        return _safe_exit_code(exc.code)
 
     if args.max_repos < 1:
         print("Error: --max-repos must be at least 1.")
@@ -97,8 +105,9 @@ def _run_email_report(argv: Sequence[str]) -> int:
 
     token = _resolve_email_token()
     if not token:
-        print("Error: No GitHub token found.")
-        print("  Set GITHUB_TOKEN or run: gh auth login")
+        from .auth import print_missing_token_error
+
+        print_missing_token_error()
         return 1
 
     if not args.dry_run:
@@ -176,15 +185,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     sys.argv = ["github-usage", *args]
     try:
         if not resolve_token():
-            print("Error: No GitHub token found.")
-            print("  Usage: github-usage <token>")
-            print("  Or set GITHUB_TOKEN env var.")
-            print("  Or run: gh auth login")
+            from .auth import print_missing_token_error
+
+            print_missing_token_error()
             return 1
         try:
             legacy_main()
             return 0
         except SystemExit as exc:
-            return int(exc.code or 0)
+            return _safe_exit_code(exc.code)
     finally:
         sys.argv = old_argv

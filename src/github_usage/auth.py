@@ -10,6 +10,13 @@ from pathlib import Path
 # Token discovery intentionally shells out to the GitHub CLI.
 
 
+def print_missing_token_error(usage_command="github-usage"):
+    print("Error: No GitHub token found.")
+    print(f"  Usage: {usage_command} <token>")
+    print("  Or set GITHUB_TOKEN env var.")
+    print("  Or run: gh auth login")
+
+
 def resolve_token():
     if len(sys.argv) > 1:
         return sys.argv[1]
@@ -43,9 +50,14 @@ def check_user_scope(api):
     import http.client
 
     conn = http.client.HTTPSConnection("api.github.com")
-    conn.request("GET", "/user", headers=api.headers)
-    resp = conn.getresponse()
-    scopes_header = resp.getheader("X-OAuth-Scopes", "")
-    resp.read()  # consume response
-    scopes = [s.strip() for s in scopes_header.split(",") if s.strip()]
-    return "user" in scopes
+    try:
+        conn.request("GET", "/user", headers=api.headers)
+        resp = conn.getresponse()
+        if resp.status != 200:
+            return False
+        scopes_header = resp.getheader("X-OAuth-Scopes", "")
+        resp.read()  # consume response
+        scopes = [s.strip() for s in scopes_header.split(",") if s.strip()]
+        return "user" in scopes
+    finally:
+        conn.close()

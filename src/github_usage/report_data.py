@@ -146,14 +146,17 @@ def get_warning_state(report_data: dict, warn_over: str | None) -> list[str]:
     if raw.endswith("%"):
         actions = report_data.get("actions")
         if not actions:
-            raise ValueError("percentage warning thresholds require Actions data")
+            return ["Percentage warning threshold skipped: Actions data not included in report."]
         threshold = float(raw[:-1])
         usage = float(actions.get("minutes_percent", 0.0))
         if usage > threshold:
             return [f"Actions minutes usage is {usage:.1f}%, above the {threshold:.1f}% threshold."]
         return []
     threshold = float(raw)
-    total_net = float(report_data["monthly_costs"]["total"]["net"])
+    monthly_costs = report_data.get("monthly_costs")
+    if not monthly_costs:
+        return []
+    total_net = float(monthly_costs["total"]["net"])
     if total_net > threshold:
         return [
             f"Current monthly net cost is {fmt_price(total_net)}, "

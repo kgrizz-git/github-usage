@@ -5,6 +5,7 @@ from __future__ import annotations
 import http.client
 import json
 import time
+import urllib.parse
 
 
 class GitHubAPI:
@@ -18,44 +19,53 @@ class GitHubAPI:
             "User-Agent": "github-usage-report-v3",
         }
 
-    def request(self, method, path, params=None):
+    def request(self, method, path, params=None, _retries=0):
         url = path
+        if not url.startswith("/"):
+            url = "/" + url
+
         if params:
-            query = "&".join(f"{k}={v}" for k, v in params.items())
-            url += f"?{query}"
+            query = urllib.parse.urlencode(params)
+            if "?" in url:
+                url += "&" + query
+            else:
+                url += "?" + query
+
         conn = http.client.HTTPSConnection("api.github.com")
-        req_headers = {**self.headers}
-        conn.request(method, url, headers=req_headers)
-        resp = conn.getresponse()
-        data = resp.read().decode("utf-8")
-        if resp.status in (200, 201, 202, 204):
-            if data:
-                try:
-                    return json.loads(data)
-                except json.JSONDecodeError:
-                    return {}
-            return {}
-        elif resp.status == 403:
-            try:
-                body = json.loads(data) if data else {}
-            except json.JSONDecodeError:
-                body = {}
-            reset = int(body.get("retry-after", 0) or 0)
-            if reset > 0:
-                time.sleep(reset + 1)
-                return self.request(method, path, params)
-            raise RuntimeError(f"API error 403: {data[:200]}")
-        elif resp.status == 404:
-            # Check if this is a billing endpoint that needs 'user' scope
-            if "billing" in path and "settings" in path:
-                raise RuntimeError(
-                    f"API error 404 on billing endpoint '{path}'. "
-                    f"This usually means your token is missing the 'user' scope. "
-                    f"Fix: run 'gh auth refresh -h github.com -s user'"
-                )
-            raise RuntimeError(f"API error 404: {data[:200]}")
-        else:
-            raise RuntimeError(f"API error {resp.status}: {data[:200]}")
+        try:
+            req_headers = {**self.headers}
+            conn.request(method, url, headers=req_headers)
+            resp = conn.getresponse()
+            self._last_link = resp.getheader("Link", "")
+            data = resp.read().decode("utf-8")
+            if resp.status in (200, 201, 202, 204):
+                if data:
+                    try:
+                        return json.loads(data)
+                    except json.JSONDecodeError:
+                        raise RuntimeError(
+                            f"API returned success {resp.status} but invalid JSON: {data[:200]}"
+                        ) from None
+                return {}
+            elif resp.status == 403:
+                reset = int(resp.getheader("Retry-After", 0) or 0)
+                if reset > 0 and _retries < 3:
+                    time.sleep(reset + 1)
+                    return self.request(method, path, params, _retries=_retries + 1)
+                raise RuntimeError(f"API error 403: {data[:200]}")
+            elif resp.status == 404:
+                # Check if this is a billing endpoint that needs 'user' scope
+                if "billing" in path and "settings" in path:
+                    raise RuntimeError(
+                        f"API error 404 on billing endpoint '{path}'. "
+                        f"This usually means your token is missing the 'user' scope. "
+                        f"Fix: run 'gh auth refresh -h github.com -s user'"
+                    )
+                raise RuntimeError(f"API error 404: {data[:200]}")
+            else:
+                raise RuntimeError(f"API error {resp.status}: {data[:200]}")
+        finally:
+            conn.close()
 
     def get_all_pages(self, path, params=None):
         all_items = []
@@ -65,13 +75,13 @@ class GitHubAPI:
             result = self.request(
                 "GET", path, {**(params or {}), "page": page, "per_page": per_page}
             )
-            if not result:
+            if not isinstance(result, list):
+                if isinstance(result, dict) and "message" in result:
+                    raise RuntimeError(f"API error on {path}: {result['message']}")
                 break
-            if isinstance(result, list):
-                all_items.extend(result)
-                if len(result) < per_page:
-                    break
-                page += 1
-            else:
+
+            all_items.extend(result)
+            if 'rel="next"' not in self._last_link:
                 break
+            page += 1
         return all_items

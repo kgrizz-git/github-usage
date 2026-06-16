@@ -41,7 +41,7 @@ def get_artifact_storage_details(api, repos: list[dict], max_repos: int = 100) -
         owner = repo.get("owner", {}).get("login", "")
         name = repo.get("name", "")
         artifacts = api.get_all_pages(f"/repos/{owner}/{name}/actions/artifacts", {"per_page": 100})
-        size = sum(int(item.get("size_in_bytes", 0)) for item in artifacts)
+        size = sum(int(item.get("size_in_bytes") or 0) for item in artifacts)
         if size:
             rows.append(
                 {"repo": repo.get("full_name") or f"{owner}/{name}", "artifact_bytes": size}
@@ -62,7 +62,9 @@ def get_release_asset_details(api, repos: list[dict], max_repos: int = 100) -> d
         name = repo.get("name", "")
         releases = api.get_all_pages(f"/repos/{owner}/{name}/releases", {"per_page": 100})
         size = sum(
-            int(asset.get("size", 0)) for release in releases for asset in release.get("assets", [])
+            int(asset.get("size") or 0)
+            for release in releases
+            for asset in release.get("assets", [])
         )
         if size:
             rows.append(

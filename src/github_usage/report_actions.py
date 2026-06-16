@@ -85,7 +85,7 @@ def show_actions_os_breakdown(api, repos):
             print(f"  {owner}/{name}:")
             for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
                 mins = os_millis[os_name] / 60000
-                total_os[os_name] += os_millis
+                total_os[os_name] += os_millis[os_name]
                 if mins > 0:
                     print(f"    {os_name:<10} {mins:>8.1f} min")
             print()

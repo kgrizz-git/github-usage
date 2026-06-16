@@ -46,3 +46,61 @@ class ApiTests(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "missing the 'user' scope"),
         ):
             GitHubAPI("fake-token").request("GET", "/users/octocat/settings/billing/usage/summary")
+
+    def test_request_retries_on_403_with_retry_after(self):
+        from github_usage.api import GitHubAPI
+
+        conn = mock.Mock()
+        resp_403 = mock.Mock(status=403)
+        resp_403.getheader.return_value = "1"
+        resp_403.read.return_value = b'{"message": "rate limit"}'
+
+        resp_200 = mock.Mock(status=200)
+        resp_200.read.return_value = b'{"ok": true}'
+
+        conn.getresponse.side_effect = [resp_403, resp_200]
+
+        with (
+            mock.patch("github_usage.api.http.client.HTTPSConnection", return_value=conn),
+            mock.patch("github_usage.api.time.sleep") as sleep,
+        ):
+            result = GitHubAPI("fake-token").request("GET", "/resource")
+
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(conn.request.call_count, 2)
+        sleep.assert_called_once_with(2)
+
+    def test_request_encodes_query_params_safely(self):
+        from github_usage.api import GitHubAPI
+
+        conn = mock.Mock()
+        resp = mock.Mock(status=200)
+        resp.read.return_value = b'{"ok": true}'
+        conn.getresponse.return_value = resp
+
+        with mock.patch("github_usage.api.http.client.HTTPSConnection", return_value=conn):
+            # Test with special characters and path without leading slash
+            GitHubAPI("fake-token").request("GET", "resource", {"q": "a+b&c=d"})
+
+        conn.request.assert_called_once()
+        _, url = conn.request.call_args.args[:2]
+        self.assertEqual(url, "/resource?q=a%2Bb%26c%3Dd")
+
+    def test_get_all_pages_uses_link_header(self):
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+
+        # Mock request to return headers
+        def mock_request(method, path, params=None, _retries=0):
+            if params.get("page") == 1:
+                api._last_link = '<https://api.github.com/resource?page=2>; rel="next"'
+                return [{"id": 1}]
+            else:
+                api._last_link = ""
+                return [{"id": 2}]
+
+        with mock.patch.object(api, "request", side_effect=mock_request):
+            result = api.get_all_pages("/resource")
+
+        self.assertEqual(result, [{"id": 1}, {"id": 2}])

@@ -30,10 +30,9 @@ from .terminal import print_header
 def main():
     token = resolve_token()
     if not token:
-        print("Error: No GitHub token found.")
-        print("  Usage: ./github-usage <token>")
-        print("  Or set GITHUB_TOKEN env var.")
-        print("  Or run: gh auth login")
+        from .auth import print_missing_token_error
+
+        print_missing_token_error()
         sys.exit(1)
 
     try:
@@ -50,11 +49,16 @@ def main():
             import http.client
 
             conn = http.client.HTTPSConnection("api.github.com")
-            conn.request("GET", "/user", headers={**api.headers, "Authorization": f"token {token}"})
-            resp = conn.getresponse()
-            scopes = resp.getheader("X-OAuth-Scopes", "none")
-            print(scopes if scopes else "none")
-            resp.read()
+            try:
+                conn.request(
+                    "GET", "/user", headers={**api.headers, "Authorization": f"token {token}"}
+                )
+                resp = conn.getresponse()
+                scopes = resp.getheader("X-OAuth-Scopes", "none")
+                print(scopes if scopes else "none")
+                resp.read()
+            finally:
+                conn.close()
             sys.exit(1)
 
         # Account & rate limits

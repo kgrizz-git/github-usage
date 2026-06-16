@@ -27,8 +27,11 @@ class CliTests(unittest.TestCase):
                 code = cli.main([])
 
         self.assertEqual(code, 1)
-        self.assertIn("No GitHub token found", stdout.getvalue())
-        self.assertIn("GITHUB_TOKEN", stdout.getvalue())
+        output = stdout.getvalue()
+        self.assertIn("Error: No GitHub token found.", output)
+        self.assertIn("Usage: github-usage <token>", output)
+        self.assertIn("Or set GITHUB_TOKEN env var.", output)
+        self.assertIn("Or run: gh auth login", output)
 
     def test_email_report_help_exits_zero_without_resolving_token(self):
         from github_usage import cli

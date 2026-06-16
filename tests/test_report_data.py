@@ -85,3 +85,21 @@ class ReportDataTests(unittest.TestCase):
         self.assertEqual(estimate["repos_considered"], 25)
         self.assertEqual(estimate["estimated_incremental_requests"], 75)
         self.assertEqual(estimate["estimated_percent_of_remaining"], 75.0)
+
+    def test_get_warning_state_handles_missing_monthly_costs(self):
+        from github_usage.report_data import get_warning_state
+
+        report_data = {"monthly_costs": None, "actions": {"minutes_percent": 50}}
+
+        # Should not crash on net cost threshold check
+        warnings = get_warning_state(report_data, "100")
+        self.assertEqual(warnings, [])
+
+    def test_get_warning_state_handles_missing_actions_for_percent_threshold(self):
+        from github_usage.report_data import get_warning_state
+
+        report_data = {"actions": None}
+
+        # Should return a warning message instead of raising ValueError
+        warnings = get_warning_state(report_data, "80%")
+        self.assertIn("Percentage warning threshold skipped", warnings[0])

@@ -125,3 +125,29 @@ class BillingTests(unittest.TestCase):
         self.assertEqual(minutes, 7)
         self.assertEqual(storage, 0)
         self.assertIn("linux", sku)
+
+    def test_get_actions_from_runs_accumulates_per_run_minutes(self):
+        from github_usage.billing import get_actions_from_runs
+
+        api = FakeAPI(
+            {
+                ("PAGES", "/repos/octocat/api/actions/runs"): [
+                    {
+                        "workflow_name": "CI",
+                        "billable": {"UBUNTU": {"millis": 60000}},  # 1 min
+                    },
+                    {
+                        "workflow_name": "CI",
+                        "billable": {"UBUNTU": {"millis": 120000}},  # 2 mins
+                    },
+                ]
+            }
+        )
+
+        total_min, os_min, wf_min = get_actions_from_runs(api, "octocat", "api")
+
+        # Total should be 1 + 2 = 3
+        self.assertEqual(total_min, 3.0)
+        # CI workflow should have 1 + 2 = 3
+        # BUG: Current implementation will have 1 (first run) + 3 (total after second run) = 4
+        self.assertEqual(wf_min["CI"], 3.0)

@@ -129,13 +129,15 @@ def get_actions_from_runs(api, owner, repo):
     )
     total_minutes = 0.0
     workflow_minutes = {}
-    os_minutes = {"UBUNTU": 0, "WINDOWS": 0, "MACOS": 0}
+    os_millis = {"UBUNTU": 0, "WINDOWS": 0, "MACOS": 0}
     for run in runs:
         billable = run.get("billable") or {}
+        run_minutes = 0.0
         for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
             millis = billable.get(os_name, {}).get("millis", 0)
-            os_minutes[os_name] += millis
-            total_minutes += millis / 60000
+            os_millis[os_name] += millis
+            run_minutes += millis / 60000
+        total_minutes += run_minutes
         wf_name = run.get("workflow_name", "Unknown")
-        workflow_minutes[wf_name] = workflow_minutes.get(wf_name, 0) + total_minutes
-    return round(total_minutes, 1), os_minutes, workflow_minutes
+        workflow_minutes[wf_name] = workflow_minutes.get(wf_name, 0) + run_minutes
+    return round(total_minutes, 1), os_millis, workflow_minutes

@@ -9,7 +9,7 @@
 - [ ] Add fixture-based tests for report rendering.
 - [ ] Add a `--month YYYY-MM` flag so users can query a specific billing period.
 - [ ] Add a redaction layer before writing export files, especially for usernames, repository names, and billing details.
-- [ ] Continue reducing long legacy report-section functions after the first `legacy.py` module split.
+- [x] Continue reducing long legacy report-section functions after the first `legacy.py` module split (Completed refactoring of `report_summary.py`).
 
 ## Email Report Follow-Ups
 
