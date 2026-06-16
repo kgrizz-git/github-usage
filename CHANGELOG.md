@@ -13,6 +13,10 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 - GitHub Actions workflow template for scheduled email reports using `GH_USAGE_TOKEN`.
 - Fixture-backed tests for email formatting, report data shaping, and workflow template safety.
 
+### Changed
+
+- Split the legacy interactive report implementation into focused auth, API, billing, storage, and report-section modules while preserving `github_usage.legacy` compatibility imports.
+
 ## [0.1.0] - 2026-06-14
 
 ### Added

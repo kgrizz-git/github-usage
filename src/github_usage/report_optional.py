@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import legacy
+from .billing import get_actions_per_repo
 from .report_helpers import gb_hours_to_avg_mb
 
 
@@ -14,7 +14,7 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
         name = repo.get("name", "")
         full_name = repo.get("full_name") or f"{owner}/{name}"
         try:
-            minutes, storage_gb_hours, sku = legacy.get_actions_per_repo(api, owner, name)
+            minutes, storage_gb_hours, sku = get_actions_per_repo(api, owner, name)
         except RuntimeError:
             continue
         rows.append(

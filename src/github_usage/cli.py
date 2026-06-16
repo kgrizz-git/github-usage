@@ -7,7 +7,10 @@ import os
 import sys
 from collections.abc import Sequence
 
-from . import __version__, email_report, legacy, report_data
+from . import __version__, email_report, report_data
+from .api import GitHubAPI
+from .auth import check_user_scope, resolve_token
+from .legacy_report import main as legacy_main
 
 HELP = """GitHub Monthly Usage Report
 
@@ -45,7 +48,7 @@ def _resolve_email_token() -> str | None:
     old_argv = sys.argv[:]
     sys.argv = ["github-usage"]
     try:
-        return legacy.resolve_token()
+        return resolve_token()
     finally:
         sys.argv = old_argv
 
@@ -109,14 +112,14 @@ def _run_email_report(argv: Sequence[str]) -> int:
     if not _confirm_release_assets(args):
         return 1
 
-    api = legacy.GitHubAPI(token)
+    api = GitHubAPI(token)
     try:
         user = api.request("GET", "/user")
         username = user.get("login")
         if not username:
             print("Error: GitHub /user response did not include a login.")
             return 1
-        if not legacy.check_user_scope(api):
+        if not check_user_scope(api):
             print("Error: Your GitHub token is missing the 'user' scope.")
             print("  The billing endpoints require the 'user' scope.")
             print("  Fix: run 'gh auth refresh -h github.com -s user'")
@@ -172,14 +175,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     old_argv = sys.argv[:]
     sys.argv = ["github-usage", *args]
     try:
-        if not legacy.resolve_token():
+        if not resolve_token():
             print("Error: No GitHub token found.")
             print("  Usage: github-usage <token>")
             print("  Or set GITHUB_TOKEN env var.")
             print("  Or run: gh auth login")
             return 1
         try:
-            legacy.main()
+            legacy_main()
             return 0
         except SystemExit as exc:
             return int(exc.code or 0)

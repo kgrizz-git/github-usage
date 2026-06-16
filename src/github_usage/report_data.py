@@ -5,16 +5,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Protocol
 
-from . import legacy
-from .report_helpers import gb_hours_to_avg_mb
+from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .report_optional import (
     estimate_api_request_count,
     get_artifact_storage_details,
     get_release_asset_details,
     get_repo_consumers,
 )
-
-UTC = UTC
 
 
 class GitHubAPIClient(Protocol):
@@ -159,8 +156,8 @@ def get_warning_state(report_data: dict, warn_over: str | None) -> list[str]:
     total_net = float(report_data["monthly_costs"]["total"]["net"])
     if total_net > threshold:
         return [
-            f"Current monthly net cost is {legacy.fmt_price(total_net)}, "
-            f"above the {legacy.fmt_price(threshold)} threshold."
+            f"Current monthly net cost is {fmt_price(total_net)}, "
+            f"above the {fmt_price(threshold)} threshold."
         ]
     return []
 

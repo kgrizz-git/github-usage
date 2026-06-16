@@ -9,7 +9,7 @@ class CliTests(unittest.TestCase):
     def test_help_exits_zero_without_resolving_token(self):
         from github_usage import cli
 
-        with mock.patch("github_usage.legacy.resolve_token") as resolve_token:
+        with mock.patch("github_usage.cli.resolve_token") as resolve_token:
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli.main(["--help"])
@@ -21,7 +21,7 @@ class CliTests(unittest.TestCase):
     def test_missing_token_exits_one_with_clear_message(self):
         from github_usage import cli
 
-        with mock.patch("github_usage.legacy.resolve_token", return_value=None):
+        with mock.patch("github_usage.cli.resolve_token", return_value=None):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli.main([])
@@ -33,7 +33,7 @@ class CliTests(unittest.TestCase):
     def test_email_report_help_exits_zero_without_resolving_token(self):
         from github_usage import cli
 
-        with mock.patch("github_usage.legacy.resolve_token") as resolve_token:
+        with mock.patch("github_usage.cli.resolve_token") as resolve_token:
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli.main(["email-report", "--help"])
@@ -65,8 +65,8 @@ class CliTests(unittest.TestCase):
         stdout = io.StringIO()
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
-            mock.patch("github_usage.legacy.GitHubAPI") as api_cls,
-            mock.patch("github_usage.legacy.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli.check_user_scope", return_value=True),
             mock.patch("github_usage.report_data.build_report_data", return_value=report_data),
             contextlib.redirect_stdout(stdout),
         ):
