@@ -1,0 +1,109 @@
+{
+  "username": "octocat",
+  "period": "current_month",
+  "generated_at": "2026-06-15T14:30:00Z",
+  "warnings": [
+    "Current monthly net cost is $31.42, above the $25.00 threshold."
+  ],
+  "errors": {
+    "copilot": "token may lack billing scope"
+  },
+  "actions": {
+    "minutes": 1250.0,
+    "minutes_limit": 2000,
+    "minutes_percent": 62.5,
+    "storage_gb_hours": 158.2,
+    "storage_avg_mb": 220.4,
+    "storage_limit_mb": 500,
+    "storage_percent": 44.1,
+    "sku_breakdown": {
+      "enterprise": {
+        "minutes": 800.0,
+        "storage_gb_hours": 100.0,
+        "gross": 3.0,
+        "discount": 0.5,
+        "net": 2.5
+      },
+      "free": {
+        "minutes": 450.0,
+        "storage_gb_hours": 50.0,
+        "gross": 0.0,
+        "discount": 0.0,
+        "net": 0.0
+      }
+    }
+  },
+  "copilot": {
+    "total_requests": 42.0,
+    "total_gross": 0.0,
+    "total_discount": 0.0,
+    "total_net": 0.0,
+    "by_model": {
+      "gpt-4.1": {
+        "requests": 30.0,
+        "gross": 0.0,
+        "discount": 0.0,
+        "net": 0.0
+      },
+      "claude-sonnet-4": {
+        "requests": 12.0,
+        "gross": 0.0,
+        "discount": 0.0,
+        "net": 0.0
+      }
+    }
+  },
+  "git_lfs": {
+    "total_gross": 0.0,
+    "total_discount": 0.0,
+    "total_net": 0.0,
+    "items": {}
+  },
+  "monthly_costs": {
+    "actions": {"gross": 6.1, "discount": 1.89, "net": 4.21},
+    "copilot": {"gross": 0.0, "discount": 0.0, "net": 0.0},
+    "git_lfs": {"gross": 0.0, "discount": 0.0, "net": 0.0},
+    "total": {"gross": 6.1, "discount": 1.89, "net": 4.21}
+  },
+  "repo_consumers": {
+    "scanned_repo_count": 2,
+    "max_repos": 100,
+    "truncated": false,
+    "by_minutes": [
+      {"repo": "octocat/api", "minutes": 900.0, "gross": 3.4, "storage_avg_mb": 180.0},
+      {"repo": "octocat/web", "minutes": 350.0, "gross": 0.81, "storage_avg_mb": 40.4}
+    ],
+    "by_cost": [
+      {"repo": "octocat/api", "minutes": 900.0, "gross": 3.4, "storage_avg_mb": 180.0},
+      {"repo": "octocat/web", "minutes": 350.0, "gross": 0.81, "storage_avg_mb": 40.4}
+    ]
+  },
+  "artifact_storage": {
+    "scanned_repo_count": 1,
+    "max_repos": 100,
+    "truncated": false,
+    "top_repos": [
+      {"repo": "octocat/api", "artifact_bytes": 943718400}
+    ]
+  },
+  "release_assets": {
+    "scanned_repo_count": 1,
+    "max_repos": 100,
+    "truncated": false,
+    "top_repos": [
+      {"repo": "octocat/api", "release_asset_bytes": 314572800}
+    ]
+  },
+  "api_estimate": {
+    "core_limit": 5000,
+    "core_remaining": 4900,
+    "estimated_incremental_requests": 3,
+    "estimated_percent_of_remaining": 0.1,
+    "repos_considered": 1,
+    "notes": []
+  },
+  "insights": [
+    "octocat/api accounts for 72% of Actions minutes.",
+    "Actions storage is below the free-tier limit."
+  ]
+}

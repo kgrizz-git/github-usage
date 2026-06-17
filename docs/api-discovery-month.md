@@ -1,0 +1,43 @@
+# API discovery: --month date-range support
+
+Run at: 2026-06-17T19:55:41Z
+Test month: 2026-05
+Range tested: since=2026-05-01T00:00:00Z, until=2026-05-31T23:59:59Z
+
+## Per-endpoint results
+
+### billing usage summary (Actions)
+
+- Path: `/users/kgrizz-git/settings/billing/usage/summary`
+- Base params: `['product']`
+- Without date range: status=200, shape=usageItems=4
+- With date range: status=200, shape=usageItems=4
+- Verdict: **ignores date range**
+
+### billing usage summary (Copilot)
+
+- Path: `/users/kgrizz-git/settings/billing/usage/summary`
+- Base params: `['product']`
+- Without date range: status=200, shape=usageItems=2
+- With date range: status=200, shape=usageItems=2
+- Verdict: **ignores date range**
+
+### billing usage summary (git_lfs)
+
+- Path: `/users/kgrizz-git/settings/billing/usage/summary`
+- Base params: `['product']`
+- Without date range: status=200, shape=usageItems=1
+- With date range: status=200, shape=usageItems=1
+- Verdict: **ignores date range**
+
+### premium request usage (copilot)
+
+- Path: `/users/kgrizz-git/settings/billing/premium_request/usage`
+- Base params: `['product']`
+- Without date range: status=200, shape=usageItems=5
+- With date range: status=200, shape=usageItems=5
+- Verdict: **ignores date range**
+
+## Summary
+
+All tested endpoints ignore the `since`/`until` parameters; --month must be **deferred** for historical queries. The flag remains accepted for label/filename purposes only.

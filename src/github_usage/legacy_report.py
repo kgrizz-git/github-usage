@@ -27,7 +27,22 @@ from .storage import get_storage_analysis
 from .terminal import print_header
 
 
-def main():
+def main(
+    *,
+    export: str | None = None,
+    output: str | None = None,
+    no_interactive: bool = False,
+    month: str | None = None,
+    dry_run: bool = False,
+) -> str | None:
+    """Run the legacy interactive report. Return the resolved username, or None on failure.
+
+    The ``export``/``output``/``month``/``dry_run`` parameters are accepted here
+    so the CLI can pass parsed arguments through, but the actual export
+    orchestration is performed by the CLI (see :mod:`github_usage.cli`). This
+    keeps the data-collection path single-purpose and avoids duplicating API
+    calls between the terminal ``show_*`` flow and :func:`build_report_data`.
+    """
     token = resolve_token()
     if not token:
         from .auth import print_missing_token_error
@@ -125,6 +140,8 @@ def main():
         print("=" * 70)
         print("  End of Report v3")
         print("=" * 70)
+
+        return username
 
     except RuntimeError as e:
         print(f"Error: {e}")

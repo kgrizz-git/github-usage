@@ -17,6 +17,7 @@ The project started as a personal reporting script and is being shaped into a re
 - Current-month net/gross cost estimate
 - Full billing history summary from the GitHub billing API
 - Scheduled plain-text email reports through Resend
+- Export reports to CSV, XLSX, PDF, JSON, or plain text files (with redaction)
 - Local smoke, security, and documentation checks for maintainers
 
 ## Requirements
@@ -105,12 +106,74 @@ github-usage email-report \
   [--warn-over 25] \
   [--warn-over 80%] \
   [--skip-actions] [--skip-copilot] [--skip-lfs] \
-  [--dry-run]
+  [--dry-run] \
+  [--export csv|xlsx|pdf|json|text|none] \
+  [--output PATH] \
+  [--email-format text|html]
 ```
 
 `--include-consumers`, `--include-artifact-storage`, and `--include-release-assets` add repo-level API calls. They consume GitHub REST API request quota, not Actions minutes, Actions storage, Copilot requests, Git LFS quota, or billable GitHub usage. Use monthly schedules and conservative `--max-repos` values for accounts with many repositories.
 
 Release assets are optional inventory, not a billing/quota report. The CLI asks for confirmation in interactive terminals, and CI must pass `--yes-include-release-assets`.
+
+## Exporting Reports
+
+Both the legacy and email-report commands can write the report to a file in
+CSV, XLSX, PDF, JSON, or plain text format. Exported files go through a
+redaction layer that masks usernames, repository names, email addresses, and
+dollar amounts before writing; interactive terminal output and the email body
+are not redacted.
+
+```sh
+# Legacy report
+github-usage --export csv --no-interactive --output report.csv
+github-usage --export xlsx --no-interactive --output report.xlsx
+github-usage --export pdf --no-interactive --output report.pdf
+github-usage --json --no-interactive          # JSON to stdout
+github-usage --json --no-interactive --output report.json
+
+# Email report
+github-usage email-report --dry-run --export text --output report.txt
+github-usage email-report --export csv --output report.csv
+```
+
+In an interactive terminal without `--export` and without `--no-interactive`,
+the legacy report prompts for a format (or `None` to skip).
+
+### Format-specific notes
+
+- **CSV** writes a UTF-8 BOM at the start of the file for Excel-on-Windows
+  compatibility.
+- **JSON** preserves the full `ReportData` dict, including the `api_estimate`
+  metadata. Datetime values are emitted as ISO-8601 strings.
+- **XLSX** uses one sheet per major report section. Sheet names are truncated
+  to 31 characters (Excel limit). Values starting with `=`, `+`, `-`, or `@`
+  are prefixed with a single quote to prevent Excel formula injection.
+- **PDF** generates a multi-page document with a cover page and one page per
+  section. Sections exceeding 30 rows are truncated with a note.
+- **Text** delegates to the existing email-report formatter.
+
+### Optional dependencies
+
+`csv`, `json`, and `text` use the standard library. `xlsx` and `pdf` require
+optional dependencies:
+
+```sh
+pip install 'github-usage[export-xlsx]'   # adds openpyxl
+pip install 'github-usage[export-pdf]'    # adds fpdf2
+```
+
+`--export xlsx` and `--export pdf` produce a clear error with the install
+hint when the dependency is missing. PEP 621 does not support a combined
+`export` extra.
+
+### Historical month queries
+
+A `--month YYYY-MM` flag for fetching historical billing data is planned but
+**deferred**. API discovery (see [`docs/api-discovery-month.md`](docs/api-discovery-month.md))
+confirmed that GitHub's billing endpoints ignore the `since`/`until`
+parameters and return the same shape with or without them, so historical
+queries are not feasible with the current GitHub API.
 
 ### GitHub Actions Setup
 
@@ -137,6 +200,12 @@ Do not use the automatic GitHub Actions `${{ github.token }}` for this report. B
 ## Privacy
 
 This tool prints account, repository, billing, and usage details to stdout. Treat generated output as sensitive unless you have reviewed and redacted it. Do not commit tokens, raw private API responses, generated billing reports, or local environment files.
+
+Exported files go through a redaction layer that masks usernames, repository
+names, email addresses, and dollar amounts before writing. The redaction is
+applied only to the file content; interactive terminal output and the email
+body are not redacted. See `src/github_usage/redact.py` for the exact
+patterns.
 
 ## Development
 
@@ -183,4 +252,4 @@ scripts/docs-check
 
 ## Roadmap
 
-See [TO_DO.md](TO_DO.md) for planned work, including export formats, JSON output, historical email reports, and modularizing the current legacy implementation.
+See [TO_DO.md](TO_DO.md) for planned work, including historical email reports and modularizing the current legacy implementation. Export formats (CSV, XLSX, PDF, JSON, text) are now implemented.

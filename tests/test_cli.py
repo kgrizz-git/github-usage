@@ -106,6 +106,18 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("all default report sections", stdout.getvalue())
 
+    def test_token_positional_with_version(self):
+        from github_usage import cli
+
+        with mock.patch("github_usage.cli.resolve_token") as resolve_token:
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = cli.main(["ghp_fake_token", "--version"])
+
+        self.assertEqual(code, 0)
+        self.assertIn("github-usage", stdout.getvalue())
+        resolve_token.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

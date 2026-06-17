@@ -33,6 +33,16 @@ dev = [
   "pre-commit>=3.7",
   "ruff>=0.6",
 ]
+# Export-format optional dependencies. PEP 621 does not support nested extras,
+# so users install one of these (not a combined `export` extra):
+#   pip install github-usage[export-xlsx]
+#   pip install github-usage[export-pdf]
+export-xlsx = ["openpyxl>=3.1"]
+export-pdf = ["fpdf2>=2.7"]
+# Test extras for the optional writers; run with:
+#   uv run --extra test-xlsx --extra test-pdf pytest
+test-xlsx = ["openpyxl>=3.1"]
+test-pdf = ["fpdf2>=2.7"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
