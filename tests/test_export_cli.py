@@ -2,7 +2,6 @@ import contextlib
 import io
 import json
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -162,8 +161,8 @@ class LegacyExportCliTests(unittest.TestCase):
         data = _report_data()
         seen_argv: list[list[str]] = []
 
-        def capture_token():
-            seen_argv.append(sys.argv[:])
+        def capture_token(*, argv=None):
+            seen_argv.append(list(argv) if argv is not None else None)
             return "ghp_fake"
 
         with (
@@ -180,7 +179,11 @@ class LegacyExportCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         legacy_main.assert_called_once()
         self.assertTrue(seen_argv)
-        self.assertEqual(seen_argv[0][1], "ghp_fake")
+        # resolve_token is now called with the explicit argv slice, not by
+        # mutating sys.argv. The first call's argv should be
+        # ["github-usage", "ghp_fake", "--no-interactive"] and resolve_token
+        # reads the first element ("ghp_fake") as the token.
+        self.assertEqual(seen_argv[0], ["github-usage", "ghp_fake", "--no-interactive"])
 
     def test_token_positional_only(self):
         from github_usage import cli

@@ -113,15 +113,6 @@ def _email_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_email_token() -> str | None:
-    old_argv = sys.argv[:]
-    sys.argv = ["github-usage"]
-    try:
-        return resolve_token()
-    finally:
-        sys.argv = old_argv
-
-
 def _missing_env(names: list[str]) -> list[str]:
     return [name for name in names if not os.environ.get(name, "").strip()]
 
@@ -219,7 +210,7 @@ def _run_email_report(argv: Sequence[str]) -> int:
         )
         return 1
 
-    token = _resolve_email_token()
+    token = resolve_token(argv=["github-usage"])
     if not token:
         from .auth import print_missing_token_error
 
@@ -245,9 +236,7 @@ def _run_email_report(argv: Sequence[str]) -> int:
             print("Error: GitHub /user response did not include a login.")
             return 1
         if not check_user_scope(api):
-            print("Error: Your GitHub token is missing the 'user' scope.")
-            print("  The billing endpoints require the 'user' scope.")
-            print("  Fix: run 'gh auth refresh -h github.com -s user'")
+            print("Error: Your GitHub token is not valid for this operation.")
             return 1
         data = report_data.build_report_data(
             api,
@@ -314,73 +303,72 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
 
     export_format = _resolve_export_format(args)
 
-    old_argv = sys.argv[:]
-    sys.argv = ["github-usage", *([token] if token else []), *flag_argv]
+    legacy_argv = ["github-usage", *([token] if token else []), *flag_argv]
+    if not resolve_token(argv=legacy_argv):
+        from .auth import print_missing_token_error
+
+        print_missing_token_error()
+        return 1
+
+    if not export_format and sys.stdin.isatty() and not args.no_interactive:
+        export_format = _prompt_export_format()
+
     try:
-        if not resolve_token():
-            from .auth import print_missing_token_error
+        legacy_main(
+            export=export_format,
+            output=args.output,
+            no_interactive=args.no_interactive,
+            month=None,
+            dry_run=args.dry_run,
+        )
+    except SystemExit as exc:
+        return _safe_exit_code(exc.code)
 
-            print_missing_token_error()
-            return 1
-
-        if not export_format and sys.stdin.isatty() and not args.no_interactive:
-            export_format = _prompt_export_format()
-
-        try:
-            legacy_main(
-                export=export_format,
-                output=args.output,
-                no_interactive=args.no_interactive,
+    if export_format and export_format != "none":
+        token = resolve_token(argv=legacy_argv)
+        api = GitHubAPI(token)
+        user = api.request("GET", "/user")
+        username = user.get("login") or "unknown"
+        data = report_data.build_report_data(
+            api,
+            username,
+            include_actions=True,
+            include_copilot=True,
+            include_lfs=True,
+            include_consumers=True,
+            include_artifact_storage=True,
+            include_release_assets=False,
+            max_repos=100,
+            warn_over=None,
+        )
+        if not args.json or args.output:
+            path = export_report.export(
+                data,
+                export_format,
+                output_path=args.output,
+                username=username,
                 month=None,
-                dry_run=args.dry_run,
+                redact_data=True,
             )
-        except SystemExit as exc:
-            return _safe_exit_code(exc.code)
-
-        if export_format and export_format != "none":
-            token = resolve_token()
-            api = GitHubAPI(token)
-            user = api.request("GET", "/user")
-            username = user.get("login") or "unknown"
-            data = report_data.build_report_data(
-                api,
-                username,
-                include_actions=True,
-                include_copilot=True,
-                include_lfs=True,
-                include_consumers=True,
-                include_artifact_storage=True,
-                include_release_assets=False,
-                max_repos=100,
-                warn_over=None,
-            )
-            if not args.json or args.output:
-                path = export_report.export(
-                    data,
-                    export_format,
-                    output_path=args.output,
-                    username=username,
-                    month=None,
-                    redact_data=True,
-                )
-                print(f"Exported to: {path}")
-            else:
-                export_report.export(data, export_format, redact_data=True, to_stdout=True)
-        return 0
-    finally:
-        sys.argv = old_argv
+            print(f"Exported to: {path}")
+        else:
+            export_report.export(data, export_format, redact_data=True, to_stdout=True)
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
-    args = list(sys.argv[1:] if argv is None else argv)
+    try:
+        args = list(sys.argv[1:] if argv is None else argv)
 
-    if args and args[0] == "email-report":
-        return _run_email_report(args[1:])
+        if args and args[0] == "email-report":
+            return _run_email_report(args[1:])
 
-    if args and args[0] == "setup":
-        from .setup_wizard import run_setup
+        if args and args[0] == "setup":
+            from .setup_wizard import run_setup
 
-        return run_setup(args[1:])
+            return run_setup(args[1:])
 
-    return _run_legacy_report(args)
+        return _run_legacy_report(args)
+    except SystemExit as exc:
+        return _safe_exit_code(exc.code)

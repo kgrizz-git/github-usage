@@ -53,27 +53,9 @@ def main(
     try:
         api = GitHubAPI(token)
 
-        # Check for 'user' scope required for billing endpoints
+        # Check that the token is accepted on a user-scoped endpoint
         if not check_user_scope(api):
-            print("Error: Your GitHub token is missing the 'user' scope.")
-            print()
-            print("  The billing endpoints require the 'user' scope.")
-            print("  Fix: run 'gh auth refresh -h github.com -s user'")
-            print()
-            print("  Current token scopes:", end=" ")
-            import http.client
-
-            conn = http.client.HTTPSConnection("api.github.com")
-            try:
-                conn.request(
-                    "GET", "/user", headers={**api.headers, "Authorization": f"token {token}"}
-                )
-                resp = conn.getresponse()
-                scopes = resp.getheader("X-OAuth-Scopes", "none")
-                print(scopes if scopes else "none")
-                resp.read()
-            finally:
-                conn.close()
+            print("Error: Your GitHub token is not valid for this operation.")
             sys.exit(1)
 
         # Account & rate limits

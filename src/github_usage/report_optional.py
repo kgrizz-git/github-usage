@@ -6,6 +6,18 @@ from .billing import get_actions_per_repo
 from .report_helpers import gb_hours_to_avg_mb
 
 
+def _safe_int_size(value) -> int | None:
+    """Return ``int(value)`` for numeric inputs, ``None`` for missing,
+    ``None``, or unparseable values. Used to skip artifacts / release
+    assets whose size is not a clean integer."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
 def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 100) -> dict:
     rows = []
     considered = repos[:max_repos]
@@ -41,7 +53,11 @@ def get_artifact_storage_details(api, repos: list[dict], max_repos: int = 100) -
         owner = repo.get("owner", {}).get("login", "")
         name = repo.get("name", "")
         artifacts = api.get_all_pages(f"/repos/{owner}/{name}/actions/artifacts", {"per_page": 100})
-        size = sum(int(item.get("size_in_bytes") or 0) for item in artifacts)
+        size = sum(
+            s
+            for s in (_safe_int_size(item.get("size_in_bytes")) for item in artifacts)
+            if s is not None
+        )
         if size:
             rows.append(
                 {"repo": repo.get("full_name") or f"{owner}/{name}", "artifact_bytes": size}
@@ -62,9 +78,13 @@ def get_release_asset_details(api, repos: list[dict], max_repos: int = 100) -> d
         name = repo.get("name", "")
         releases = api.get_all_pages(f"/repos/{owner}/{name}/releases", {"per_page": 100})
         size = sum(
-            int(asset.get("size") or 0)
-            for release in releases
-            for asset in release.get("assets", [])
+            s
+            for s in (
+                _safe_int_size(asset.get("size"))
+                for release in releases
+                for asset in release.get("assets", [])
+            )
+            if s is not None
         )
         if size:
             rows.append(

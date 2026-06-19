@@ -7,6 +7,8 @@ import json
 import time
 import urllib.parse
 
+from . import __version__
+
 
 class GitHubAPI:
     def __init__(self, token):
@@ -16,7 +18,7 @@ class GitHubAPI:
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "github-usage-report-v3",
+            "User-Agent": f"github-usage-report/{__version__} (+https://github.com/kgrizz-git/github-usage)",
         }
 
     def request(self, method, path, params=None, _retries=0):
@@ -54,12 +56,12 @@ class GitHubAPI:
                     return self.request(method, path, params, _retries=_retries + 1)
                 raise RuntimeError(f"API error 403: {data[:200]}")
             elif resp.status == 404:
-                # Check if this is a billing endpoint that needs 'user' scope
+                # Check if this is a billing endpoint that needs elevated access
                 if "billing" in path and "settings" in path:
                     raise RuntimeError(
                         f"API error 404 on billing endpoint '{path}'. "
-                        f"This usually means your token is missing the 'user' scope. "
-                        f"Fix: run 'gh auth refresh -h github.com -s user'"
+                        f"This usually means your token does not have access "
+                        f"to this billing endpoint."
                     )
                 raise RuntimeError(f"API error 404: {data[:200]}")
             else:

@@ -33,7 +33,7 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(result, {})
 
-    def test_billing_404_includes_user_scope_guidance(self):
+    def test_billing_404_message_no_longer_mentions_user_scope(self):
         from github_usage.api import GitHubAPI
 
         conn = mock.Mock()
@@ -43,9 +43,18 @@ class ApiTests(unittest.TestCase):
 
         with (
             mock.patch("github_usage.api.http.client.HTTPSConnection", return_value=conn),
-            self.assertRaisesRegex(RuntimeError, "missing the 'user' scope"),
+            self.assertRaisesRegex(RuntimeError, "does not have access"),
         ):
             GitHubAPI("fake-token").request("GET", "/users/octocat/settings/billing/usage/summary")
+
+    def test_user_agent_includes_version_and_repo_url(self):
+        from github_usage import __version__
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+
+        self.assertIn(f"github-usage-report/{__version__}", api.headers["User-Agent"])
+        self.assertIn("github.com", api.headers["User-Agent"])
 
     def test_request_retries_on_403_with_retry_after(self):
         from github_usage.api import GitHubAPI

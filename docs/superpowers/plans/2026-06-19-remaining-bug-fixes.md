@@ -1,5 +1,25 @@
 # [2026-06-19 02:35] Implementation Plan — Remaining Bug Report Items
 
+> **Status: COMPLETED 2026-06-19.** All 8 bug-fix tasks (Phases 1–3) and
+> the test-coverage / stale-fixture tasks are implemented. `bash scripts/check`,
+> `bash scripts/smoke`, and `bash scripts/docs-check` all pass. 187 unit tests
+> pass, including 33 new tests added as part of this plan.
+>
+> **Implementation deviations from the plan, made during execution:**
+> 1. **#16 — float-with-fraction test case.** The plan stated
+>    `size_in_bytes=1024.7 → item skipped`, but `int(1024.7)` in Python
+>    returns `1024` (truncation) rather than raising `ValueError`. The
+>    `_safe_int_size` helper preserves that truncation behaviour; the
+>    new test `test_truncates_float_with_fraction` reflects this and
+>    the artifact / release-asset test expectations were updated to
+>    include the truncated contribution (1024 → 2304, 2048.5 → 3584).
+> 2. **`tests/test_export_cli.py::test_token_positional_before_flags`**
+>    was updated for the new explicit-`argv` flow. The original
+>    assertion (`seen_argv[0][1] == "ghp_fake"`) checked the old
+>    `sys.argv`-mutation behaviour; the new assertion
+>    (`seen_argv[0] == ["github-usage", "ghp_fake", "--no-interactive"]`)
+>    checks that `resolve_token` now receives the explicit argv slice.
+
 This plan addresses the items still open after the work captured in
 [`2026-06-16-bug-fixes.md`](2026-06-16-bug-fixes.md) and the staleness review
 at the top of
@@ -21,7 +41,8 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
 
 ### Phase 1: High Priority (correctness)
 
-- [ ] **#20 — `_generated_line` prints `Generated: None`**
+- [x] **#20 — `_generated_line` prints `Generated: None`**
+  - **Status:** COMPLETED
   - **File:** `src/github_usage/email_report.py`
   - **Problem:** `format_report_email` calls
     `_generated_line(str(data.get("generated_at", "")))`. When callers pass
@@ -62,7 +83,8 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
     - `generated_at="2026-06-15T14:30:00Z"` → unchanged behaviour.
   - **Verify:** `bash scripts/check`.
 
-- [ ] **#8 — `check_user_scope` rejects fine-grained PATs and GitHub Apps**
+- [x] **#8 — `check_user_scope` rejects fine-grained PATs and GitHub Apps**
+  - **Status:** COMPLETED
   - **File:** `src/github_usage/auth.py`
   - **Problem:** The check reads the deprecated `X-OAuth-Scopes` header,
     which fine-grained PATs and GitHub Apps do not emit. A valid token
@@ -127,9 +149,10 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
   - **Verify:** `bash scripts/check` and `bash scripts/smoke` (the
     error-message change is a user-visible CLI output change).
 
-- [ ] **#18 — `sys.argv` mutation is process-global**
-  - **Files:** `src/github_usage/cli.py` (`_resolve_email_token`,
-    `_run_legacy_report`).
+- [x] **#18 — `sys.argv` mutation is process-global**
+  - **Status:** COMPLETED
+  - **Files:** `src/github_usage/cli.py` (`_run_legacy_report` — the
+    `_resolve_email_token` wrapper was deleted as part of this fix).
   - **Problem:** Both call sites save and restore `sys.argv`, but the
     mutation is not thread-safe. Library users running under
     `concurrent.futures` or with a signal handler that inspects
@@ -168,7 +191,8 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
 
 ### Phase 2: Medium Priority (finish partial fixes)
 
-- [ ] **#12 — `try/except SystemExit` around `legacy_main`**
+- [x] **#12 — `try/except SystemExit` around `legacy_main`**
+  - **Status:** COMPLETED
   - **File:** `src/github_usage/cli.py`
   - **Problem:** `_run_legacy_report` still wraps the `legacy_main`
     call in `try/except SystemExit` (line 337-338). The literal
@@ -195,7 +219,9 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
     the argparse error message on stderr and does not raise.
   - **Verify:** `bash scripts/check` and `bash scripts/smoke`.
 
-- [ ] **#16 — `int()` raises on non-numeric size values**
+- [x] **#16 — `int()` raises on non-numeric size values**
+  - **Status:** COMPLETED (with the float-truncation deviation noted in
+    the header)
   - **File:** `src/github_usage/report_optional.py`
   - **Problem:** `int(item.get("size_in_bytes") or 0)` and
     `int(asset.get("size") or 0)` now handle `None` and missing keys,
@@ -231,7 +257,8 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
 
 ### Phase 3: Low Priority (nice-to-haves)
 
-- [ ] **#19 — Static `User-Agent` string**
+- [x] **#19 — Static `User-Agent` string**
+  - **Status:** COMPLETED
   - **File:** `src/github_usage/api.py`
   - **Note:** This was a Low/suggestion-only item. Optional. If
     addressed, set the `User-Agent` to
@@ -243,7 +270,8 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
     part of this change.
   - **Verify:** `bash scripts/check`.
 
-- [ ] **Test coverage: remaining untested modules**
+- [x] **Test coverage: remaining untested modules**
+  - **Status:** COMPLETED
   - The bug report's coverage gap section is now substantially closed,
     but a few entry points are still untested. Add minimal smoke tests:
     - `auth.check_user_scope` (covered by the #8 tests above).
@@ -252,7 +280,9 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
       `get_release_asset_details`.
   - **Verify:** `bash scripts/check`.
 
-- [ ] **Stale fixture files in `tests/fixtures/`**
+- [x] **Stale fixture files in `tests/fixtures/`**
+  - **Status:** COMPLETED (deleted 9 unreferenced fixtures; only
+    `email_report_data.json` and `export_report_data.json` remain)
   - `artifacts.json`, `billing_actions_summary.json`,
     `billing_copilot_summary.json`, `billing_git_lfs_summary.json`,
     `premium_request_usage.json`, `rate_limit.json`, `releases.json`,

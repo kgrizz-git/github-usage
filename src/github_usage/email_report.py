@@ -15,13 +15,15 @@ def default_subject(username: str, generated_at: str | None = None) -> str:
     return f"GitHub Usage Report for {username} - {day}"
 
 
-def _generated_line(generated_at: str) -> str:
+def _generated_line(generated_at: str | None) -> str:
+    if not generated_at:
+        return f"Generated: {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M UTC')}"
     if generated_at.endswith("Z"):
         generated_at = generated_at[:-1] + "+00:00"
     try:
         generated = datetime.fromisoformat(generated_at).astimezone(UTC)
     except ValueError:
-        return f"Generated: {generated_at}"
+        return f"Generated: {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M UTC')}"
     return f"Generated: {generated.strftime('%Y-%m-%d %H:%M UTC')}"
 
 
@@ -41,7 +43,7 @@ def format_report_email(data: dict) -> str:
     """Format report data as a plain-text email body."""
     lines = [
         f"GitHub Usage Report for {data.get('username', '?')}",
-        _generated_line(str(data.get("generated_at", ""))),
+        _generated_line(data.get("generated_at")),
         "Period: current month",
         "",
     ]

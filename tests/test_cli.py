@@ -116,6 +116,73 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("all default report sections", stdout.getvalue())
 
+    def test_email_report_invalid_token_message_omits_user_scope_remediation(self):
+        from github_usage import cli
+
+        with (
+            mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
+            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli.check_user_scope", return_value=False),
+        ):
+            api = api_cls.return_value
+            api.request.return_value = {"login": "octocat"}
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = cli.main(["email-report", "--dry-run", "--skip-actions"])
+
+        self.assertEqual(code, 1)
+        output = stdout.getvalue()
+        self.assertIn("not valid for this operation", output)
+        self.assertNotIn("'user' scope", output)
+        self.assertNotIn("gh auth refresh", output)
+
+    def test_email_report_does_not_mutate_sys_argv(self):
+        from github_usage import cli
+
+        sentinel_argv = ["sentinel-program", "sentinel-arg"]
+        with (
+            mock.patch.object(cli.sys, "argv", list(sentinel_argv)),
+            mock.patch("github_usage.cli.resolve_token", return_value=None),
+        ):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                cli.main(["email-report", "--help"])
+            self.assertEqual(cli.sys.argv, sentinel_argv)
+
+    def test_email_report_bad_flag_returns_nonzero_without_raising(self):
+        from github_usage import cli
+
+        with (
+            mock.patch.dict(os.environ, {}, clear=True),
+            mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
+        ):
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with (
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                code = cli.main(["email-report", "--max-repos", "foo"])
+
+        self.assertNotEqual(code, 0)
+        self.assertIn("--max-repos", stderr.getvalue())
+
+    def test_main_catches_systemexit_from_subcommand(self):
+        from github_usage import cli
+
+        with mock.patch("github_usage.cli._run_email_report", side_effect=SystemExit(7)):
+            code = cli.main(["email-report"])
+
+        self.assertEqual(code, 7)
+
+    def test_main_catches_systemexit_from_setup(self):
+        from github_usage import cli
+
+        with mock.patch("github_usage.setup_wizard.run_setup", side_effect=SystemExit(2)):
+            code = cli.main(["setup"])
+
+        self.assertEqual(code, 2)
+
     def test_token_positional_with_version(self):
         from github_usage import cli
 

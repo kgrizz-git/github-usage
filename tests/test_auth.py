@@ -51,6 +51,87 @@ class AuthTests(unittest.TestCase):
         ):
             self.assertEqual(legacy.resolve_token(), "env-token")
 
+    def test_resolve_token_with_explicit_argv_skips_sys_argv(self):
+        from github_usage import auth
+
+        with (
+            mock.patch.object(auth.sys, "argv", ["github-usage", "should-not-be-used"]),
+            mock.patch.dict(os.environ, {"GITHUB_TOKEN": "env-token"}, clear=True),
+        ):
+            self.assertEqual(auth.resolve_token(argv=["explicit-token"]), "explicit-token")
+
+    def test_resolve_token_with_argv_none_falls_back_to_sys_argv(self):
+        from github_usage import auth
+
+        with (
+            mock.patch.object(auth.sys, "argv", ["github-usage", "arg-token"]),
+            mock.patch.dict(os.environ, {}, clear=True),
+        ):
+            self.assertEqual(auth.resolve_token(argv=None), "arg-token")
+
+    def test_resolve_token_with_empty_argv_falls_through_to_env(self):
+        from github_usage import auth
+
+        with (
+            mock.patch.object(auth.sys, "argv", ["github-usage"]),
+            mock.patch.dict(os.environ, {"GITHUB_TOKEN": "env-token"}, clear=True),
+        ):
+            self.assertEqual(auth.resolve_token(argv=[]), "env-token")
+
+    def test_check_user_scope_returns_true_on_200_without_scopes_header(self):
+        import http.client
+
+        from github_usage import auth
+
+        conn = mock.Mock()
+        resp = mock.Mock(status=200)
+        resp.getheader.return_value = ""
+        resp.read.return_value = b'{"login":"octocat"}'
+        conn.getresponse.return_value = resp
+
+        api = mock.Mock()
+        api.headers = {"Authorization": "Bearer fake-token"}
+
+        with mock.patch.object(http.client, "HTTPSConnection", return_value=conn):
+            self.assertTrue(auth.check_user_scope(api))
+        conn.close.assert_called_once()
+
+    def test_check_user_scope_returns_true_for_classic_pat_with_user_scope(self):
+        import http.client
+
+        from github_usage import auth
+
+        conn = mock.Mock()
+        resp = mock.Mock(status=200)
+        resp.getheader.return_value = "user, repo"
+        resp.read.return_value = b'{"login":"octocat"}'
+        conn.getresponse.return_value = resp
+
+        api = mock.Mock()
+        api.headers = {"Authorization": "Bearer fake-token"}
+
+        with mock.patch.object(http.client, "HTTPSConnection", return_value=conn):
+            self.assertTrue(auth.check_user_scope(api))
+        conn.close.assert_called_once()
+
+    def test_check_user_scope_returns_false_on_401(self):
+        import http.client
+
+        from github_usage import auth
+
+        conn = mock.Mock()
+        resp = mock.Mock(status=401)
+        resp.getheader.return_value = ""
+        resp.read.return_value = b'{"message":"Bad credentials"}'
+        conn.getresponse.return_value = resp
+
+        api = mock.Mock()
+        api.headers = {"Authorization": "Bearer fake-token"}
+
+        with mock.patch.object(http.client, "HTTPSConnection", return_value=conn):
+            self.assertFalse(auth.check_user_scope(api))
+        conn.close.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

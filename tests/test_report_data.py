@@ -103,3 +103,62 @@ class ReportDataTests(unittest.TestCase):
         # Should return a warning message instead of raising ValueError
         warnings = get_warning_state(report_data, "80%")
         self.assertIn("Percentage warning threshold skipped", warnings[0])
+
+    def test_get_key_insights_reports_top_repo_share_when_consumers_present(self):
+        from github_usage.report_data import get_key_insights
+
+        report = {
+            "actions": {"minutes": 100.0, "storage_percent": 100.0},
+            "repo_consumers": {
+                "by_minutes": [
+                    {"repo": "octocat/heavy", "minutes": 60.0},
+                    {"repo": "octocat/light", "minutes": 10.0},
+                ]
+            },
+        }
+
+        insights = get_key_insights(report)
+
+        self.assertEqual(len(insights), 1)
+        self.assertIn("octocat/heavy", insights[0])
+        self.assertIn("60%", insights[0])
+
+    def test_get_key_insights_omits_share_when_actions_is_none(self):
+        from github_usage.report_data import get_key_insights
+
+        report = {
+            "actions": None,
+            "repo_consumers": {"by_minutes": [{"repo": "octocat/heavy", "minutes": 60.0}]},
+        }
+
+        insights = get_key_insights(report)
+
+        self.assertEqual(insights, [])
+
+    def test_get_key_insights_reports_storage_below_free_tier(self):
+        from github_usage.report_data import get_key_insights
+
+        report = {
+            "actions": {"minutes": 100.0, "storage_percent": 50.0},
+            "repo_consumers": {"by_minutes": []},
+        }
+
+        insights = get_key_insights(report)
+
+        self.assertEqual(insights, ["Actions storage is below the free-tier limit."])
+
+    def test_get_key_insights_caps_at_three(self):
+        from github_usage.report_data import get_key_insights
+
+        # Build a long by_minutes list so the share insight is the only
+        # candidate; verify length is bounded.
+        report = {
+            "actions": {"minutes": 100.0, "storage_percent": 50.0},
+            "repo_consumers": {
+                "by_minutes": [{"repo": f"r{i}", "minutes": 1.0} for i in range(10)]
+            },
+        }
+
+        insights = get_key_insights(report)
+
+        self.assertLessEqual(len(insights), 3)

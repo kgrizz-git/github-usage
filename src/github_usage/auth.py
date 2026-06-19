@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess  # nosec B404
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 # Token discovery intentionally shells out to the GitHub CLI.
@@ -17,9 +18,11 @@ def print_missing_token_error(usage_command="github-usage"):
     print("  Or run: gh auth login")
 
 
-def resolve_token():
-    if len(sys.argv) > 1:
-        return sys.argv[1]
+def resolve_token(argv: Sequence[str] | None = None):
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv:
+        return argv[0]
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if token:
         return token
@@ -45,8 +48,8 @@ def resolve_token():
 
 
 def check_user_scope(api):
-    """Check if the token has the 'user' scope required for billing endpoints.
-    Returns True if scope is present, False otherwise."""
+    """Return True if the token is accepted on a user-scoped endpoint
+    (200 from GET /user), False otherwise."""
     import http.client
 
     conn = http.client.HTTPSConnection("api.github.com")
@@ -55,9 +58,7 @@ def check_user_scope(api):
         resp = conn.getresponse()
         if resp.status != 200:
             return False
-        scopes_header = resp.getheader("X-OAuth-Scopes", "")
         resp.read()  # consume response
-        scopes = [s.strip() for s in scopes_header.split(",") if s.strip()]
-        return "user" in scopes
+        return True
     finally:
         conn.close()
