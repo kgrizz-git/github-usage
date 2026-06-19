@@ -33,6 +33,16 @@ class CliTests(unittest.TestCase):
         self.assertIn("Or set GITHUB_TOKEN env var.", output)
         self.assertIn("Or run: gh auth login", output)
 
+    def test_setup_help_exits_zero(self):
+        from github_usage import cli
+
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = cli.main(["setup", "--help"])
+
+        self.assertEqual(code, 0)
+        self.assertIn("github-usage setup", stdout.getvalue())
+
     def test_email_report_help_exits_zero_without_resolving_token(self):
         from github_usage import cli
 

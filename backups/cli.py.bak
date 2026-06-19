@@ -18,13 +18,6 @@ HELP = """GitHub Monthly Usage Report
 Usage:
   github-usage [GITHUB_TOKEN] [options]
   github-usage email-report [options]
-  github-usage setup [options]
-
-Setup:
-  scripts/setup               Guided setup for secrets, options, launchd, CI, hooks
-  github-usage setup --status Show configured paths without printing secrets
-  github-usage setup --verify Run email-report --dry-run using local config
-  github-usage setup --print-args Print email-report CLI args from config.toml
 
 Legacy report options:
   --export FORMAT         Export format: csv | xlsx | pdf | json | text | none
@@ -377,10 +370,5 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args and args[0] == "email-report":
         return _run_email_report(args[1:])
-
-    if args and args[0] == "setup":
-        from .setup_wizard import run_setup
-
-        return run_setup(args[1:])
 
     return _run_legacy_report(args)

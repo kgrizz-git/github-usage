@@ -1,0 +1,20 @@
+title = "github-usage gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow example configs, fixtures, and test tokens"
+paths = [
+  '''\.env\.email-report\.example$''',
+  '''\.github-usage/config\.example\.toml$''',
+  '''^tests/fixtures/''',
+  '''^backups/''',
+  '''^bug-report-''',
+]
+regexes = [
+  '''ghp_fake''',
+  '''re_fake''',
+  '''resend-key''',
+  '''fake-token''',
+]

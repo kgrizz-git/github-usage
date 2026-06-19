@@ -51,6 +51,33 @@ PYTHONPATH=src python3 -m github_usage
 
 The root-level `github-usage` file is a compatibility wrapper for the packaged CLI.
 
+## Setup
+
+Use one entry point to configure local secrets, report options, macOS launchd schedules, GitHub Actions secrets, and developer hooks:
+
+```sh
+python3 -m pip install -e '.[dev]'
+scripts/setup
+```
+
+The guided wizard can:
+
+- Write `.env.email-report` (mode `600`) for `GITHUB_TOKEN`, Resend, and recipient settings
+- Write `.github-usage/config.toml` for report flags and schedule defaults
+- Verify with `email-report --dry-run`
+- Install a Monday 9:00 LaunchAgent on macOS (local timezone)
+- Set GitHub Actions secrets with `gh secret set`
+- Install pre-commit and pre-push hooks (including Gitleaks)
+
+Non-interactive helpers:
+
+```sh
+scripts/setup --status    # show configured paths (secrets masked)
+scripts/setup --verify    # dry-run using local config
+```
+
+Example templates (safe to commit): [`.env.email-report.example`](.env.email-report.example) and [`.github-usage/config.example.toml`](.github-usage/config.example.toml). Generated local files under `.github-usage/` and `.env.email-report` are gitignored.
+
 ## Authentication
 
 The CLI resolves a token in this order:
@@ -76,6 +103,8 @@ GITHUB_TOKEN="<token>" github-usage
 Passing a token as a command-line argument is supported, but it can expose the token through shell history or process listings. Prefer `gh auth login` or `GITHUB_TOKEN`.
 
 ## Scheduled Email Reports
+
+Run `scripts/setup` for guided configuration, or configure manually.
 
 `github-usage email-report` collects the current-month billing data, renders a plain-text email body, and sends it with Resend. Use `--dry-run` first to preview the message without requiring email settings:
 
@@ -177,7 +206,7 @@ queries are not feasible with the current GitHub API.
 
 ### GitHub Actions Setup
 
-This repo includes `.github/workflows/email-report.yml` as a workflow template. Copy it into the repository where you want the scheduled report to run, then create these repository secrets:
+This repo includes [`.github/workflows/email-report.yml`](.github/workflows/email-report.yml) as a workflow template. Run `scripts/setup` and choose **GitHub Actions secrets** to set these with `gh secret set`:
 
 - `GH_USAGE_TOKEN`: a personal access token with the `user` scope
 - `RESEND_API_KEY`: your Resend API key
@@ -185,6 +214,16 @@ This repo includes `.github/workflows/email-report.yml` as a workflow template. 
 - `RESEND_FROM`: a sender address on your verified Resend domain
 
 Do not use the automatic GitHub Actions `${{ github.token }}` for this report. Billing endpoints require a user-scoped token, and Actions reserves the `GITHUB_` secret prefix, so the workflow stores the personal token as `GH_USAGE_TOKEN` and exposes it to the CLI as `GITHUB_TOKEN`.
+
+After secrets are set, test with `gh workflow run email-report.yml`.
+
+### macOS launchd Setup
+
+Run `scripts/setup` and choose **macOS launchd schedule** (or the recommended full setup). The wizard writes `.github-usage/config.toml`, generates a LaunchAgent plist, and can install it for Monday 9:00 in your local timezone.
+
+Scheduled runs invoke [`scripts/send-email-report.sh`](scripts/send-email-report.sh), which loads `.env.email-report`, applies config options, and logs to `reports/`. Override the env file with `GITHUB_USAGE_ENV_FILE` or the log directory with `GITHUB_USAGE_LOG_DIR` if needed.
+
+The committed template at [`launchd/com.github.github-usage.email-report.plist`](launchd/com.github.github-usage.email-report.plist) is reference-only; prefer the wizard-generated plist under `.github-usage/launchd/`.
 
 ### Email Troubleshooting
 
@@ -226,7 +265,10 @@ Install optional development tools:
 ```sh
 python3 -m pip install -e '.[dev]'
 pre-commit install
+pre-commit install --hook-type pre-push
 ```
+
+Or run `scripts/setup` and choose **Developer security hooks** to install commit and push hooks (including Gitleaks).
 
 Run local security checks:
 

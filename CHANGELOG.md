@@ -11,6 +11,9 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 - `github-usage email-report` subcommand for plain-text scheduled billing reports.
 - Resend email delivery support using stdlib HTTP calls.
 - GitHub Actions workflow template for scheduled email reports using `GH_USAGE_TOKEN`.
+- **`scripts/setup` guided wizard** for local secrets, report options, macOS launchd, GitHub Actions secrets, and pre-commit/pre-push hooks.
+- `scripts/send-email-report.sh` scheduled runner and launchd template for local macOS schedules (Mondays at 9:00).
+- **`.gitleaks.toml`** allowlist for example configs, fixtures, and test tokens.
 - Fixture-backed tests for email formatting, report data shaping, and workflow template safety.
 - New unit tests for `storage.py`, `report_summary.py`, `report_actions.py`, `report_account.py`, and `report_products.py` (39 tests total).
 - **Report export:** `--export csv|xlsx|pdf|json|text|none` flag on both the legacy and email-report commands, with atomic write and an auto-generated default filename.

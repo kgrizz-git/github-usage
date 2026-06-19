@@ -32,7 +32,5 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run Python security checks
-        run: |
-          pip-audit
-          bandit -r src
+      - name: Run repository security script
+        run: GITHUB_USAGE_SKIP_GITLEAKS=1 scripts/security

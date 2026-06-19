@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# send-email-report.sh
+#
+# Runs `github-usage email-report` for local or launchd scheduled delivery.
+#
+# Inputs:
+#   - Optional env file (default: .env.email-report in the repo root)
+#   - GITHUB_TOKEN or gh auth token (resolved by the CLI)
+#   - RESEND_API_KEY, REPORT_EMAIL, RESEND_FROM for live sends
+#   - Extra CLI flags passed as script arguments
+#
+# Outputs:
+#   - Sends the report email via Resend (unless --dry-run is passed)
+#   - Appends run output to reports/email-report-YYYYMMDD-HHMMSS.log
+#
+# Requirements:
+#   - Repo venv (created automatically by scripts/python on first run)
+#   - pip install -e . from the repo root
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+ENV_FILE="${GITHUB_USAGE_ENV_FILE:-$ROOT_DIR/.env.email-report}"
+LOG_DIR="${GITHUB_USAGE_LOG_DIR:-$ROOT_DIR/reports}"
+mkdir -p "$LOG_DIR"
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+STAMP="$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="$LOG_DIR/email-report-${STAMP}.log"
+
+{
+  echo "==> send-email-report started at $(date -Iseconds)"
+  PYTHONPATH=src scripts/python -m github_usage email-report "$@"
+  echo "==> send-email-report finished at $(date -Iseconds)"
+} >>"$LOG_FILE" 2>&1

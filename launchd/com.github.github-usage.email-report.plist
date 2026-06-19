@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Reference LaunchAgent template. Prefer scripts/setup, which generates
+  .github-usage/launchd/com.github.github-usage.email-report.plist
+  with your repo path and schedule from config.toml.
+
+  Install via: scripts/setup  (choose macOS launchd schedule)
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.github.github-usage.email-report</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/ABS/PATH/TO/github-usage/scripts/send-email-report.sh</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/ABS/PATH/TO/github-usage</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Weekday</key>
+		<integer>1</integer>
+		<key>Hour</key>
+		<integer>9</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/ABS/PATH/TO/github-usage/reports/launchd.stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>/ABS/PATH/TO/github-usage/reports/launchd.stderr.log</string>
+</dict>
+</plist>

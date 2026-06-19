@@ -21,5 +21,7 @@ done
 
 PYTHONPATH=src python3 -m github_usage --help | grep -q "GITHUB_TOKEN"
 grep -q "github-usage" README.md
+grep -q "scripts/setup" README.md
+test -x scripts/setup
 
 echo "docs check passed"

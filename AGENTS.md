@@ -7,6 +7,7 @@
 - Use `scripts/check` as the default verification command before claiming a code change is complete.
 - Use `scripts/smoke` after CLI entrypoint changes.
 - Use `scripts/docs-check` after README, docs, or CLI help changes.
+- Use `scripts/setup` as the single entry point for guided local/CI email-report configuration.
 - Do not print, commit, or store real GitHub tokens, raw private API responses, or generated billing reports.
 - Tests should use fake tokens, mocks, and fixtures rather than live GitHub API calls.
 - Optional live checks must be gated behind an explicit environment variable.

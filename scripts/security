@@ -7,14 +7,20 @@ cd "$ROOT_DIR"
 missing=0
 
 if command -v gitleaks >/dev/null 2>&1; then
-  if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git rev-parse --verify HEAD >/dev/null 2>&1; then
-    gitleaks detect --source . --redact
-  else
-    gitleaks detect --source . --redact --no-git
+  if [ "${GITHUB_USAGE_SKIP_GITLEAKS:-}" != "1" ]; then
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git rev-parse --verify HEAD >/dev/null 2>&1; then
+      gitleaks detect --source . --redact
+    else
+      gitleaks detect --source . --redact --no-git
+    fi
   fi
 else
-  echo "Missing gitleaks. Install it to run secret scanning locally."
-  missing=1
+  if [ "${GITHUB_USAGE_SKIP_GITLEAKS:-}" = "1" ]; then
+    echo "Skipping gitleaks (GITHUB_USAGE_SKIP_GITLEAKS=1)."
+  else
+    echo "Missing gitleaks. Install it to run secret scanning locally."
+    missing=1
+  fi
 fi
 
 has_runtime_deps="$(python3 - <<'PY'

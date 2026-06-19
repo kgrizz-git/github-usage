@@ -1,0 +1,22 @@
+# Example email-report options for github-usage.
+# Copy to .github-usage/config.toml or run: scripts/setup
+#
+# This file contains no secrets. Generated local config lives in .github-usage/ (gitignored).
+
+[email_report]
+include_consumers = false
+include_artifact_storage = false
+include_release_assets = false
+max_repos = 100
+warn_over = [
+  "25",
+  "80%",
+]
+skip_actions = false
+skip_copilot = false
+skip_lfs = false
+
+[schedule]
+weekday = 1
+hour = 9
+minute = 0
