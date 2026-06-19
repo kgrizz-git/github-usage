@@ -28,13 +28,32 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
     `generated_at=None`, `str(None)` becomes the literal string `"None"`,
     `datetime.fromisoformat("None")` raises `ValueError`, and the `except`
     branch returns `f"Generated: None"`. When `generated_at` is `""`, the
-    same path returns `f"Generated: "` with a stray trailing space.
+    same path returns `f"Generated: "` with a stray trailing space. A
+    straight type-hint change from `str` to `str | None` is **not** a
+    sufficient fix on its own: line 19 calls
+    `generated_at.endswith("Z")` before the `try/except`, and that
+    raises `AttributeError` (not `ValueError`) when `generated_at` is
+    `None`, which the `except ValueError` clause does not catch.
   - **Change:** Make `_generated_line` treat a falsy or unparseable
     `generated_at` as "use today's UTC date" rather than reflecting the
-    raw input. Update the function's type hint from `generated_at: str`
-    to `generated_at: str | None` to match the new contract. Drop the
-    `str(...)` wrap at the call site and pass the value through
-    unchanged.
+    raw input. Concretely: update the type hint from
+    `generated_at: str` to `generated_at: str | None`, add a short-circuit
+    `if not generated_at: return f"Generated: {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M UTC')}"`
+    at the top of the function (this both handles `None` and the `""`
+    case before the `endswith` call), and change the `except ValueError`
+    branch to also fall back to today's date instead of reflecting the
+    raw input. Drop the `str(...)` wrap at the call site (line 44) and
+    pass the value through unchanged.
+  - **Caller contract:** `default_subject` (line 12) already accepts
+    `generated_at: str | None`. The two production callers of
+    `format_report_email` (`cli.py:264` via `report_data.build_report_data`
+    and `export_text.py:23`) pass the `data` dict that flows through
+    `report_data.py:231`, which always sets `generated_at` to a
+    non-None string at build time. However, tests and any caller that
+    constructs a `data` dict by hand (e.g. `tests/test_email_report.py`)
+    can legitimately pass `generated_at=None`, so the `str | None`
+    contract on `_generated_line` matches the established
+    `default_subject` contract.
   - **Validation:** Add tests in `tests/test_email_report.py` covering:
     - `generated_at=None` → output contains a current-date prefix and does
       not contain the literal string `None`.
@@ -92,6 +111,12 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
       to this billing endpoint." Leave the setup_wizard.py prompts
       that mention "user scope" in user-facing labels alone — those
       are input prompts, not error messages, and are out of scope.
+  - **Docstring update:** Update the `check_user_scope` docstring
+    (`auth.py:48`), which currently reads
+    "Check if the token has the 'user' scope required for billing
+    endpoints.", to reflect the new scope-agnostic behaviour. Suggested
+    replacement: "Return True if the token is accepted on a
+    user-scoped endpoint (200 from GET /user), False otherwise."
   - **Validation:** Add tests in `tests/test_auth.py` covering:
     - Token works (200 from `/user`, no `X-OAuth-Scopes` header) →
       returns `True` (covers fine-grained PATs and GitHub Apps).
@@ -132,11 +157,13 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
     - `resolve_token(argv=["fake-token"])` returns `"fake-token"`
       without reading `sys.argv`.
     - `resolve_token(argv=None)` reads from `sys.argv` (legacy path).
-    - Calling `_resolve_email_token()` does not mutate `sys.argv`
-      (assert `sys.argv` is unchanged before/after).
     - `_run_legacy_report` flow does not mutate `sys.argv` across the
       whole call (use a sentinel argv and assert it is unchanged
       after `cli.main(["ghp_fake_token", "--json"])` returns).
+    - (The earlier draft of this plan listed a test for
+      `_resolve_email_token()` here; remove that test — the
+      `_resolve_email_token` wrapper itself is being deleted as part
+      of this fix, so testing it is obsolete.)
   - **Verify:** `bash scripts/check` and `bash scripts/smoke`.
 
 ### Phase 2: Medium Priority (finish partial fixes)
@@ -153,9 +180,13 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
     so `SystemExit` will propagate naturally. Wrap the **entire body
     of `main()`** (cli.py:374 — currently no top-level try/except) in a
     single `try/except SystemExit` that converts the exit to a return
-    code via `_safe_exit_code`. Keep the `_safe_exit_code` translation
-    in the two `parse_args` call sites (cli.py:195 in `_run_email_report`
-    and cli.py:301 in `_run_legacy_report`) so argparse errors (e.g.
+    code via `_safe_exit_code`. This intentionally also catches
+    `SystemExit` from the `setup` branch (where `run_setup()` may also
+    call `sys.exit`) — that is the desired behaviour, since the caller
+    of `main()` always wants a return code, never an uncaught
+    `SystemExit`. Keep the `_safe_exit_code` translation in the two
+    `parse_args` call sites (cli.py:195 in `_run_email_report` and
+    cli.py:301 in `_run_legacy_report`) so argparse errors (e.g.
     bad `--max-repos foo`) still return a non-zero code instead of
     propagating `SystemExit`.
   - **Validation:** Add a test in `tests/test_cli.py` asserting that
@@ -189,6 +220,13 @@ per `AGENTS.md`; all new tests use fake tokens, mocks, and fixtures.
     - `size_in_bytes="abc"` → item skipped, repo still aggregated.
     - `size_in_bytes=1024.7` → item skipped.
     - `size_in_bytes=None` → still skipped (regression).
+    - **Direct unit tests for `_safe_int_size`** (e.g.
+      `_safe_int_size("1024") == 1024`,
+      `_safe_int_size("1024.5") is None`,
+      `_safe_int_size(None) is None`,
+      `_safe_int_size({"unexpected": "type"}) is None`) so the
+      helper's contract is pinned independently of the aggregation
+      call sites.
   - **Verify:** `bash scripts/check`.
 
 ### Phase 3: Low Priority (nice-to-haves)
