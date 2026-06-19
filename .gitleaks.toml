@@ -10,7 +10,7 @@ paths = [
   '''\.github-usage/config\.example\.toml$''',
   '''^tests/fixtures/''',
   '''^backups/''',
-  '''^bug-report-''',
+  '''^docs/assessments/bug-report-''',
 ]
 regexes = [
   '''ghp_fake''',
