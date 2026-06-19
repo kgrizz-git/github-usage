@@ -31,6 +31,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **Security workflow Gitleaks scan:** Fetch full git history in CI so push-range secret scans can resolve the parent commit.
 - **CLI token positional argument:** Restored `github-usage <token>` support after the argparse refactor peeled flags but rejected the token.
 - **Email-report structured export:** `email-report --export csv|xlsx|pdf|json` now passes structured report data instead of the formatted email body.
 - **Email-report auto filename:** `email-report --export` without `--output` now auto-generates an output path, matching the legacy export behavior.
