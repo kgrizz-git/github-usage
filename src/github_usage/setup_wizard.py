@@ -89,9 +89,56 @@ def _prompt_yes_no(message: str, default: bool = False) -> bool:
     return answer in {"y", "yes"}
 
 
+def _prompt_secret(prompt: str) -> str:
+    """Prompt for a secret value, echoing * for each character typed.
+
+    Falls back to getpass.getpass on Windows or when stdin is not a TTY.
+    The fallback suppresses all echo (no per-character feedback).
+    """
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    if sys.platform == "win32" or not sys.stdin.isatty():
+        return getpass.getpass("")
+    try:
+        import termios
+        import tty
+    except ImportError:
+        return getpass.getpass("")
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        chars: list[str] = []
+        while True:
+            ch = sys.stdin.read(1)
+            if ch in ("\r", "\n"):
+                break
+            if ch == "\x03":
+                raise KeyboardInterrupt
+            if ch in ("\x7f", "\x08"):
+                if chars:
+                    chars.pop()
+                    sys.stdout.write("\b \b")
+                    sys.stdout.flush()
+                continue
+            if ch and ord(ch) < 0x20:
+                continue
+            chars.append(ch)
+            sys.stdout.write("*")
+            sys.stdout.flush()
+        sys.stdout.write(f" ({len(chars)} chars)\n")
+        sys.stdout.flush()
+        return "".join(chars)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
 def _prompt_value(label: str, default: str = "", secret: bool = False) -> str:
-    prompt = f"{label} [{default}]: " if default and not secret else f"{label}: "
-    value = getpass.getpass(prompt) if secret else input(prompt).strip()
+    if secret:
+        value = _prompt_secret(f"{label} (hidden): ")
+    else:
+        prompt = f"{label} [{default}]: " if default else f"{label}: "
+        value = input(prompt).strip()
     if not value and default:
         return default
     return value
@@ -184,7 +231,7 @@ def _resolve_github_token(existing: dict[str, str]) -> str:
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     return result.stdout.strip()
-    token = _prompt_value("GitHub token (repo or fine-grained Plan:Read)", secret=True)
+    token = _prompt_value("GitHub token", secret=True)
     return token.strip()
 
 
