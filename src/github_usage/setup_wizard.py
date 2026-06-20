@@ -112,16 +112,20 @@ def _configure_email_options(paths: SetupPaths) -> None:
     email = config["email_report"]
     print("\nEmail report options (stored in .github-usage/config.toml):")
     email["include_consumers"] = _prompt_yes_no(
-        "Include top repository breakdowns?", email["include_consumers"]
+        "Include top repository breakdowns (consumers of Actions minutes)?",
+        email["include_consumers"],
     )
     email["include_artifact_storage"] = _prompt_yes_no(
         "Include Actions artifact storage details?", email["include_artifact_storage"]
     )
     email["include_release_assets"] = _prompt_yes_no(
-        "Include release asset inventory (extra API calls)?",
+        "Include release asset inventory (one extra API call per release)?",
         email["include_release_assets"],
     )
-    email["max_repos"] = _prompt_int("Max repositories to scan", int(email["max_repos"]))
+    email["max_repos"] = _prompt_int(
+        "Max repositories to scan (caps API work; higher = slower, more complete)",
+        int(email["max_repos"]),
+    )
     email["skip_actions"] = _prompt_yes_no("Skip Actions section?", email["skip_actions"])
     email["skip_copilot"] = _prompt_yes_no("Skip Copilot section?", email["skip_copilot"])
     email["skip_lfs"] = _prompt_yes_no("Skip Git LFS section?", email["skip_lfs"])
@@ -212,9 +216,13 @@ def _configure_launchd(paths: SetupPaths) -> int:
         print("LaunchAgent setup is only available on macOS.")
         return 0
     print(f"\nLaunchAgent status: {launch_agent_status()}")
-    action = (
-        input("Choose action: [i]nstall / [u]ninstall / [g]enerate only / [s]kip: ").strip().lower()
-    )
+    print("The plist file controls when scripts/send-email-report.sh runs on this Mac.")
+    print("Choose an action:")
+    print("  i — install    (write the plist and load it into ~/Library/LaunchAgents)")
+    print("  u — uninstall  (unload and remove the loaded agent)")
+    print("  g — generate   (write the plist file but don't load it; review first)")
+    print("  s — skip       (leave launchd alone)")
+    action = input("Action [s]: ").strip().lower()
     if action in {"", "s", "skip"}:
         return 0
     if action in {"g", "generate"}:
@@ -301,6 +309,23 @@ def _full_setup(paths: SetupPaths) -> int:
     return 0
 
 
+def _wrap_description(text: str, width: int = 66) -> list[str]:
+    """Word-wrap a description string to the given width."""
+    words = text.split()
+    if not words:
+        return [""]
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        if len(current) + 1 + len(word) <= width:
+            current = f"{current} {word}"
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
+
+
 def _interactive_menu(paths: SetupPaths) -> int:
     def _secrets_only(paths_arg: SetupPaths) -> int:
         _configure_env_secrets(paths_arg)
@@ -323,19 +348,82 @@ def _interactive_menu(paths: SetupPaths) -> int:
         return 0
 
     options = {
-        "1": ("Recommended full setup", _full_setup),
-        "2": ("Local email secrets only", _secrets_only),
-        "3": ("Report options only", _options_only),
-        "4": ("macOS launchd schedule", _configure_launchd),
-        "5": ("GitHub Actions secrets", _ci_only),
-        "6": ("Developer security hooks", _hooks_only),
-        "7": ("Verify configuration", _verify_setup),
-        "8": ("Show status", _status_only),
+        "1": (
+            "Recommended full setup",
+            (
+                "Walk through every step: local secrets, report options, schedule, "
+                "verification, and (optionally) install launchd, CI secrets, and "
+                "developer hooks. Best for first-time setup."
+            ),
+            _full_setup,
+        ),
+        "2": (
+            "Local email secrets only",
+            (
+                "Write .env.email-report (mode 600) with GITHUB_TOKEN, RESEND_API_KEY, "
+                "REPORT_EMAIL, and RESEND_FROM. Use this if you only run reports locally."
+            ),
+            _secrets_only,
+        ),
+        "3": (
+            "Report options only",
+            (
+                "Configure which sections appear in the email (consumers, artifact "
+                "storage, release assets) and the max repositories to scan, stored in "
+                ".github-usage/config.toml."
+            ),
+            _options_only,
+        ),
+        "4": (
+            "macOS launchd schedule",
+            (
+                "Generate, install, or remove the LaunchAgent plist that runs "
+                "scripts/send-email-report.sh on your weekly schedule. macOS only."
+            ),
+            _configure_launchd,
+        ),
+        "5": (
+            "GitHub Actions secrets",
+            (
+                "Push secrets to this repository with `gh secret set` so the scheduled "
+                "GitHub Actions workflow can send the report. Requires `gh` CLI auth."
+            ),
+            _ci_only,
+        ),
+        "6": (
+            "Developer security hooks",
+            (
+                "Install pre-commit and pre-push hooks (ruff, ruff-format, gitleaks) "
+                "to catch issues and leaked secrets before they leave your machine."
+            ),
+            _hooks_only,
+        ),
+        "7": (
+            "Verify configuration",
+            (
+                "Run `email-report --dry-run` against your local config to confirm it "
+                "works end-to-end without actually sending an email."
+            ),
+            _verify_setup,
+        ),
+        "8": (
+            "Show status",
+            (
+                "Print where setup files live, which env values are set (masked), and "
+                "the LaunchAgent state. Exits non-zero if not minimally configured."
+            ),
+            _status_only,
+        ),
     }
     print("github-usage setup")
     print("==================")
-    for key, (label, _) in options.items():
+    print("Configure local secrets, report options, schedules, CI secrets, and dev hooks.")
+    print("First time? Choose option 1 to walk through everything in order.")
+    print()
+    for key, (label, description, _) in options.items():
         print(f"  {key}) {label}")
+        for line in _wrap_description(description):
+            print(f"     {line}")
     print("  q) Quit")
     choice = input("\nChoose an option [1]: ").strip().lower() or "1"
     if choice in {"q", "quit"}:
@@ -344,7 +432,7 @@ def _interactive_menu(paths: SetupPaths) -> int:
     if not action:
         print("Unknown option.")
         return 1
-    _, handler = action
+    _, _, handler = action
     result = handler(paths)
     return int(result or 0)
 

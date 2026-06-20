@@ -21,7 +21,7 @@ from github_usage.setup_config import (
     write_env_file,
 )
 from github_usage.setup_launchd import generate_plist
-from github_usage.setup_wizard import run_setup
+from github_usage.setup_wizard import _wrap_description, run_setup
 
 
 class SetupConfigTests(unittest.TestCase):
@@ -179,6 +179,27 @@ class GitignoreSetupTests(unittest.TestCase):
         gitignore = Path(".gitignore").read_text()
         self.assertIn(".github-usage/", gitignore)
         self.assertIn(".env.email-report", gitignore)
+
+
+class MenuDescriptionTests(unittest.TestCase):
+    def test_wrap_description_respects_width(self):
+        text = (
+            "Walk through every step: local secrets, report options, schedule, "
+            "verification, and optionally install launchd, CI secrets, and dev hooks."
+        )
+        for line in _wrap_description(text, width=40):
+            self.assertLessEqual(len(line), 40)
+
+    def test_wrap_description_preserves_all_words(self):
+        text = "alpha beta gamma delta epsilon zeta eta theta iota kappa"
+        joined = " ".join(_wrap_description(text, width=20))
+        self.assertEqual(joined, text)
+
+    def test_wrap_description_handles_short_text(self):
+        self.assertEqual(_wrap_description("short", width=40), ["short"])
+
+    def test_wrap_description_handles_empty(self):
+        self.assertEqual(_wrap_description("", width=40), [""])
 
 
 if __name__ == "__main__":
