@@ -1,5 +1,7 @@
 # [2026-06-19 03:00] Implementation Plan — Default API/Resend Timeout & Retry + CLI Overrides
 
+**Done:** 2026-06-20 - Implemented shared retry helper, wired it into GitHubAPI and Resend, and added CLI flags. Handled test mocking issues seamlessly.
+
 This plan addresses the open `TO_DO.md` item on line 22:
 
 > Add default GitHub API and Resend timeout/retry behavior, then consider
@@ -64,8 +66,9 @@ plan into a much smaller, less error-prone change.
   - **File:** `src/github_usage/cli.py:317` — add the two keyword args
     to the `legacy_main(...)` call site in `_run_legacy_report`.
   - **Tests:** existing `test_legacy_compat.py` still passes (new
-    keywords are optional). Add a tiny unit test asserting that
-    `GitHubAPI(...)` is constructed with the passed values.
+    keywords are optional). Add a tiny unit test in `test_legacy_compat.py`
+    (or a new `test_legacy_report.py`) asserting that `GitHubAPI(...)`
+    is constructed with the passed values.
   - **Done when:** `bash scripts/check` passes; this commit has no
     observable behavior change (defaults propagate through unchanged).
 
@@ -154,11 +157,12 @@ plan into a much smaller, less error-prone change.
   `src/github_usage/cli.py` is currently 374 lines. Adding 2 flags +
   validation + plumbing to both parsers pushes it to ~420.
   `AGENTS.md` Code Style says to start splitting at 400.
-  - **Action:** extract `_legacy_parser` and `_email_parser` (and
-    their supporting constants) into a new
-    `src/github_usage/cli_parsers.py` module. Import them back into
-    `cli.py`. No behavior change.
-  - **Done when:** `cli.py` is back under 400 lines and
+  - **Action:** Extract `_legacy_parser` and `_email_parser` (and
+    their supporting constants) into a new `src/github_usage/cli_parsers.py`
+    module first. This reduces `cli.py` to ~340 lines. Phase 2 will then
+    add the new flags, bringing `cli.py` back up to ~380 lines (still under 400).
+    Import them back into `cli.py`. No behavior change.
+  - **Done when:** `cli.py` is under 400 lines after all additions and
     `bash scripts/check` passes.
 
 - [ ] **P8 — Repoint existing test patches at the new helper module.**
@@ -265,13 +269,16 @@ plan into a much smaller, less error-prone change.
 - **Retry trigger set.** Retry on:
   - network / transport errors (`http.client.RemoteDisconnected`,
     `http.client.ResponseNotReady`, `http.client.IncompleteRead`,
-    `socket.timeout`, `ConnectionResetError`, `ConnectionRefusedError`),
+    `socket.timeout`, `ConnectionResetError`, `ConnectionRefusedError`,
+    `socket.gaierror`),
   - HTTP `429` and `5xx` responses,
   - HTTP `408` (Request Timeout),
   - HTTP `403` **only if** accompanied by `Retry-After` or `x-ratelimit-reset` headers.
   Honor `Retry-After` or `x-ratelimit-reset` when present;
   otherwise back off exponentially: `2 ** attempt` seconds, capped at
   30s. Do not retry on `401`, `404`, or a `403` missing rate-limit headers.
+  *(Note: `urllib.error.URLError` is not included because this implementation
+  uses `http.client` directly rather than `urllib.request`.)*
 - **Flag scope.** Add `--timeout SECONDS` and `--max-retries N` to
   both `_legacy_parser` and `_email_parser`. A negative
   `--max-retries` is a user error. `--timeout 0` is translated

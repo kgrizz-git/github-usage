@@ -14,7 +14,7 @@
 
 - [x] Support saving the rendered email report through the shared `--output PATH` / export path instead of adding an email-only attachment flag.
 - [ ] Add `--email-format text|html` after the plain-text formatter is stable. (Flag added in this PR; HTML rendering deferred.)
-- [ ] Add default GitHub API and Resend timeout/retry behavior, then consider `--timeout SECONDS` and `--max-retries N` flags if users need control. **[Plan](../superpowers/plans/2026-06-19-default-timeout-retry.md)**
+- [x] Add default GitHub API and Resend timeout/retry behavior...
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
 
 ## Remaining Bug Fixes (from bug-report-20260616-143630.md)

@@ -11,6 +11,7 @@ from typing import Any
 from . import __version__, email_report, export_report, report_data
 from .api import GitHubAPI
 from .auth import check_user_scope, resolve_token
+from .cli_parsers import _email_parser, _legacy_parser
 from .legacy_report import main as legacy_main
 
 HELP = """GitHub Monthly Usage Report
@@ -32,6 +33,8 @@ Legacy report options:
   --json                  Shorthand for --export json (prints to stdout without --output)
   --no-interactive        Never prompt; use defaults
   --dry-run               No-op for the legacy flow
+  --timeout SECONDS       Seconds to wait before failing a request
+  --max-retries N         Maximum number of retry attempts for transient errors
 
 Email-report options:
   --export FORMAT         Export the report to a file in the given format
@@ -39,7 +42,8 @@ Email-report options:
   --email-format FMT      Email body format: text | html (html deferred)
   --include-consumers, --include-artifact-storage, --include-release-assets,
   --yes-include-release-assets, --max-repos N, --warn-over VALUE,
-  --skip-actions, --skip-copilot, --skip-lfs, --dry-run
+  --skip-actions, --skip-copilot, --skip-lfs, --dry-run,
+  --timeout SECONDS, --max-retries N
 
 Note: a --month YYYY-MM flag for historical billing queries is planned but
 deferred. GitHub's billing endpoints do not currently support date-range
@@ -56,7 +60,6 @@ Export optional dependencies:
   pip install github-usage[export-pdf]    # for --export pdf
 """
 
-_EXPORT_FORMATS = ("csv", "xlsx", "pdf", "json", "text", "none")
 _EXPORT_PROMPT_CHOICES = {
     "1": "csv",
     "2": "xlsx",
@@ -74,43 +77,6 @@ def _split_optional_token(argv: Sequence[str]) -> tuple[str | None, list[str]]:
     if argv and not argv[0].startswith("-"):
         return argv.pop(0), argv
     return None, argv
-
-
-def _legacy_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="github-usage",
-        description="Run the GitHub usage report and optionally export to a file.",
-        add_help=False,
-    )
-    parser.add_argument("-h", "--help", action="store_true")
-    parser.add_argument("--version", action="store_true")
-    parser.add_argument("--export", choices=_EXPORT_FORMATS, default=None)
-    parser.add_argument("--output", default=None)
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("--no-interactive", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
-    return parser
-
-
-def _email_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="github-usage email-report",
-        description="Send or preview a scheduled plain-text GitHub usage email report.",
-    )
-    parser.add_argument("--include-consumers", action="store_true")
-    parser.add_argument("--include-artifact-storage", action="store_true")
-    parser.add_argument("--include-release-assets", action="store_true")
-    parser.add_argument("--yes-include-release-assets", action="store_true")
-    parser.add_argument("--max-repos", type=int, default=100)
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--warn-over")
-    parser.add_argument("--skip-actions", action="store_true")
-    parser.add_argument("--skip-copilot", action="store_true")
-    parser.add_argument("--skip-lfs", action="store_true")
-    parser.add_argument("--export", choices=_EXPORT_FORMATS, default=None)
-    parser.add_argument("--output", default=None)
-    parser.add_argument("--email-format", choices=("text", "html"), default="text")
-    return parser
 
 
 def _missing_env(names: list[str]) -> list[str]:
@@ -210,13 +176,14 @@ def _run_email_report(argv: Sequence[str]) -> int:
         )
         return 1
 
-    token = resolve_token(argv=["github-usage"])
+    token = resolve_token(sys.argv)
     if not token:
         from .auth import print_missing_token_error
 
         print_missing_token_error()
         return 1
 
+    api = GitHubAPI(token, timeout=args.timeout, max_retries=args.max_retries)
     if not args.dry_run:
         missing = _missing_env(["RESEND_API_KEY", "REPORT_EMAIL", "RESEND_FROM"])
         if missing:
@@ -228,14 +195,13 @@ def _run_email_report(argv: Sequence[str]) -> int:
     if not _confirm_release_assets(args):
         return 1
 
-    api = GitHubAPI(token)
     try:
         user = api.request("GET", "/user")
         username = user.get("login")
         if not username:
             print("Error: GitHub /user response did not include a login.")
             return 1
-        if not check_user_scope(api):
+        if not check_user_scope(api, user=user):
             print("Error: Your GitHub token is not valid for this operation.")
             return 1
         data = report_data.build_report_data(
@@ -273,6 +239,8 @@ def _run_email_report(argv: Sequence[str]) -> int:
             os.environ["REPORT_EMAIL"],
             subject,
             body,
+            timeout=args.timeout,
+            max_retries=args.max_retries,
         )
         print(f"Email report sent to {os.environ['REPORT_EMAIL']}.")
         return 0
@@ -320,6 +288,8 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
             no_interactive=args.no_interactive,
             month=None,
             dry_run=args.dry_run,
+            timeout=getattr(args, "timeout", None),
+            max_retries=getattr(args, "max_retries", None),
         )
     except SystemExit as exc:
         return _safe_exit_code(exc.code)

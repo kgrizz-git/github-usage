@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import http.client
 import json
 from datetime import UTC, datetime
 
@@ -169,8 +168,18 @@ def format_report_email(data: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def send_email(api_key: str, from_addr: str, to_addr: str, subject: str, body: str) -> None:
+def send_email(
+    api_key: str,
+    from_addr: str,
+    to_addr: str,
+    subject: str,
+    body: str,
+    timeout: float | None = None,
+    max_retries: int | None = None,
+) -> None:
     """Send a plain-text report through Resend."""
+    from . import http_retry
+
     payload = json.dumps(
         {
             "from": from_addr,
@@ -179,20 +188,18 @@ def send_email(api_key: str, from_addr: str, to_addr: str, subject: str, body: s
             "text": body,
         }
     )
-    conn = http.client.HTTPSConnection("api.resend.com")
-    try:
-        conn.request(
-            "POST",
-            "/emails",
-            body=payload,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-        )
-        resp = conn.getresponse()
-        response_body = resp.read().decode("utf-8", errors="replace")
-    finally:
-        conn.close()
-    if resp.status not in (200, 201):
-        raise RuntimeError(f"Resend API error {resp.status}: {response_body[:300]}")
+    response = http_retry.request_with_retries(
+        "POST",
+        "/emails",
+        host="api.resend.com",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        body=payload,
+        timeout=timeout if timeout is not None else http_retry.DEFAULT_TIMEOUT_SECONDS,
+        max_retries=max_retries if max_retries is not None else http_retry.DEFAULT_MAX_RETRIES,
+    )
+    if response.status not in (200, 201):
+        response_body = response.body.decode("utf-8", errors="replace")
+        raise RuntimeError(f"Resend API error {response.status}: {response_body[:300]}")

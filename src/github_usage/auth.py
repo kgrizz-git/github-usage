@@ -49,18 +49,13 @@ def resolve_token(argv: Sequence[str] | None = None):
     return None
 
 
-def check_user_scope(api):
+def check_user_scope(api, user=None):
     """Return True if the token is accepted on a user-scoped endpoint
     (200 from GET /user), False otherwise."""
-    import http.client
-
-    conn = http.client.HTTPSConnection("api.github.com")
+    if user is not None:
+        return bool(user.get("login"))
     try:
-        conn.request("GET", "/user", headers=api.headers)
-        resp = conn.getresponse()
-        if resp.status != 200:
-            return False
-        resp.read()  # consume response
-        return True
-    finally:
-        conn.close()
+        user = api.request("GET", "/user")
+        return bool(user.get("login"))
+    except RuntimeError:
+        return False

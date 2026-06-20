@@ -82,11 +82,14 @@ class EmailReportTests(unittest.TestCase):
 
         conn = mock.Mock()
         resp = mock.Mock(status=400)
+        import http.client
+
+        resp.headers = http.client.HTTPMessage()
         resp.read.return_value = b'{"message":"domain is not verified"}'
         conn.getresponse.return_value = resp
 
         with (
-            mock.patch("github_usage.email_report.http.client.HTTPSConnection", return_value=conn),
+            mock.patch("github_usage.http_retry.http.client.HTTPSConnection", return_value=conn),
             self.assertRaisesRegex(RuntimeError, "domain is not verified"),
         ):
             send_email("resend-key", "reports@example.com", "to@example.com", "Subject", "Body")
@@ -98,10 +101,13 @@ class EmailReportTests(unittest.TestCase):
 
         conn = mock.Mock()
         resp = mock.Mock(status=201)
+        import http.client
+
+        resp.headers = http.client.HTTPMessage()
         resp.read.return_value = b'{"id":"email-id"}'
         conn.getresponse.return_value = resp
 
-        with mock.patch("github_usage.email_report.http.client.HTTPSConnection", return_value=conn):
+        with mock.patch("github_usage.http_retry.http.client.HTTPSConnection", return_value=conn):
             send_email("resend-key", "reports@example.com", "to@example.com", "Subject", "Body")
 
         _, path = conn.request.call_args.args[:2]

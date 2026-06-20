@@ -34,6 +34,8 @@ def main(
     no_interactive: bool = False,
     month: str | None = None,
     dry_run: bool = False,
+    timeout: float | None = None,
+    max_retries: int | None = None,
 ) -> str | None:
     """Run the legacy interactive report. Return the resolved username, or None on failure.
 
@@ -51,7 +53,7 @@ def main(
         sys.exit(1)
 
     try:
-        api = GitHubAPI(token)
+        api = GitHubAPI(token, timeout=timeout, max_retries=max_retries)
 
         # Check that the token is accepted on a user-scoped endpoint
         if not check_user_scope(api):
