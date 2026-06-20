@@ -25,7 +25,9 @@ def resolve_token(argv: Sequence[str] | None = None):
         argv = sys.argv[1:]
     if argv:
         return argv[0]
-    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    token = (
+        os.environ.get("GH_USAGE_TOKEN", "").strip() or os.environ.get("GITHUB_TOKEN", "").strip()
+    )
     if token:
         return token
     try:

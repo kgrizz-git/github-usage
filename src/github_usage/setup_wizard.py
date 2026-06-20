@@ -297,6 +297,31 @@ def _configure_launchd(paths: SetupPaths) -> int:
     return 0
 
 
+def _set_ci_gh_token() -> subprocess.CompletedProcess:
+    """Set GH_USAGE_TOKEN, offering to pipe the current gh auth token."""
+    try:
+        gh_result = subprocess.run(  # nosec
+            ["gh", "auth", "token"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if (
+            gh_result.returncode == 0
+            and gh_result.stdout.strip()
+            and _prompt_yes_no("Use token from `gh auth token`?", True)
+        ):
+            return subprocess.run(  # nosec
+                ["gh", "secret", "set", "GH_USAGE_TOKEN"],
+                input=gh_result.stdout.strip(),
+                text=True,
+                check=False,
+            )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return subprocess.run(["gh", "secret", "set", "GH_USAGE_TOKEN"], check=False)  # nosec
+
+
 def _configure_ci_secrets() -> None:
     if not shutil.which("gh"):
         print("Install GitHub CLI (`gh`) and authenticate to set repository secrets.")
@@ -312,7 +337,10 @@ def _configure_ci_secrets() -> None:
         print(f"\n{name} — {description}")
         if not _prompt_yes_no(f"Set {name}?", True):
             continue
-        result = subprocess.run(["gh", "secret", "set", name], check=False)  # nosec
+        if name == "GH_USAGE_TOKEN":
+            result = _set_ci_gh_token()
+        else:
+            result = subprocess.run(["gh", "secret", "set", name], check=False)  # nosec
         if result.returncode != 0:
             print(f"Failed to set {name}.")
             return

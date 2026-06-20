@@ -52,7 +52,7 @@ jobs:
       - run: pip install -e .
       - name: Send email report
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_USAGE_TOKEN }}
+          GH_USAGE_TOKEN: ${{ secrets.GH_USAGE_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           REPORT_EMAIL: ${{ inputs.report_email || secrets.REPORT_EMAIL }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
