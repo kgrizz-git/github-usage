@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# scripts/setup — single entry point for guided github-usage configuration.
-set -euo pipefail
-
+# Legacy entrypoint: forwards to the root setup script.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
-
-exec env PYTHONPATH=src scripts/python -m github_usage setup "$@"
+exec "$ROOT_DIR/setup.sh" "$@"

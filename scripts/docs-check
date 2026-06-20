@@ -21,7 +21,8 @@ done
 
 PYTHONPATH=src python3 -m github_usage --help | grep -q "GITHUB_TOKEN"
 grep -q "github-usage" README.md
-grep -q "scripts/setup" README.md
+grep -qE '(^|[[:space:]])\./setup\.sh([[:space:]]|$)' README.md
+test -x setup.sh
 test -x scripts/setup
 
 # Warn about assessment files older than 30 days (they may be stale)

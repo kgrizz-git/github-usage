@@ -46,6 +46,13 @@
 
 - [x] Instruct agents (via `AGENTS.md`) to mark plan items completed (check boxes) as they are implemented, rather than leaving them open or deleting them, so the plan file remains an accurate record of progress. **Done:** the 2026-06-19-bug-fixes plan was updated with `- [x]` checkboxes, `**Status:** COMPLETED` lines, and a `> **Status: COMPLETED 2026-06-19.**` banner at the top documenting verification results and implementation deviations.
 
+## Configuration & Setup
+
+- [ ] Add support for configuring multiple reports with different run frequencies, targets, and options.
+- [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules).
+- [x] Move the `setup` entrypoint to the root repo directory for easier discovery (or add a wrapper entrypoint). **Done:** 2026-06-20 — promoted to `./setup.sh` with `scripts/setup` retained as a backward-compat shim (plan 2026-06-20-move-setup-entrypoint).
+- [ ] Add Windows/PowerShell support for the setup script.
+
 ## DEFERRED
 
 - [ ] Add clearly labeled end-of-month spend projections based on elapsed days in the billing period.

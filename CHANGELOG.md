@@ -51,6 +51,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Setup entrypoint moved to `./setup.sh`:** The guided setup entry point now lives at the repo root as `setup.sh` for easier discovery. The previous `scripts/setup` path is preserved as a thin wrapper that forwards to the new root script.
 - **Refactored `report_summary.py`:** Split large `show_final_summary` function into smaller, testable sub-functions.
 - **Unified Error Messaging:** Shared `print_missing_token_error` helper for consistent CLI feedback.
 - **Safe Exit Codes:** Added helper to handle non-numeric `SystemExit` codes gracefully.

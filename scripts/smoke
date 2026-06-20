@@ -8,6 +8,8 @@ PYTHONPATH=src scripts/python -m github_usage --help
 PYTHONPATH=src scripts/python -m github_usage --version
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--timeout"
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--max-retries"
+./setup.sh --help
+scripts/setup --help
 SMOKE_HOME="$(mktemp -d)"
 env -u GITHUB_TOKEN HOME="$SMOKE_HOME" PYTHONPATH=src .venv/bin/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
   cat /tmp/github-usage-smoke.out

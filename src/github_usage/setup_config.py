@@ -1,4 +1,4 @@
-"""Local setup paths, env files, and email-report config for scripts/setup."""
+"""Local setup paths, env files, and email-report config for ./setup.sh."""
 
 from __future__ import annotations
 
