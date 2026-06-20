@@ -35,24 +35,18 @@ flaws the main plan inherited from the current code, or extract small
 utilities that the main plan depends on. Doing them first turns the main
 plan into a much smaller, less error-prone change.
 
-- [ ] **P1 — Decide the 403 / Retry-After policy before writing tests.**
-  The current `api.py:52-57` branch retries 403+`Retry-After` and the new
-  helper will retry 408/429/5xx+`Retry-After`. The main plan kept the old
-  branch "preserved unchanged" — that creates a double-retry counter
-  (helper max_retries=3 + outer `_retries < 3` cap) and the tests in
-  Phase 1 will keep needing special-case scaffolding to avoid it.
-  Adopt the following policy and write the policy into a one-paragraph
-  comment block in `src/github_usage/http_retry.py`:
+- [ ] **P1 — Decide the 403 / Rate-Limit policy before writing tests.**
+  The current `api.py:52-57` branch retries 403+`Retry-After`. We must preserve
+  403 retries ONLY when they are accompanied by rate limit headers (`Retry-After`
+  or `x-ratelimit-reset`), because GitHub uses 403 for primary and secondary
+  rate limiting.
+  Adopt the following policy and write it into a comment block in `src/github_usage/http_retry.py`:
     - The helper retries any status in `RETRYABLE_STATUSES` (408, 429,
-      500, 502, 503, 504) when `Retry-After` is present or the status
-      itself is retryable. It does **not** retry 403, 404, or any other
-      4xx.
-    - The 403+`Retry-After` branch in `api.py` is **deleted**. Callers
-      that depended on the 403+`Retry-After` retry get a
-      `RuntimeError("API error 403: ...")` instead. The CLI's
-      `check_user_scope` already does a 200-only check, so the 403
-      branch was only ever reachable from the user-error path; no
-      production code path loses retry coverage by deleting it.
+      500, 502, 503, 504) unconditionally.
+    - It **also** retries 403 IF AND ONLY IF `Retry-After` or `x-ratelimit-reset`
+      is present in the response headers. It does not retry 401, 404, or other 4xx.
+    - The legacy 403+`Retry-After` branch in `api.py` is **deleted** since the helper
+      now natively handles 403 rate limits.
     - Document the decision in this plan's "Done" note.
 
 - [ ] **P2 — Change `legacy_report.main` signature to accept `timeout` /
@@ -119,17 +113,20 @@ plan into a much smaller, less error-prone change.
     `rg "HTTPSConnection" src/`), and `_run_email_report` no longer
     triggers two `/user` calls per run.
 
-- [ ] **P4 — Add `parse_retry_after` utility.**
+- [ ] **P4 — Add `parse_rate_limit_headers` utility.**
   - **File:** `src/github_usage/http_retry.py` (new, with the helper
     from Phase 1)
   - **Signature:**
     ```python
-    def parse_retry_after(header_value: str | None) -> int | None:
-        """Return the integer seconds from a Retry-After header, or None."""
+    def parse_rate_limit_headers(headers: http.client.HTTPMessage) -> float | None:
+        """Return the float seconds to sleep based on Retry-After or x-ratelimit-reset, or None."""
     ```
-  - **Behavior:** strip whitespace; return `None` for `None`, empty,
-    or non-integer input. Used by the helper and (defensively) by any
-    future caller that wants to inspect a `Retry-After` value.
+  - **Behavior:**
+    - First check `Retry-After`. Try parsing it as an integer (seconds). If that fails,
+      try parsing it as an HTTP-Date string.
+    - If `Retry-After` is missing or unparseable, check `x-ratelimit-reset` (an epoch timestamp).
+      If present, return `max(0.0, float(header) - time.time())`.
+    - Return `None` if neither header is present or parseable. Used by the helper to dynamically calculate sleep times.
 
 - [ ] **P5 — Add a `FakeSleeper` test helper.**
   - **File:** `tests/_fakes.py` (new)
@@ -267,15 +264,14 @@ plan into a much smaller, less error-prone change.
   above is what the implemented code will actually do.)
 - **Retry trigger set.** Retry on:
   - network / transport errors (`http.client.RemoteDisconnected`,
-    `http.client.ResponseNotReady`, `socket.timeout`,
-    `ConnectionResetError`, `ConnectionRefusedError`),
+    `http.client.ResponseNotReady`, `http.client.IncompleteRead`,
+    `socket.timeout`, `ConnectionResetError`, `ConnectionRefusedError`),
   - HTTP `429` and `5xx` responses,
-  - HTTP `408` (Request Timeout).
-  Honor `Retry-After` (header, integer seconds) when present;
+  - HTTP `408` (Request Timeout),
+  - HTTP `403` **only if** accompanied by `Retry-After` or `x-ratelimit-reset` headers.
+  Honor `Retry-After` or `x-ratelimit-reset` when present;
   otherwise back off exponentially: `2 ** attempt` seconds, capped at
-  30s. Do not retry on `401`, `403`, `404`, or any other 4xx.
-  (Per Pre-Implementation P1: the existing 403+`Retry-After` branch
-  is removed; 403 is treated as a hard error, same as 401/404.)
+  30s. Do not retry on `401`, `404`, or a `403` missing rate-limit headers.
 - **Flag scope.** Add `--timeout SECONDS` and `--max-retries N` to
   both `_legacy_parser` and `_email_parser`. A negative
   `--max-retries` is a user error. `--timeout 0` is translated
@@ -333,6 +329,7 @@ plan into a much smaller, less error-prone change.
     RETRYABLE_EXCEPTIONS = (
         http.client.RemoteDisconnected,
         http.client.ResponseNotReady,
+        http.client.IncompleteRead,
         ConnectionResetError,
         ConnectionRefusedError,
         socket.timeout,
@@ -345,9 +342,9 @@ plan into a much smaller, less error-prone change.
         body: bytes
         headers: http.client.HTTPMessage
 
-    def parse_retry_after(header_value: str | None) -> int | None: ...
+    def parse_rate_limit_headers(headers: http.client.HTTPMessage) -> float | None: ...
 
-    def backoff_seconds(attempt: int, retry_after: int | None = None) -> float: ...
+    def backoff_seconds(attempt: int, retry_after: float | None = None) -> float: ...
 
     def request_with_retries(
         method: str,
@@ -385,21 +382,19 @@ plan into a much smaller, less error-prone change.
       Returns the captured `Response`. The `Link` header is read by
       callers as `response.headers.get("Link", "")`, preserving
       `get_all_pages` semantics without exposing the live socket.
-    - On `RETRYABLE_EXCEPTIONS` or status in `RETRYABLE_STATUSES`,
+    - On `RETRYABLE_EXCEPTIONS`, status in `RETRYABLE_STATUSES`, or `403` with rate-limit headers,
       sleeps `backoff_seconds(attempt, retry_after=...)` and retries
       while `attempt < max_retries`. After exhausting retries, raises
       the last transport error or `RuntimeError("API error {status}: {body[:200]}")`
       to match the existing message shape. The connection is closed
-      in a `finally` per attempt.
-    - Honors `Retry-After` via `parse_retry_after` (returns `None`
-      when missing or unparseable). When `Retry-After` is present
-      and ≥ 0, the helper sleeps exactly that long, **capped at
-      `DEFAULT_MAX_BACKOFF_SECONDS` (30s)** to avoid hanging on a
-      hostile or misconfigured `Retry-After: 3600` header. When
+      in a `finally` per attempt. (Note: buffering the entire body via `resp.read()`
+      is safe here since this client is used for JSON API responses, not large file downloads.)
+    - Honors `Retry-After` or `x-ratelimit-reset` via `parse_rate_limit_headers` (returns `None`
+      when missing or unparseable). When rate limit headers dictate a sleep ≥ 0,
+      the helper sleeps exactly that long, **capped at `DEFAULT_MAX_BACKOFF_SECONDS` (30s)**
+      to avoid hanging on a hostile or misconfigured header. When
       absent, the helper sleeps `backoff_seconds(attempt)` =
-      `2 ** attempt` seconds, capped at 30s. (The cap is the same
-      value as the default timeout — the review noted that an
-      uncapped `Retry-After` could stall a run for an hour.)
+      `2 ** attempt` seconds, capped at 30s.
     - `sleep` is injectable so tests can assert without sleeping.
   - **Tests:** `tests/test_http_retry.py` (new). Use the
     `FakeSleeper` from `tests/_fakes.py` (Pre-Implementation P5) to
@@ -409,9 +404,11 @@ plan into a much smaller, less error-prone change.
       increasing sequence).
     - `test_respects_retry_after_header` — server returns 503 +
       `Retry-After: 7`, helper sleeps exactly 7 before retrying.
-    - `test_does_not_retry_on_404` — single call, `FakeSleeper.calls`
-      is `[]`.
-    - `test_does_not_retry_on_401_403` — single call each.
+    - `test_respects_x_ratelimit_reset` — server returns 403 +
+      `x-ratelimit-reset`, helper sleeps calculated duration.
+    - `test_does_not_retry_on_404` — single call, `FakeSleeper.calls` is `[]`.
+    - `test_does_not_retry_on_401_and_headerless_403` — single call each.
+    - `test_retries_on_403_with_rate_limit_headers` — 403 + `Retry-After` is retried.
     - `test_retries_on_remote_disconnected` — first attempt raises
       `http.client.RemoteDisconnected`, second succeeds.
     - `test_exhausts_retries_then_raises_runtime_error` — 5xx
@@ -425,8 +422,8 @@ plan into a much smaller, less error-prone change.
       rejection.
     - `test_max_retries_zero_means_no_retry` — 5xx once, raises
       `RuntimeError` after exactly one attempt.
-    - `test_parse_retry_after_handles_missing_unparseable_and_valid` —
-      unit tests for the small utility.
+    - `test_parse_rate_limit_headers_handles_missing_unparseable_and_valid` —
+      unit tests for the utility, including HTTP-date fallback for `Retry-After` and epoch parsing for `x-ratelimit-reset`.
 
 - [ ] **Wire the helper into `GitHubAPI`.**
   - **File:** `src/github_usage/api.py`
@@ -453,7 +450,8 @@ plan into a much smaller, less error-prone change.
     - **Delete the 403 / `Retry-After` branch entirely** (per
       Pre-Implementation P1). 403 now raises
       `RuntimeError("API error 403: {data[:200]}")` like any other
-      non-retryable status. The `_retries` parameter and the
+      error, **unless** it has rate limit headers, in which case the helper
+      retries it natively. The `_retries` parameter and the
       recursive call site are removed.
     - Keep the 404 billing-endpoint message; keep the JSON-decode
       error; keep the "message in dict" handling in
@@ -466,11 +464,11 @@ plan into a much smaller, less error-prone change.
     - `test_request_retries_on_5xx` — 5xx twice then 200, assert
       `FakeSleeper.calls` is `[1, 2]`.
     - `test_max_retries_zero_means_no_retry` — 5xx once, raises.
-    - `test_403_no_longer_retries` — replacement for the old
-      `test_request_retries_on_403_with_retry_after`. 403 +
-      `Retry-After: 7` raises `RuntimeError` after a single attempt
-      with no sleep. Update the existing test name and assertion
-      rather than adding a new one.
+    - `test_403_without_headers_raises` — replacement for the old
+      `test_request_retries_on_403_with_retry_after`. 403 missing
+      rate limit headers raises `RuntimeError` after a single attempt
+      with no sleep. `test_403_with_retry_after_retries` should be added
+      to ensure the helper processes the rate limit correctly.
     - `test_404_billing_message_still_works` — preserved behavior.
   - **Done when:** `python -m unittest tests.test_api tests.test_http_retry`
     passes; `bash scripts/check` passes; `bash scripts/smoke` passes.
@@ -617,9 +615,8 @@ plan into a much smaller, less error-prone change.
       and `github-usage email-report`. Default 30s timeout, 3
       retries with exponential backoff for `api.github.com` and
       `api.resend.com` calls.
-    - Changed: 403 responses from `api.github.com` are no longer
-      retried automatically; users see a `RuntimeError` immediately
-      (per Pre-Implementation P1).
+    - Changed: Rate limit handling (403/429) is now centralized. `x-ratelimit-reset`
+      is now honored alongside `Retry-After`, and headerless 403s fail instantly.
 
 - [ ] **Run the full verification chain.**
   - `bash scripts/check`
@@ -663,18 +660,13 @@ plan into a much smaller, less error-prone change.
    past the limit. The `Retry-After` path fires first, so the
    practical risk is bounded; the plan accepts this and does not add
    a per-tenant cap.
-5. **Removed 403 / `Retry-After` retry.** The original code retried
-   403 responses with a `Retry-After` header, which is what
-   `check_user_scope`'s 200-only check used to flow around. After
-   P1 the 403 branch is gone, and 403 raises immediately. **Impact
-   assessment:** `check_user_scope` is a 200-only test, so 403s
-   there are failures (not retried before, and not retried after).
-   The only consumer-facing 403+`Retry-After` path was in
-   `api.py:52-57`, which is exercised from `cli.py:233` (`/user`)
-   and indirectly from `legacy_report.py`. None of these callers
-   depended on the 403 retry to succeed; they all consume the
-   resulting data. **Resolution:** delete the branch; document the
-   behavior change in CHANGELOG.
+5. **Handling 403 / Rate Limits.** The original code manually retried
+   403 responses with a `Retry-After` header. After P1, this manual branch
+   is removed, but the helper natively absorbs 403s that contain rate-limit
+   headers (`Retry-After` or `x-ratelimit-reset`). **Impact assessment:**
+   Rate limiting is now handled robustly without a custom branch in `api.py`.
+   Headerless 403s will correctly hard-fail immediately. **Resolution:**
+   delete the custom branch; no loss of rate-limit resilience.
 6. **Backoff thundering herd.** Back-to-back retries with the same
    `attempt` count across processes can thunder-herd GitHub on a
    multi-worker CI run. Out of scope; jitter is a future plan.
@@ -694,8 +686,8 @@ plan into a much smaller, less error-prone change.
   `DEFAULT_MAX_BACKOFF_SECONDS` (30s).
 - Transport errors (timeouts, connection resets, DNS) retry up to
   `max_retries` times.
-- 403 responses raise `RuntimeError` immediately (per P1; the
-  legacy 403+`Retry-After` branch is removed).
+- 403 responses without rate-limit headers raise `RuntimeError` immediately
+  (the manual legacy 403+`Retry-After` branch is removed).
 - `auth.check_user_scope(api)` uses `api.request("GET", "/user")`
   and inherits the new timeout/retry behavior (per P3). Callers
   do not call `/user` twice (per P8 and the duplicate-`/user`

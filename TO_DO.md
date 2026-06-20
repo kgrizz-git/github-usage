@@ -7,20 +7,14 @@
 - [x] Add `--output PATH` alongside `--export FORMAT`.
 - [x] Add `--no-interactive` so scripts and CI never hang on prompts.
 - [x] Add fixture-based tests for report rendering.
-- [ ] Add a `--month YYYY-MM` flag so users can query a specific billing period. **Deferred** — see `docs/api-discovery-month.md`; GitHub's billing endpoints ignore `since`/`until` parameters.
 - [x] Add a redaction layer before writing export files, especially for usernames, repository names, and billing details.
 - [x] Continue reducing long legacy report-section functions after the first `legacy.py` module split (Completed refactoring of `report_summary.py`).
 
 ## Email Report Follow-Ups
 
-- [ ] Add historical email reports with `github-usage email-report --month YYYY-MM` after GitHub billing API period/filter behavior is specified and tested. **Blocked** by the same API gap as the legacy `--month` flag.
-- [ ] Add month-over-month and year-over-year comparison sections once historical report data is available.
-- [ ] Add clearly labeled end-of-month spend projections based on elapsed days in the billing period.
 - [x] Support saving the rendered email report through the shared `--output PATH` / export path instead of adding an email-only attachment flag.
 - [ ] Add `--email-format text|html` after the plain-text formatter is stable. (Flag added in this PR; HTML rendering deferred.)
-- [ ] Add optional CC/BCC delivery fields for team and finance distribution.
 - [ ] Add default GitHub API and Resend timeout/retry behavior, then consider `--timeout SECONDS` and `--max-retries N` flags if users need control. **[Plan](../superpowers/plans/2026-06-19-default-timeout-retry.md)**
-- [ ] Evaluate report retention destinations such as GitHub Releases, S3, or shared drives after export/output support exists.
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
 
 ## Remaining Bug Fixes (from bug-report-20260616-143630.md)
@@ -51,3 +45,15 @@
 ## Process & Workflow
 
 - [x] Instruct agents (via `AGENTS.md`) to mark plan items completed (check boxes) as they are implemented, rather than leaving them open or deleting them, so the plan file remains an accurate record of progress. **Done:** the 2026-06-19-bug-fixes plan was updated with `- [x]` checkboxes, `**Status:** COMPLETED` lines, and a `> **Status: COMPLETED 2026-06-19.**` banner at the top documenting verification results and implementation deviations.
+
+## DEFERRED
+
+- [ ] Add clearly labeled end-of-month spend projections based on elapsed days in the billing period.
+- [ ] Add optional CC/BCC delivery fields for team and finance distribution.
+- [ ] Evaluate report retention destinations such as GitHub Releases, S3, or shared drives after export/output support exists.
+
+## BLOCKED, INDEFINITELY DEFERRED
+
+- [ ] Add a `--month YYYY-MM` flag so users can query a specific billing period. **Deferred** — see `docs/api-discovery-month.md`; GitHub's billing endpoints ignore `since`/`until` parameters.
+- [ ] Add historical email reports with `github-usage email-report --month YYYY-MM` after GitHub billing API period/filter behavior is specified and tested. **Blocked** by the same API gap as the legacy `--month` flag.
+- [ ] Add month-over-month and year-over-year comparison sections once historical report data is available.
