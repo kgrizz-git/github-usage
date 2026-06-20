@@ -176,7 +176,7 @@ def _run_email_report(argv: Sequence[str]) -> int:
         )
         return 1
 
-    token = resolve_token(sys.argv)
+    token = resolve_token(argv=[])
     if not token:
         from .auth import print_missing_token_error
 
