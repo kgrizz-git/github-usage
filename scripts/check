@@ -20,4 +20,7 @@ env -u GITHUB_TOKEN HOME="$SMOKE_HOME" PYTHONPATH=src .venv/bin/python -m github
 }
 grep -q "No GitHub token found" /tmp/github-usage-smoke.out
 
+echo "==> Size check"
+scripts/python scripts/check-sizes
+
 echo "check passed"

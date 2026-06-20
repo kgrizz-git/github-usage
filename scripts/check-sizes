@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Advisory size check for source files and functions.
+
+Warns (exit 0) when files approach or exceed soft size limits.
+Does not fail the build — output is informational only.
+"""
+
+import ast
+import sys
+from pathlib import Path
+
+FILE_WARN = 400
+FILE_LIMIT = 500
+FN_WARN = 80
+FN_LIMIT = 100
+
+
+def function_body_lines(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
+    if not node.body:
+        return 0
+    return node.end_lineno - node.body[0].lineno + 1
+
+
+def check_file(path: Path) -> list[str]:
+    warnings = []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    n = len(lines)
+
+    if n >= FILE_LIMIT:
+        warnings.append(f"{path}: {n} lines (limit {FILE_LIMIT})")
+    elif n >= FILE_WARN:
+        warnings.append(f"{path}: {n} lines (approaching {FILE_LIMIT}-line limit)")
+
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except SyntaxError:
+        return warnings
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            fn_lines = function_body_lines(node)
+            if fn_lines >= FN_LIMIT:
+                warnings.append(
+                    f"{path}:{node.lineno}: {node.name}() {fn_lines} lines (limit {FN_LIMIT})"
+                )
+            elif fn_lines >= FN_WARN:
+                warnings.append(
+                    f"{path}:{node.lineno}: {node.name}() {fn_lines} lines"
+                    f" (approaching {FN_LIMIT}-line limit)"
+                )
+
+    return warnings
+
+
+def main() -> None:
+    root = Path(__file__).parent.parent
+    sources = sorted((root / "src" / "github_usage").rglob("*.py"))
+
+    all_warnings: list[str] = []
+    for path in sources:
+        all_warnings.extend(check_file(path))
+
+    if all_warnings:
+        print("==> Size warnings (advisory — not a build failure)")
+        for w in all_warnings:
+            print(f"  {w}")
+    else:
+        print("==> Size check: all files within advisory limits")
+
+
+if __name__ == "__main__":
+    main()
+    sys.exit(0)

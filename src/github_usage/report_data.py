@@ -62,6 +62,7 @@ def _billing_summary(api: GitHubAPIClient, username: str, product: str) -> dict 
 
 
 def get_actions_usage(api: GitHubAPIClient, username: str) -> dict:
+    """Return Actions compute minutes, storage, and per-SKU cost breakdown."""
     summary = _billing_summary(api, username, "Actions")
     total_minutes = 0.0
     storage_gb_hours = 0.0
@@ -87,6 +88,7 @@ def get_actions_usage(api: GitHubAPIClient, username: str) -> dict:
 
 
 def get_copilot_usage(api: GitHubAPIClient, username: str) -> dict:
+    """Return Copilot billing totals and per-model premium request breakdown."""
     summary = _billing_summary(api, username, "Copilot")
     premium = api.request(
         "GET",
@@ -114,6 +116,7 @@ def get_copilot_usage(api: GitHubAPIClient, username: str) -> dict:
 
 
 def get_gitlfs_usage(api: GitHubAPIClient, username: str) -> dict:
+    """Return Git LFS billing totals and raw line items."""
     summary = _billing_summary(api, username, "git_lfs")
     cost = _summary_cost(summary)
     return {
@@ -123,6 +126,7 @@ def get_gitlfs_usage(api: GitHubAPIClient, username: str) -> dict:
 
 
 def get_monthly_costs(api: GitHubAPIClient, username: str) -> dict:
+    """Return gross/discount/net costs for Actions, Copilot, Git LFS, and their total."""
     actions = _summary_cost(_billing_summary(api, username, "Actions"))
     copilot = _summary_cost(_billing_summary(api, username, "Copilot"))
     git_lfs = _summary_cost(_billing_summary(api, username, "git_lfs"))
@@ -140,6 +144,7 @@ def _limited_repos(api: GitHubAPIClient, max_repos: int) -> tuple[list[dict], bo
 
 
 def get_warning_state(report_data: dict, warn_over: str | None) -> list[str]:
+    """Return warning messages if cost or usage exceeds the warn_over threshold; empty list otherwise."""
     if not warn_over:
         return []
     raw = warn_over.strip().removeprefix("$")
@@ -166,6 +171,7 @@ def get_warning_state(report_data: dict, warn_over: str | None) -> list[str]:
 
 
 def get_key_insights(report_data: dict) -> list[str]:
+    """Return up to three plain-English insight strings derived from report_data."""
     insights = []
     actions = report_data.get("actions")
     consumers = report_data.get("repo_consumers")
@@ -203,6 +209,7 @@ def build_report_data(
     max_repos: int,
     warn_over: str | None,
 ) -> dict:
+    """Fetch and assemble all enabled billing sections into a single report dict."""
     errors = {}
     repos = []
     truncated = False

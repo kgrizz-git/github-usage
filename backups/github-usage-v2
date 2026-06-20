@@ -18,15 +18,16 @@ Token resolution (first match wins):
     4. ~/.config/github-cli/github.yaml (oauth_token field)
 """
 
-import subprocess
-import sys
 import json
 import os
+import subprocess
+import sys
 import time
-from datetime import datetime, timezone, date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 # ── Token Resolution ────────────────────────────────────────────────────
+
 
 def resolve_token():
     if len(sys.argv) > 1:
@@ -35,9 +36,7 @@ def resolve_token():
     if token:
         return token
     try:
-        result = subprocess.run(
-            ["gh", "auth", "token"], capture_output=True, text=True, timeout=10
-        )
+        result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=10)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -56,6 +55,7 @@ def resolve_token():
 
 # ── GitHub API Helper ───────────────────────────────────────────────────
 
+
 class GitHubAPI:
     def __init__(self, token):
         self.token = token
@@ -69,6 +69,7 @@ class GitHubAPI:
 
     def request(self, method, path, params=None):
         import http.client
+
         url = f"{self.base}{path}"
         if params:
             query = "&".join(f"{k}={v}" for k, v in params.items())
@@ -103,7 +104,9 @@ class GitHubAPI:
         page = 1
         per_page = 100
         while True:
-            result = self.request("GET", path, {**(params or {}), "page": page, "per_page": per_page})
+            result = self.request(
+                "GET", path, {**(params or {}), "page": page, "per_page": per_page}
+            )
             if not result:
                 break
             if isinstance(result, list):
@@ -118,25 +121,32 @@ class GitHubAPI:
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
+
 def hours_in_current_month():
     today = date.today()
     first_day = today.replace(day=1)
     last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
     return (last_day - first_day).days * 24 + 1
 
+
 def gb_hours_to_avg_mb(gb_hours):
     h = hours_in_current_month()
     return (gb_hours / h) * 1024 if h > 0 else 0
 
+
 def fmt_price(v):
     return f"${v:.4f}"
 
+
 # ── Billing Data Collectors ─────────────────────────────────────────────
+
 
 def get_billing_summary(api, username, product):
     """Get usage summary for a product. Returns parsed items dict keyed by sku."""
     try:
-        billing = api.request("GET", f"/users/{username}/settings/billing/usage/summary", {"product": product})
+        billing = api.request(
+            "GET", f"/users/{username}/settings/billing/usage/summary", {"product": product}
+        )
     except RuntimeError:
         return None
     if not billing:
@@ -151,13 +161,18 @@ def get_billing_summary(api, username, product):
         summary["total_net"] += item.get("netAmount", 0)
     return summary
 
+
 def get_premium_request_usage(api, username, product="copilot", model=None):
     """Get premium request usage breakdown by model."""
     params = {"product": product}
     if model:
         params["model"] = model
     try:
-        data = api.request("GET", f"/users/{username}/settings/billing/premium_request/usage", params if params else None)
+        data = api.request(
+            "GET",
+            f"/users/{username}/settings/billing/premium_request/usage",
+            params if params else None,
+        )
     except RuntimeError:
         return None
     if not data:
@@ -167,13 +182,20 @@ def get_premium_request_usage(api, username, product="copilot", model=None):
     for item in items:
         m = item.get("model", "Unknown")
         if m not in by_model:
-            by_model[m] = {"items": [], "total_requests": 0, "total_gross": 0, "total_discount": 0, "total_net": 0}
+            by_model[m] = {
+                "items": [],
+                "total_requests": 0,
+                "total_gross": 0,
+                "total_discount": 0,
+                "total_net": 0,
+            }
         by_model[m]["items"].append(item)
         by_model[m]["total_requests"] += item.get("grossQuantity", 0)
         by_model[m]["total_gross"] += item.get("grossAmount", 0)
         by_model[m]["total_discount"] += item.get("discountAmount", 0)
         by_model[m]["total_net"] += item.get("netAmount", 0)
     return by_model
+
 
 def get_full_billing(api, username):
     """Get full billing usage report (all products, all time this year)."""
@@ -184,6 +206,7 @@ def get_full_billing(api, username):
     if not data:
         return None
     return data.get("usageItems", [])
+
 
 def get_user_actions_billing(api, username):
     """Get user-level Actions billing. Returns (total_minutes, storage_gb_hours, sku_breakdown)."""
@@ -203,13 +226,15 @@ def get_user_actions_billing(api, username):
         sku_breakdown[sku] = item
     return total_minutes, total_storage_gb_hours, sku_breakdown
 
+
 def get_actions_per_repo(api, owner, repo):
     """Get per-repo Actions billing."""
     try:
-        billing = api.request("GET", f"/users/{owner}/settings/billing/usage/summary", {
-            "product": "Actions",
-            "repository": f"{owner}/{repo}"
-        })
+        billing = api.request(
+            "GET",
+            f"/users/{owner}/settings/billing/usage/summary",
+            {"product": "Actions", "repository": f"{owner}/{repo}"},
+        )
     except RuntimeError:
         return 0.0, 0.0, {}
     if not billing:
@@ -227,6 +252,7 @@ def get_actions_per_repo(api, owner, repo):
             total_storage_gb_hours += qty
         sku_breakdown[sku] = item
     return total_minutes, total_storage_gb_hours, sku_breakdown
+
 
 def get_actions_from_runs(api, owner, repo):
     """Fallback: calculate minutes from workflow runs."""
@@ -253,19 +279,23 @@ def get_actions_from_runs(api, owner, repo):
 
 # ── Report Sections ─────────────────────────────────────────────────────
 
+
 def print_header():
     print("=" * 70)
     print("        GitHub Monthly Usage Report v2")
     print("=" * 70)
     print()
 
+
 def print_sep(title):
     print(f"── {title} {'─' * (60 - len(title))}")
+
 
 def print_section(title):
     print(f"\n{'=' * 70}")
     print(f"  {title}")
     print(f"{'=' * 70}\n")
+
 
 def show_rate_limits(api):
     print_sep("API Rate Limit")
@@ -274,8 +304,12 @@ def show_rate_limits(api):
 
     # Standard limits
     print()
-    for name, key in [("Core API", "core"), ("GraphQL API", "graphql"),
-                       ("Search API", "search"), ("Code Scanning", "code_scanning_upload")]:
+    for name, key in [
+        ("Core API", "core"),
+        ("GraphQL API", "graphql"),
+        ("Search API", "search"),
+        ("Code Scanning", "code_scanning_upload"),
+    ]:
         r = resources.get(key, {})
         rem = r.get("remaining", "?")
         lim = r.get("limit", "?")
@@ -283,7 +317,9 @@ def show_rate_limits(api):
         reset_ts = r.get("reset", 0)
         reset_str = ""
         if reset_ts:
-            reset_str = f"  (resets {datetime.fromtimestamp(reset_ts, tz=timezone.utc).strftime('%H:%M UTC')})"
+            reset_str = (
+                f"  (resets {datetime.fromtimestamp(reset_ts, tz=UTC).strftime('%H:%M UTC')})"
+            )
         print(f"  {name:<25} {rem:>6} / {lim:<6} remaining{reset_str}")
 
     # Premium / high-tier
@@ -296,6 +332,7 @@ def show_rate_limits(api):
             pct = (used / limit * 100) if limit else 0
             print(f"    {name:<35} {used:>6} / {limit:<6} ({pct:.1f}% used)")
     print()
+
 
 def show_account_info(api):
     print_sep("Account Info")
@@ -322,31 +359,35 @@ def show_account_info(api):
     print()
     return username, user_type
 
+
 def show_actions_summary(api, username, user_minutes, user_storage_gb_hours, sku_breakdown):
     print_section("GitHub Actions Usage")
-    print(f"  Summary:")
+    print("  Summary:")
     print(f"    Compute Minutes:    {user_minutes:>10.1f} min")
     print(f"    Storage (GB-hrs):   {user_storage_gb_hours:>10.4f} GB-hrs")
     print(f"    Avg Storage (MB):   {gb_hours_to_avg_mb(user_storage_gb_hours):>10.1f} MB")
     print()
 
     # Per-SKU breakdown
-    print(f"  Per-SKU Breakdown:")
+    print("  Per-SKU Breakdown:")
     print(f"    {'SKU':<30} {'QTY':>10} {'UNIT':<18} {'GROSS':>10} {'DISCOUNT':>10} {'NET':>10}")
-    print(f"    {'-'*30} {'-'*10} {'-'*18} {'-'*10} {'-'*10} {'-'*10}")
+    print(f"    {'-' * 30} {'-' * 10} {'-' * 18} {'-' * 10} {'-' * 10} {'-' * 10}")
     for sku, item in sku_breakdown.items():
         qty = item.get("grossQuantity", 0)
         unit = item.get("unitType", "")
         gross = item.get("grossAmount", 0)
         discount = item.get("discountAmount", 0)
         net = item.get("netAmount", 0)
-        print(f"    {sku:<30} {qty:>10.4f} {unit:<18} {fmt_price(gross):>10} {fmt_price(discount):>10} {fmt_price(net):>10}")
+        print(
+            f"    {sku:<30} {qty:>10.4f} {unit:<18} {fmt_price(gross):>10} {fmt_price(discount):>10} {fmt_price(net):>10}"
+        )
     print()
+
 
 def show_actions_per_repo(api, repos):
     print_section("Per-Repository Actions Breakdown")
     print(f"  {'REPO':<45} {'MINUTES':>10} {'GB-HRS':>10} {'AVG MB':>10} {'GROSS':>10}")
-    print(f"  {'-'*45} {'-'*10} {'-'*10} {'-'*10} {'-'*10}")
+    print(f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
 
     repo_data = []
     for repo in repos:
@@ -357,16 +398,21 @@ def show_actions_per_repo(api, repos):
         avg_mb = gb_hours_to_avg_mb(storage_gb_hours)
         gross = sum(i.get("grossAmount", 0) for i in sku.values())
         repo_data.append((full, minutes, storage_gb_hours, avg_mb, gross, sku))
-        print(f"  {full:<45} {minutes:>10.1f} {storage_gb_hours:>10.4f} {avg_mb:>10.1f} {fmt_price(gross):>10}")
+        print(
+            f"  {full:<45} {minutes:>10.1f} {storage_gb_hours:>10.4f} {avg_mb:>10.1f} {fmt_price(gross):>10}"
+        )
 
     total_mins = sum(r[1] for r in repo_data)
     total_gb = sum(r[2] for r in repo_data)
     total_mb = gb_hours_to_avg_mb(total_gb)
     total_gross = sum(r[4] for r in repo_data)
-    print(f"  {'-'*45} {'-'*10} {'-'*10} {'-'*10} {'-'*10}")
-    print(f"  {'TOTAL':<45} {total_mins:>10.1f} {total_gb:>10.4f} {total_mb:>10.1f} {fmt_price(total_gross):>10}")
+    print(f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
+    print(
+        f"  {'TOTAL':<45} {total_mins:>10.1f} {total_gb:>10.4f} {total_mb:>10.1f} {fmt_price(total_gross):>10}"
+    )
     print()
     return repo_data
+
 
 def show_actions_top_consumers(repo_data):
     print_sep("Top 10 Repos by Actions Minutes")
@@ -375,6 +421,7 @@ def show_actions_top_consumers(repo_data):
     for full, minutes, _, avg_mb, gross, _ in sorted_repos[:10]:
         print(f"    {minutes:>8.1f} min | {avg_mb:>8.1f} MB | {full}")
     print()
+
 
 def show_actions_os_breakdown(api, repos):
     """Show Ubuntu/Windows/macOS breakdown for top repos."""
@@ -396,7 +443,7 @@ def show_actions_os_breakdown(api, repos):
                     print(f"    {os_name:<10} {mins:>8.1f} min")
             print()
     if found:
-        print(f"  TOTAL:")
+        print("  TOTAL:")
         for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
             mins = total_os[os_name] / 60000
             if mins > 0:
@@ -405,6 +452,7 @@ def show_actions_os_breakdown(api, repos):
         print("  No detailed OS breakdown available from workflow runs API.")
         print("  (Use the Actions Summary above for total minutes by OS type)")
     print()
+
 
 def show_copilot_summary(api, username):
     print_section("GitHub Copilot Usage")
@@ -422,7 +470,7 @@ def show_copilot_summary(api, username):
     total_discount = 0
     total_net = 0
 
-    print(f"  Summary:")
+    print("  Summary:")
     for sku, item in items.items():
         qty = item.get("grossQuantity", 0)
         unit = item.get("unitType", "")
@@ -434,29 +482,38 @@ def show_copilot_summary(api, username):
         total_gross += gross
         total_discount += discount
         total_net += net
-        print(f"    {sku:<35} {qty:>10.2f} {unit:<10} @ {fmt_price(price)}/ea | gross: {fmt_price(gross)} | discount: {fmt_price(discount)} | net: {fmt_price(net)}")
+        print(
+            f"    {sku:<35} {qty:>10.2f} {unit:<10} @ {fmt_price(price)}/ea | gross: {fmt_price(gross)} | discount: {fmt_price(discount)} | net: {fmt_price(net)}"
+        )
     print()
-    print(f"    {'TOTAL':<35} {total_requests:>10.2f} requests | gross: {fmt_price(total_gross)} | discount: {fmt_price(total_discount)} | net: {fmt_price(total_net)}")
+    print(
+        f"    {'TOTAL':<35} {total_requests:>10.2f} requests | gross: {fmt_price(total_gross)} | discount: {fmt_price(total_discount)} | net: {fmt_price(total_net)}"
+    )
     print()
 
     # By model breakdown
-    print(f"  By Model:")
+    print("  By Model:")
     premium_by_model = get_premium_request_usage(api, username)
     if not premium_by_model:
         print("    No model-level data available.")
         print()
         return
 
-    for model, data in sorted(premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True):
+    for model, data in sorted(
+        premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
+    ):
         print(f"    {model}:")
         print(f"      Total requests: {data['total_requests']:.2f}")
-        print(f"      Gross: {fmt_price(data['total_gross'])} | Discount: {fmt_price(data['total_discount'])} | Net: {fmt_price(data['total_net'])}")
+        print(
+            f"      Gross: {fmt_price(data['total_gross'])} | Discount: {fmt_price(data['total_discount'])} | Net: {fmt_price(data['total_net'])}"
+        )
         for item in data["items"]:
             sku = item.get("sku", "unknown")
             qty = item.get("grossQuantity", 0)
             price = item.get("pricePerUnit", 0)
             print(f"        {sku}: {qty:.2f} @ {fmt_price(price)}/ea")
         print()
+
 
 def show_gitlfs_summary(api, username):
     print_section("Git LFS Usage")
@@ -468,15 +525,18 @@ def show_gitlfs_summary(api, username):
 
     items = summary["items"]
     print(f"  {'SKU':<30} {'QTY':>10} {'UNIT':<18} {'GROSS':>10} {'DISCOUNT':>10} {'NET':>10}")
-    print(f"  {'-'*30} {'-'*10} {'-'*18} {'-'*10} {'-'*10} {'-'*10}")
+    print(f"  {'-' * 30} {'-' * 10} {'-' * 18} {'-' * 10} {'-' * 10} {'-' * 10}")
     for sku, item in items.items():
         qty = item.get("grossQuantity", 0)
         unit = item.get("unitType", "")
         gross = item.get("grossAmount", 0)
         discount = item.get("discountAmount", 0)
         net = item.get("netAmount", 0)
-        print(f"    {sku:<30} {qty:>10.4f} {unit:<18} {fmt_price(gross):>10} {fmt_price(discount):>10} {fmt_price(net):>10}")
+        print(
+            f"    {sku:<30} {qty:>10.4f} {unit:<18} {fmt_price(gross):>10} {fmt_price(discount):>10} {fmt_price(net):>10}"
+        )
     print()
+
 
 def show_full_billing_history(api, username):
     """Show detailed billing history with all products."""
@@ -489,7 +549,19 @@ def show_full_billing_history(api, username):
 
     # Aggregate by product+sku
     from collections import defaultdict
-    agg = defaultdict(lambda: {"entries": 0, "total_qty": 0, "total_gross": 0, "total_discount": 0, "total_net": 0, "units": set(), "repos": set(), "months": set()})
+
+    agg = defaultdict(
+        lambda: {
+            "entries": 0,
+            "total_qty": 0,
+            "total_gross": 0,
+            "total_discount": 0,
+            "total_net": 0,
+            "units": set(),
+            "repos": set(),
+            "months": set(),
+        }
+    )
 
     for item in full:
         prod = item.get("product", "unknown")
@@ -508,8 +580,10 @@ def show_full_billing_history(api, username):
         if dt:
             agg[key]["months"].add(dt)
 
-    print(f"  {'PRODUCT/SKU':<40} {'ENRIES':>6} {'TOTAL QTY':>12} {'UNITS':<12} {'GROSS':>10} {'DISCOUNT':>10} {'NET':>10}")
-    print(f"  {'-'*40} {'-'*6} {'-'*12} {'-'*12} {'-'*10} {'-'*10} {'-'*10}")
+    print(
+        f"  {'PRODUCT/SKU':<40} {'ENRIES':>6} {'TOTAL QTY':>12} {'UNITS':<12} {'GROSS':>10} {'DISCOUNT':>10} {'NET':>10}"
+    )
+    print(f"  {'-' * 40} {'-' * 6} {'-' * 12} {'-' * 12} {'-' * 10} {'-' * 10} {'-' * 10}")
 
     for key in sorted(agg.keys()):
         d = agg[key]
@@ -517,7 +591,9 @@ def show_full_billing_history(api, username):
         repos = ", ".join(sorted(d["repos"]))[:30]
         months = ", ".join(sorted(d["months"]))
         qty_str = f"{d['total_qty']:.2f}"
-        print(f"  {key:<40} {d['entries']:>6} {qty_str:>12} {units:<12} {fmt_price(d['total_gross']):>10} {fmt_price(d['total_discount']):>10} {fmt_price(d['total_net']):>10}")
+        print(
+            f"  {key:<40} {d['entries']:>6} {qty_str:>12} {units:<12} {fmt_price(d['total_gross']):>10} {fmt_price(d['total_discount']):>10} {fmt_price(d['total_net']):>10}"
+        )
         if repos:
             print(f"    repos: {repos}")
         if months:
@@ -526,9 +602,12 @@ def show_full_billing_history(api, username):
     total_gross = sum(d["total_gross"] for d in agg.values())
     total_discount = sum(d["total_discount"] for d in agg.values())
     total_net = sum(d["total_net"] for d in agg.values())
-    print(f"  {'-'*40} {'-'*6} {'-'*12} {'-'*12} {'-'*10} {'-'*10} {'-'*10}")
-    print(f"  {'TOTAL':<40} {'':>6} {'':>12} {'':>12} {fmt_price(total_gross):>10} {fmt_price(total_discount):>10} {fmt_price(total_net):>10}")
+    print(f"  {'-' * 40} {'-' * 6} {'-' * 12} {'-' * 12} {'-' * 10} {'-' * 10} {'-' * 10}")
+    print(
+        f"  {'TOTAL':<40} {'':>6} {'':>12} {'':>12} {fmt_price(total_gross):>10} {fmt_price(total_discount):>10} {fmt_price(total_net):>10}"
+    )
     print()
+
 
 def show_monthly_costs(repo_data, username, api):
     """Show estimated monthly costs for current month."""
@@ -557,18 +636,29 @@ def show_monthly_costs(repo_data, username, api):
     total_net = actions_net + copilot_net + lfs_net
 
     print(f"  {'Category':<25} {'GROSS':>12} {'DISCOUNT':>12} {'NET':>12}")
-    print(f"  {'-'*25} {'-'*12} {'-'*12} {'-'*12}")
-    print(f"  {'Actions':<25} {fmt_price(actions_gross):>12} {fmt_price(actions_discount):>12} {fmt_price(actions_net):>12}")
-    print(f"  {'Copilot':<25} {fmt_price(copilot_gross):>12} {fmt_price(copilot_discount):>12} {fmt_price(copilot_net):>12}")
-    print(f"  {'Git LFS':<25} {fmt_price(lfs_gross):>12} {fmt_price(lfs_discount):>12} {fmt_price(lfs_net):>12}")
-    print(f"  {'-'*25} {'-'*12} {'-'*12} {'-'*12}")
-    print(f"  {'TOTAL':<25} {fmt_price(total_gross):>12} {fmt_price(total_discount):>12} {fmt_price(total_net):>12}")
+    print(f"  {'-' * 25} {'-' * 12} {'-' * 12} {'-' * 12}")
+    print(
+        f"  {'Actions':<25} {fmt_price(actions_gross):>12} {fmt_price(actions_discount):>12} {fmt_price(actions_net):>12}"
+    )
+    print(
+        f"  {'Copilot':<25} {fmt_price(copilot_gross):>12} {fmt_price(copilot_discount):>12} {fmt_price(copilot_net):>12}"
+    )
+    print(
+        f"  {'Git LFS':<25} {fmt_price(lfs_gross):>12} {fmt_price(lfs_discount):>12} {fmt_price(lfs_net):>12}"
+    )
+    print(f"  {'-' * 25} {'-' * 12} {'-' * 12} {'-' * 12}")
+    print(
+        f"  {'TOTAL':<25} {fmt_price(total_gross):>12} {fmt_price(total_discount):>12} {fmt_price(total_net):>12}"
+    )
     print()
 
     if total_discount > 0:
         savings_pct = (total_discount / total_gross * 100) if total_gross > 0 else 0
-        print(f"  You're saving {fmt_price(total_discount)} ({savings_pct:.1f}% discount) this month!")
+        print(
+            f"  You're saving {fmt_price(total_discount)} ({savings_pct:.1f}% discount) this month!"
+        )
         print()
+
 
 def show_limits_summary(username, user_minutes, user_storage_gb_hours):
     print_section("Limits Summary")
@@ -588,51 +678,54 @@ def show_limits_summary(username, user_minutes, user_storage_gb_hours):
     # Copilot: Copilot Pro includes premium requests
     copilot_summary = get_billing_summary(GitHubAPI(""), username, "Copilot")
 
-    print(f"  Actions Minutes:")
+    print("  Actions Minutes:")
     print(f"    Used:         {user_minutes:>8.1f} / {min_limit} min")
     print(f"    Remaining:    {min_remaining:>8.1f} min ({min_pct:.1f}% used)")
     print()
-    print(f"  Actions Storage (avg):")
+    print("  Actions Storage (avg):")
     print(f"    Used:         {avg_storage_mb:>8.1f} / {storage_limit} MB")
     print(f"    Remaining:    {storage_remaining:>8.1f} MB ({storage_pct:.1f}% used)")
     print()
 
     # Copilot limits note
-    print(f"  Copilot Pro:")
-    print(f"    Includes: Copilot Chat, Copilot Agent, Code Review, etc.")
-    print(f"    Premium requests are billed at $0.04/request after included allowance.")
-    print(f"    (Check your plan details for exact premium request limits)")
+    print("  Copilot Pro:")
+    print("    Includes: Copilot Chat, Copilot Agent, Code Review, etc.")
+    print("    Premium requests are billed at $0.04/request after included allowance.")
+    print("    (Check your plan details for exact premium request limits)")
     print()
+
 
 def show_what_else(api, username):
     """Show info about other available data points."""
     print_section("Other Available Data Points")
-    print(f"  Products available via billing API:")
-    print(f"    - actions        : GitHub Actions compute & storage")
-    print(f"    - copilot        : Copilot Chat, Agent, Code Review, etc.")
-    print(f"    - git_lfs        : Git LFS storage")
-    print(f"    - codespaces     : GitHub Codespaces compute & storage")
-    print(f"    - packages       : GitHub Packages (npm, Docker, etc.)")
-    print(f"    - models         : GitHub Models (LLM API usage)")
+    print("  Products available via billing API:")
+    print("    - actions        : GitHub Actions compute & storage")
+    print("    - copilot        : Copilot Chat, Agent, Code Review, etc.")
+    print("    - git_lfs        : Git LFS storage")
+    print("    - codespaces     : GitHub Codespaces compute & storage")
+    print("    - packages       : GitHub Packages (npm, Docker, etc.)")
+    print("    - models         : GitHub Models (LLM API usage)")
     print()
-    print(f"  Other endpoints available:")
+    print("  Other endpoints available:")
     print(f"    - /users/{username}/settings/billing/usage")
-    print(f"      Full billing history (all products, daily granularity)")
+    print("      Full billing history (all products, daily granularity)")
     print(f"    - /users/{username}/settings/billing/premium_request/usage")
-    print(f"      Premium request usage by model (Claude Sonnet 4.6, GPT-5.4, etc.)")
+    print("      Premium request usage by model (Claude Sonnet 4.6, GPT-5.4, etc.)")
     print()
-    print(f"  Rate limits tracked:")
-    print(f"    - Core API:       5000/hour (authenticated)")
-    print(f"    - GraphQL API:    5000/hour (authenticated)")
-    print(f"    - Search API:     30/minute (full text search)")
-    print(f"    - Code Scanning:  5000/hour")
-    print(f"    - Actions Runner: 10000/hour (registration)")
-    print(f"    - SCIM:           15000/hour (enterprise)")
-    print(f"    - Audit Log:      1750/hour")
-    print(f"    - Dependency:     100/hour (snapshots + SBOM)")
+    print("  Rate limits tracked:")
+    print("    - Core API:       5000/hour (authenticated)")
+    print("    - GraphQL API:    5000/hour (authenticated)")
+    print("    - Search API:     30/minute (full text search)")
+    print("    - Code Scanning:  5000/hour")
+    print("    - Actions Runner: 10000/hour (registration)")
+    print("    - SCIM:           15000/hour (enterprise)")
+    print("    - Audit Log:      1750/hour")
+    print("    - Dependency:     100/hour (snapshots + SBOM)")
     print()
 
+
 # ── Main ────────────────────────────────────────────────────────────────
+
 
 def main():
     token = resolve_token()

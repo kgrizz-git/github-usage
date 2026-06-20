@@ -70,4 +70,5 @@ __all__ = [
 
 
 def hours_in_current_month():
+    """Return the total number of hours in the current calendar month."""
     return hours_in_month()

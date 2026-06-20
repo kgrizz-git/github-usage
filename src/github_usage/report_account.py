@@ -8,6 +8,7 @@ from .terminal import print_section, print_sep
 
 
 def show_rate_limits(api):
+    """Print a breakdown of GitHub API rate limits for the authenticated token."""
     print_sep("API Rate Limit")
     data = api.request("GET", "/rate_limit")
     resources = data.get("resources", {})
@@ -45,6 +46,7 @@ def show_rate_limits(api):
 
 
 def show_account_info(api):
+    """Print account details, plan info, and collaborator seat counts."""
     print_sep("Account Info")
     user = api.request("GET", "/user")
     username = user.get("login", "?")

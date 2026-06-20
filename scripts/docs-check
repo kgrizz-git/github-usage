@@ -24,4 +24,14 @@ grep -q "github-usage" README.md
 grep -q "scripts/setup" README.md
 test -x scripts/setup
 
+# Warn about assessment files older than 30 days (they may be stale)
+stale=()
+while IFS= read -r -d '' f; do
+  stale+=("$f")
+done < <(find docs/assessments -name "*.md" -mtime +30 -print0 2>/dev/null)
+if [[ ${#stale[@]} -gt 0 ]]; then
+  echo "Warning: the following assessment files are older than 30 days and may be stale:"
+  printf '  %s\n' "${stale[@]}"
+fi
+
 echo "docs check passed"

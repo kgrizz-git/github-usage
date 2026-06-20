@@ -10,6 +10,7 @@ from .terminal import print_section
 
 
 def show_copilot_summary(api, username):
+    """Print Copilot billing summary and per-model premium request breakdown."""
     print_section("GitHub Copilot Usage")
 
     # Summary
@@ -71,6 +72,7 @@ def show_copilot_summary(api, username):
 
 
 def show_gitlfs_summary(api, username):
+    """Print Git LFS billing summary and per-SKU line items."""
     print_section("Git LFS Usage")
     summary = get_billing_summary(api, username, "git_lfs")
     if not summary:

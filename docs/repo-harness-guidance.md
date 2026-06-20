@@ -185,3 +185,16 @@ Before release, run a release check:
 9. Add `AGENTS.md` with the concise operational instructions.
 10. Add `CHANGELOG.md` and start at `0.1.0` while the CLI contract is still settling.
 11. Add `.gitignore` and docs/release hygiene checklists before the first tagged release.
+
+## Periodic Maintenance Checklist
+
+Run these checks periodically (suggested: monthly or after any significant batch of changes) and record the results in an assessment doc under `docs/assessments/`.
+
+- [ ] Run `scripts/check` — all lint, type, and test checks pass.
+- [ ] Run `scripts/smoke` — CLI entrypoints still start and produce expected output.
+- [ ] Run `scripts/docs-check` — required docs exist, CLI help text is consistent with README, no stale assessment files (>30 days old) without a staleness note.
+- [ ] Run `scripts/security` — no new secrets or high-severity Bandit/pip-audit findings.
+- [ ] Review `docs/assessments/` — archive or update any file with a staleness notice.
+- [ ] Review `docs/superpowers/plans/` — move completed or superseded plans to `docs/superpowers/plans/archived/`.
+- [ ] Check `wc -l src/github_usage/*.py` — flag any file approaching 400 lines for proactive splitting (soft limit: 500 lines).
+- [ ] Review `AGENTS.md` and `docs/repo-harness-guidance.md` — ensure guidance still reflects actual repo conventions.

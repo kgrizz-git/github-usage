@@ -8,6 +8,7 @@ from .terminal import print_section, print_sep
 
 
 def show_actions_summary(api, username, user_minutes, user_storage_gb_hours, sku_breakdown):
+    """Print the Actions compute and storage summary with per-SKU cost breakdown."""
     print_section("GitHub Actions Usage")
     print("  Summary:")
     print(f"    Compute Minutes:    {user_minutes:>10.1f} min")
@@ -32,6 +33,7 @@ def show_actions_summary(api, username, user_minutes, user_storage_gb_hours, sku
 
 
 def show_actions_per_repo(api, repos):
+    """Print per-repository Actions minutes, storage, and gross cost; return row data."""
     print_section("Per-Repository Actions Breakdown")
     print(f"  {'REPO':<45} {'MINUTES':>10} {'GB-HRS':>10} {'AVG MB':>10} {'GROSS':>10}")
     print(f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
@@ -62,6 +64,7 @@ def show_actions_per_repo(api, repos):
 
 
 def show_actions_top_consumers(repo_data):
+    """Print the top 10 repositories ranked by Actions minutes consumed."""
     print_sep("Top 10 Repos by Actions Minutes")
     print()
     sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True)
@@ -102,6 +105,7 @@ def show_actions_os_breakdown(api, repos):
 
 
 def show_limits_summary(username, user_minutes, user_storage_gb_hours):
+    """Print free-tier usage vs. limit for Actions minutes and storage."""
     print_section("Limits Summary")
 
     # Actions limits (free tier)

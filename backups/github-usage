@@ -13,15 +13,16 @@ Token resolution (first match wins):
     4. ~/.config/github-cli/github.yaml (oauth_token field)
 """
 
-import subprocess
-import sys
 import json
 import os
+import subprocess
+import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # ── Token Resolution ────────────────────────────────────────────────────
+
 
 def resolve_token():
     # 1. CLI arg
@@ -35,9 +36,7 @@ def resolve_token():
 
     # 3. gh CLI
     try:
-        result = subprocess.run(
-            ["gh", "auth", "token"], capture_output=True, text=True, timeout=10
-        )
+        result = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, timeout=10)
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -59,6 +58,7 @@ def resolve_token():
 
 # ── GitHub API Helper ───────────────────────────────────────────────────
 
+
 class GitHubAPI:
     def __init__(self, token):
         self.token = token
@@ -73,12 +73,14 @@ class GitHubAPI:
 
     def _get_session(self):
         import http.client
+
         self._session = http.client.HTTPSConnection("api.github.com")
         return self._session
 
     def request(self, method, path, params=None):
         """Make an API request and return parsed JSON."""
         import http.client
+
         url = f"{self.base}{path}"
         if params:
             query = "&".join(f"{k}={v}" for k, v in params.items())
@@ -117,7 +119,9 @@ class GitHubAPI:
         page = 1
         per_page = 100
         while True:
-            result = self.request("GET", path, {**(params or {}), "page": page, "per_page": per_page})
+            result = self.request(
+                "GET", path, {**(params or {}), "page": page, "per_page": per_page}
+            )
             if not result:
                 break
             if isinstance(result, list):
@@ -131,6 +135,7 @@ class GitHubAPI:
 
 
 # ── Report Generation ───────────────────────────────────────────────────
+
 
 def print_header():
     print("=" * 60)
@@ -154,9 +159,11 @@ def get_rate_limit(api):
     print(f"  Core API:     {core.get('remaining', '?')} / {core.get('limit', '?')} remaining")
     reset_ts = core.get("reset", 0)
     if reset_ts:
-        reset_date = datetime.fromtimestamp(reset_ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        reset_date = datetime.fromtimestamp(reset_ts, tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
         print(f"  Resets at:    {reset_date}")
-    print(f"  GraphQL API:  {graphql.get('remaining', '?')} / {graphql.get('limit', '?')} remaining")
+    print(
+        f"  GraphQL API:  {graphql.get('remaining', '?')} / {graphql.get('limit', '?')} remaining"
+    )
     print(
         f"  Actions (runner registration):  "
         f"{actions_reg.get('remaining', '?')} / {actions_reg.get('limit', '?')} remaining"
@@ -183,7 +190,11 @@ def get_user_info(api):
 
     limits = {
         "User": {"minutes": 2000, "storage_mb": 500, "plan": "Personal (free: 2000 min, 500 MB)"},
-        "Organization": {"minutes": None, "storage_mb": None, "plan": "Organization (org-dependent)"},
+        "Organization": {
+            "minutes": None,
+            "storage_mb": None,
+            "plan": "Organization (org-dependent)",
+        },
         "Enterprise": {"minutes": None, "storage_mb": None, "plan": "Enterprise (org-dependent)"},
     }
     info = limits.get(user_type, {"minutes": 2000, "storage_mb": 500, "plan": "Unknown"})
@@ -195,7 +206,9 @@ def get_user_info(api):
 def get_user_actions_billing(api, username):
     """Get user-level Actions billing via new usage summary API. Returns (total_minutes, storage_bytes)."""
     try:
-        billing = api.request("GET", f"/users/{username}/settings/billing/usage/summary", {"product": "Actions"})
+        billing = api.request(
+            "GET", f"/users/{username}/settings/billing/usage/summary", {"product": "Actions"}
+        )
     except RuntimeError:
         return None, None
 
@@ -217,6 +230,7 @@ def get_user_actions_billing(api, username):
 
     # Convert gigabyte-hours to average MB for the month
     from datetime import date, timedelta
+
     today = date.today()
     first_day = today.replace(day=1)
     last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
@@ -229,10 +243,11 @@ def get_user_actions_billing(api, username):
 def get_actions_billing_per_repo(api, owner, repo):
     """Get per-repo Actions billing via new usage summary API. Returns (minutes, storage_mb)."""
     try:
-        billing = api.request("GET", f"/users/{owner}/settings/billing/usage/summary", {
-            "product": "Actions",
-            "repository": f"{owner}/{repo}"
-        })
+        billing = api.request(
+            "GET",
+            f"/users/{owner}/settings/billing/usage/summary",
+            {"product": "Actions", "repository": f"{owner}/{repo}"},
+        )
     except RuntimeError:
         return 0.0, 0
 
@@ -253,6 +268,7 @@ def get_actions_billing_per_repo(api, owner, repo):
             total_storage_gb_hours += quantity
 
     from datetime import date, timedelta
+
     today = date.today()
     first_day = today.replace(day=1)
     last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
@@ -265,6 +281,7 @@ def get_actions_billing_per_repo(api, owner, repo):
 def get_actions_billing_from_runs(api, owner, repo):
     """Fallback: calculate minutes from workflow runs. May not have billable data for free accounts."""
     from datetime import date, timedelta
+
     today = date.today()
     first_day = today.replace(day=1)
     last_day = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
@@ -315,7 +332,7 @@ def print_actions_usage(api, repos, username, user_minutes=None, user_storage=No
     # Per-repo breakdown
     print("── Per-Repository Actions Minutes ───────────────────────")
     print(f"  {'REPO':<45} {'MINUTES':>12} {'STORAGE (MB)':>14}")
-    print(f"  {'-'*45} {'-'*12} {'-'*14}")
+    print(f"  {'-' * 45} {'-' * 12} {'-' * 14}")
 
     repo_data = {}  # full_name -> {minutes, storage, workflows}
 
@@ -352,7 +369,7 @@ def print_actions_usage(api, repos, username, user_minutes=None, user_storage=No
         print(f"  Total Actions Minutes Used: {total_minutes:.1f} min")
         print(f"  Total Storage Used: {total_storage:.1f} MB")
         if total_minutes == 0:
-            print(f"  Note: Actions billing data not available (requires 'user' scope)")
+            print("  Note: Actions billing data not available (requires 'user' scope)")
     print()
 
     return repo_data, total_minutes, total_storage
@@ -392,11 +409,11 @@ def print_workflow_breakdown(api, top_repo):
 
     total = sum(workflows.values())
     print(f"  {'WORKFLOW':<45} {'MINUTES':>10} {'SHARE':>8}")
-    print(f"  {'-'*45} {'-'*10} {'-'*8}")
+    print(f"  {'-' * 45} {'-' * 10} {'-' * 8}")
     for wf, mins in sorted(workflows.items(), key=lambda x: x[1], reverse=True)[:15]:
         share = (mins / total * 100) if total > 0 else 0
         print(f"  {wf:<45} {mins:>10.2f} {share:>7.1f}%")
-    print(f"  {'-'*45} {'-'*10} {'-'*8}")
+    print(f"  {'-' * 45} {'-' * 10} {'-' * 8}")
     print(f"  {'TOTAL':<45} {total:>10.2f}")
     print()
 
@@ -420,11 +437,11 @@ def print_limits_summary(repo_data, user_type, user_minutes=None, user_storage=N
         remaining_st = max(0, storage_limit - total_storage)
         pct_st = (total_storage / storage_limit * 100) if storage_limit else 0
 
-        print(f"  Actions Minutes:")
+        print("  Actions Minutes:")
         print(f"    Used:         {total_minutes:.1f} / {min_limit} min")
         print(f"    Remaining:    {remaining_min:.1f} min ({pct_min:.1f}% used)")
         print()
-        print(f"  Storage:")
+        print("  Storage:")
         print(f"    Used:         {total_storage:.1f} / {storage_limit} MB")
         print(f"    Remaining:    {remaining_st:.1f} MB ({pct_st:.1f}% used)")
     else:
@@ -438,6 +455,7 @@ def print_limits_summary(repo_data, user_type, user_minutes=None, user_storage=N
 
 
 # ── Main ────────────────────────────────────────────────────────────────
+
 
 def main():
     token = resolve_token()
@@ -455,7 +473,9 @@ def main():
         username, user_type, limits = get_user_info(api)
         repos = get_all_repos(api)
         user_minutes, user_storage = get_user_actions_billing(api, username)
-        repo_data, total_minutes, total_storage = print_actions_usage(api, repos, username, user_minutes, user_storage)
+        repo_data, total_minutes, total_storage = print_actions_usage(
+            api, repos, username, user_minutes, user_storage
+        )
         sorted_repos = print_top_consumers(repo_data)
         top_repo = sorted_repos[0] if sorted_repos else None
         print_workflow_breakdown(api, top_repo)

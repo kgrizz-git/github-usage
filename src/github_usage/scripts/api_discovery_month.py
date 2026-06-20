@@ -62,6 +62,7 @@ def _summarize(data) -> str:
 
 
 def main() -> int:
+    """Probe GitHub billing endpoints to discover month-filtering support."""
     _require_env("GITHUB_USAGE_API_DISCOVERY")
     token = _require_env("GITHUB_TOKEN")
 

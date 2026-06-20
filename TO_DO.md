@@ -19,7 +19,7 @@
 - [x] Support saving the rendered email report through the shared `--output PATH` / export path instead of adding an email-only attachment flag.
 - [ ] Add `--email-format text|html` after the plain-text formatter is stable. (Flag added in this PR; HTML rendering deferred.)
 - [ ] Add optional CC/BCC delivery fields for team and finance distribution.
-- [ ] Add default GitHub API and Resend timeout/retry behavior, then consider `--timeout SECONDS` and `--max-retries N` flags if users need control.
+- [ ] Add default GitHub API and Resend timeout/retry behavior, then consider `--timeout SECONDS` and `--max-retries N` flags if users need control. **[Plan](../superpowers/plans/2026-06-19-default-timeout-retry.md)**
 - [ ] Evaluate report retention destinations such as GitHub Releases, S3, or shared drives after export/output support exists.
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
 
@@ -39,14 +39,14 @@
 
 ## Repo Engineering & Hygiene
 
-- [ ] Enforce file size limits: add a lint step (or pre-commit hook) that fails if any source file exceeds 300 lines or any function exceeds 50 lines, per `AGENTS.md` style rule.
-- [ ] Instruct agents (via `AGENTS.md`) to keep files under 800 lines whenever possible, splitting large modules proactively rather than waiting for the lint threshold to trigger.
-- [ ] Improve overall repo hygiene: ensure `.gitignore` is complete, `pyproject.toml` / `requirements.txt` are in sync, and no stale artifacts (`.pyc`, `__pycache__`, `.env` files) are tracked.
-- [ ] Add a doc hygiene check: verify that public modules/functions have docstrings, and that `AGENTS.md` / `README.md` / CLI `--help` text are consistent.
-- [ ] Review and update `AGENTS.md` instructions to agents: clarify the staleness comment pattern, the done criteria, the test coverage expectations from the bug report, and the file-size guidance.
-- [ ] Add a stale-documentation reminder: scripts or CI should flag assessment files (e.g. `docs/assessments/`) older than 30 days for review, since the current bug report already has a staleness notice.
-- [ ] Add a repo harness maintenance checklist: periodic re-runs of `scripts/check`, `scripts/smoke`, `scripts/docs-check`, and `scripts/security` with updated results in assessment docs.
-- [ ] Instruct agents (via `AGENTS.md`) to move complete, superseded, or archived plans to `superpowers/plans/archived/` to keep the active plans directory uncluttered.
+- [x] Add advisory size warnings: add a `scripts/check-sizes` script (and optional pre-commit hook) that warns when any source file exceeds 400 lines or any function exceeds 80 lines. Thresholds revised to 500-line / 100-line soft limits — warnings only, no hard failures. **Done 2026-06-19:** `scripts/check-sizes` written (AST-based, exit 0 always); wired into `scripts/check`. **[Plan](docs/superpowers/plans/archived/plan-repo-hygiene.md#1-enforce-file-size-limits)**
+- [x] Instruct agents (via `AGENTS.md`) to keep files under 800 lines whenever possible, splitting large modules proactively rather than waiting for the lint threshold to trigger. **Done 2026-06-19:** Added "start extracting when approaching 200 lines" guidance to `AGENTS.md` Code Style (threshold revised from 800 to 200 — see plan). **[Plan](docs/superpowers/plans/archived/plan-repo-hygiene.md#2-agent-guidance-keep-files-under-800-lines)**
+- [x] Improve overall repo hygiene: ensure `.gitignore` is complete, `pyproject.toml` / `requirements.txt` are in sync, and no stale artifacts (`.pyc`, `__pycache__`, `.env` files) are tracked. **Done 2026-06-19:** Added `pyproject.toml` dependency declaration note to `AGENTS.md`; no other changes needed (all hygiene checks passed). **[Plan](docs/superpowers/plans/archived/plan-repo-hygiene.md#3-improve-overall-repo-hygiene)**
+- [x] Add a doc hygiene check: verify that public modules/functions have docstrings, and that `AGENTS.md` / `README.md` / CLI `--help` text are consistent. **Done 2026-06-19:** Added ruff `D100`/`D103`/`D104` (Google convention) to `pyproject.toml`; added docstrings to all 27 previously uncovered public functions and modules; 0 violations. CLI/README consistency already covered by `scripts/docs-check`. **[Plan](docs/superpowers/plans/archived/plan-repo-hygiene.md#4-add-doc-hygiene-check)**
+- [x] Review and update `AGENTS.md` instructions to agents: clarify the staleness comment pattern, the done criteria, the test coverage expectations from the bug report, and the file-size guidance. **Done 2026-06-19:** Done criteria expanded with docstring/test/checkbox/archiving guidance; Code Style updated with 200-line proactive split signal; Repository Expectations updated with `pyproject.toml` dependency note.
+- [x] Add a stale-documentation reminder: scripts or CI should flag assessment files (e.g. `docs/assessments/`) older than 30 days for review, since the current bug report already has a staleness notice. **Done 2026-06-19:** Extended `scripts/docs-check` to `find docs/assessments -name "*.md" -mtime +30` and print a warning listing stale files.
+- [x] Add a repo harness maintenance checklist: periodic re-runs of `scripts/check`, `scripts/smoke`, `scripts/docs-check`, and `scripts/security` with updated results in assessment docs. **Done 2026-06-19:** Added "Periodic Maintenance Checklist" section to `docs/repo-harness-guidance.md`.
+- [x] Instruct agents (via `AGENTS.md`) to move complete, superseded, or archived plans to `superpowers/plans/archived/` to keep the active plans directory uncluttered. **Done 2026-06-19:** Added archiving instruction to `AGENTS.md` Done Criteria; created `docs/superpowers/plans/archived/` directory.
 
 ## Process & Workflow
 

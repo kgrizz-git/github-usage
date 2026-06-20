@@ -19,6 +19,7 @@ def _safe_int_size(value) -> int | None:
 
 
 def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 100) -> dict:
+    """Return top repos ranked by Actions minutes and gross cost."""
     rows = []
     considered = repos[:max_repos]
     for repo in considered:
@@ -47,6 +48,7 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
 
 
 def get_artifact_storage_details(api, repos: list[dict], max_repos: int = 100) -> dict:
+    """Return per-repo artifact storage totals for the top storage consumers."""
     rows = []
     considered = repos[:max_repos]
     for repo in considered:
@@ -71,6 +73,7 @@ def get_artifact_storage_details(api, repos: list[dict], max_repos: int = 100) -
 
 
 def get_release_asset_details(api, repos: list[dict], max_repos: int = 100) -> dict:
+    """Return per-repo release asset storage totals for the top storage consumers."""
     rows = []
     considered = repos[:max_repos]
     for repo in considered:
@@ -107,6 +110,7 @@ def estimate_api_request_count(
     core_limit: int | None = None,
     core_remaining: int | None = None,
 ) -> dict:
+    """Estimate the number of additional API requests optional sections will make."""
     repos_considered = min(repo_count, max_repos)
     per_repo_options = sum([include_consumers, include_artifact_storage, include_release_assets])
     estimated = repos_considered * per_repo_options

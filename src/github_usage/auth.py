@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 def print_missing_token_error(usage_command="github-usage"):
+    """Print a human-readable error explaining how to supply a GitHub token."""
     print("Error: No GitHub token found.")
     print(f"  Usage: {usage_command} <token>")
     print("  Or set GITHUB_TOKEN env var.")
@@ -19,6 +20,7 @@ def print_missing_token_error(usage_command="github-usage"):
 
 
 def resolve_token(argv: Sequence[str] | None = None):
+    """Return the GitHub token from argv, env, gh CLI, or config file; None if not found."""
     if argv is None:
         argv = sys.argv[1:]
     if argv:
