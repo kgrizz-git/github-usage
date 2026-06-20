@@ -33,7 +33,14 @@ from .setup_launchd import (
 )
 
 CI_SECRETS = (
-    ("GH_USAGE_TOKEN", "GitHub personal access token with the user scope"),
+    (
+        "GH_USAGE_TOKEN",
+        (
+            "GitHub PAT that can read your personal repos and billing "
+            "(classic: `repo` scope; fine-grained: `Metadata: Read-only` + "
+            "`Plan: Read-only` on your user account)"
+        ),
+    ),
     ("RESEND_API_KEY", "Resend API key"),
     ("REPORT_EMAIL", "Recipient email address"),
     ("RESEND_FROM", "Sender address on your verified Resend domain"),
@@ -177,7 +184,7 @@ def _resolve_github_token(existing: dict[str, str]) -> str:
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     return result.stdout.strip()
-    token = _prompt_value("GitHub token (user scope)", secret=True)
+    token = _prompt_value("GitHub token (repo or fine-grained Plan:Read)", secret=True)
     return token.strip()
 
 
@@ -386,7 +393,10 @@ def _interactive_menu(paths: SetupPaths) -> int:
             "GitHub Actions secrets",
             (
                 "Push secrets to this repository with `gh secret set` so the scheduled "
-                "GitHub Actions workflow can send the report. Requires `gh` CLI auth."
+                "GitHub Actions workflow can send the report. The GitHub token must be "
+                "able to read your personal repos and user-billing endpoints "
+                "(classic `repo`, or fine-grained with `Metadata: Read-only` and the "
+                "account permission `Plan: Read-only`). Requires `gh` CLI auth."
             ),
             _ci_only,
         ),

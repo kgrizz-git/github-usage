@@ -208,12 +208,23 @@ queries are not feasible with the current GitHub API.
 
 This repo includes [`.github/workflows/email-report.yml`](.github/workflows/email-report.yml) as a workflow template. Run `./setup.sh` and choose **GitHub Actions secrets** to set these with `gh secret set`:
 
-- `GH_USAGE_TOKEN`: a personal access token with the `user` scope
+- `GH_USAGE_TOKEN`: a personal access token that can read your personal repos
+  and your user-level billing data
+  - Classic PAT: select the `repo` scope (it covers repos, releases, Actions
+    artifacts/runs, and the `/users/{username}/settings/billing/*` endpoints)
+  - Fine-grained PAT: create it with your user as the resource owner,
+    "All repositories" access, `Metadata: Read-only` (for `/user/repos` and
+    `/repos/{owner}/{repo}/...`) and the account permission `Plan: Read-only`
+    (for the billing endpoints). `read:user` alone is not enough.
 - `RESEND_API_KEY`: your Resend API key
 - `REPORT_EMAIL`: the recipient address
 - `RESEND_FROM`: a sender address on your verified Resend domain
 
-Do not use the automatic GitHub Actions `${{ github.token }}` for this report. Billing endpoints require a user-scoped token, and Actions reserves the `GITHUB_` secret prefix, so the workflow stores the personal token as `GH_USAGE_TOKEN` and exposes it to the CLI as `GITHUB_TOKEN`.
+Do not use the automatic GitHub Actions `${{ github.token }}` for this report.
+The Actions-provided `GITHUB_TOKEN` is scoped to the repository's installation
+and cannot reach the user-billing endpoints that this report needs. The
+`GITHUB_` secret prefix is reserved by Actions, so the workflow stores the
+personal token as `GH_USAGE_TOKEN` and exposes it to the CLI as `GITHUB_TOKEN`.
 
 After secrets are set, test with `gh workflow run email-report.yml`.
 
