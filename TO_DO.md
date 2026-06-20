@@ -52,6 +52,7 @@
 - [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules).
 - [x] Move the `setup` entrypoint to the root repo directory for easier discovery (or add a wrapper entrypoint). **Done:** 2026-06-20 — promoted to `./setup.sh` with `scripts/setup` retained as a backward-compat shim (plan 2026-06-20-move-setup-entrypoint).
 - [ ] Add Windows/PowerShell support for the setup script.
+- [ ] Add single entrypoint for guiding user through running report locally or to email once, as well as through guided setup.
 
 ## DEFERRED
 
