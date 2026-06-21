@@ -27,6 +27,8 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 - **CSV writer**: section-based layout with `### Section ###` headers; UTF-8 BOM for Excel-on-Windows compatibility.
 - **Optional dependency extras**: `pip install github-usage[export-xlsx]` and `[export-pdf]`. PEP 621 does not support nested extras, so users install one at a time.
 - **API discovery script** (`src/github_usage/scripts/api_discovery_month.py`): gated by `GITHUB_USAGE_API_DISCOVERY=1`; tests whether billing endpoints honor `since`/`until` parameters and writes a sanitized report to `docs/api-discovery-month.md`.
+- **Schedule-only menu option:** Configure the report schedule (weekday, hour, minute) from the setup menu without running the full wizard; regenerates the LaunchAgent plist and reminds the user to reinstall it when a LaunchAgent is already installed.
+- **Full-setup plist sync:** Recommended full setup now regenerates the LaunchAgent plist after schedule prompts, even when launchd install is skipped.
 
 ### Deferred
 

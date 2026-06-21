@@ -235,6 +235,8 @@ def _full_setup(paths: SetupPaths) -> int:
     _configure_env_secrets(paths)
     _configure_email_options(paths)
     _configure_schedule(paths)
+    plist = generate_plist(paths)
+    print(f"Generated {plist.relative_to(paths.root)}")
     code = _verify_setup(paths)
     if code != 0:
         print("Verify failed; fix auth or options before scheduling.")
@@ -280,6 +282,22 @@ def _status_only(paths: SetupPaths) -> int:
     return 0
 
 
+_REINSTALL_REMINDER = (
+    "LaunchAgent is installed. Run option 5 (macOS launchd schedule) "
+    "and choose install to apply the new schedule."
+)
+
+
+def _schedule_only(paths: SetupPaths) -> int:
+    """Configure the schedule and regenerate the LaunchAgent plist."""
+    _configure_schedule(paths)
+    plist = generate_plist(paths)
+    print(f"Generated {plist.relative_to(paths.root)}")
+    if sys.platform == "darwin" and launch_agent_status() == "installed":
+        print(_REINSTALL_REMINDER)
+    return 0
+
+
 _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
     (
         "1",
@@ -312,6 +330,17 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
     ),
     (
         "4",
+        "Report schedule only",
+        (
+            "Configure the day of the week and time for your local reporting "
+            "schedule and regenerate the LaunchAgent plist. Stored in "
+            ".github-usage/config.toml. The GitHub Actions workflow has its own "
+            "cron and ignores this value."
+        ),
+        _schedule_only,
+    ),
+    (
+        "5",
         "macOS launchd schedule",
         (
             "Generate, install, or remove the LaunchAgent plist that runs "
@@ -320,7 +349,7 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _configure_launchd,
     ),
     (
-        "5",
+        "6",
         "GitHub Actions secrets",
         (
             "Push secrets to this repository with `gh secret set` so the scheduled "
@@ -332,7 +361,7 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _ci_only,
     ),
     (
-        "6",
+        "7",
         "Developer security hooks",
         (
             "Install pre-commit and pre-push hooks (ruff, ruff-format, gitleaks) "
@@ -341,7 +370,7 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _hooks_only,
     ),
     (
-        "7",
+        "8",
         "Verify configuration",
         (
             "Run `email-report --dry-run` against your local config to confirm it "
@@ -350,7 +379,7 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _verify_setup,
     ),
     (
-        "8",
+        "9",
         "Show status",
         (
             "Print where setup files live, which env values are set (masked), and "

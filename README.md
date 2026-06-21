@@ -232,6 +232,8 @@ After secrets are set, test with `gh workflow run email-report.yml`.
 
 Run `./setup.sh` and choose **macOS launchd schedule** (or the recommended full setup). The wizard writes `.github-usage/config.toml`, generates a LaunchAgent plist, and can install it for Monday 9:00 in your local timezone.
 
+To change only the report schedule after initial setup, choose **Report schedule only** from the main menu. It updates `[schedule]` in `config.toml` and regenerates the LaunchAgent plist. If a LaunchAgent is already installed, the wizard reminds you to rerun the macOS launchd option and choose install to apply the new schedule.
+
 Scheduled runs invoke [`scripts/send-email-report.sh`](scripts/send-email-report.sh), which loads `.env.email-report`, applies config options, and logs to `reports/`. Override the env file with `GITHUB_USAGE_ENV_FILE` or the log directory with `GITHUB_USAGE_LOG_DIR` if needed.
 
 The committed template at [`launchd/com.github.github-usage.email-report.plist`](launchd/com.github.github-usage.email-report.plist) is reference-only; prefer the wizard-generated plist under `.github-usage/launchd/`.
