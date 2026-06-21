@@ -8,7 +8,7 @@ def get_storage_analysis(api, repos):
     repo_storage = []
     for repo in repos:
         try:
-            owner = repo.get("owner", {}).get("login")
+            owner = (repo.get("owner") or {}).get("login")
             name = repo.get("name")
             if not owner or not name:
                 continue

@@ -43,3 +43,23 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(len(result["repos"]), 1)
         self.assertEqual(result["repos"][0]["total_storage"], 2.0)
         self.assertEqual(len(result["repos"][0]["items"]), 2)
+
+    def test_get_storage_analysis_handles_owner_null(self):
+        from github_usage.storage import get_storage_analysis
+
+        api = FakeAPI()
+        # owner=None (JSON null) used to crash with
+        # AttributeError: 'NoneType' object has no attribute 'get' on the
+        # original `repo.get("owner", {}).get("login")` chain. After A1 the
+        # `(repo.get("owner") or {}).get("login")` form short-circuits.
+        repos = [
+            {"owner": None, "name": "x"},
+            {"owner": None},
+            {"owner": {"login": "octocat"}, "name": "valid", "full_name": "octocat/valid"},
+        ]
+
+        # Should not raise; only the valid repo survives.
+        result = get_storage_analysis(api, repos)
+        # No storage found (FakeAPI returns []), so result may be empty —
+        # the key check is that the call returns and contains "repos".
+        self.assertIn("repos", result)

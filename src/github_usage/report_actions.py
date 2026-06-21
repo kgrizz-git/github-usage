@@ -40,8 +40,10 @@ def show_actions_per_repo(api, repos):
 
     repo_data = []
     for repo in repos:
-        owner = repo["owner"]["login"]
-        name = repo["name"]
+        owner = (repo.get("owner") or {}).get("login", "")
+        name = repo.get("name", "")
+        if not owner or not name:
+            continue
         full = f"{owner}/{name}"
         minutes, storage_gb_hours, sku = get_actions_per_repo(api, owner, name)
         avg_mb = gb_hours_to_avg_mb(storage_gb_hours)
@@ -80,8 +82,10 @@ def show_actions_os_breakdown(api, repos):
     total_os = {"UBUNTU": 0, "WINDOWS": 0, "MACOS": 0}
     found = False
     for repo in repos[:10]:
-        owner = repo["owner"]["login"]
-        name = repo["name"]
+        owner = (repo.get("owner") or {}).get("login", "")
+        name = repo.get("name", "")
+        if not owner or not name:
+            continue
         minutes, os_millis, _ = get_actions_from_runs(api, owner, name)
         if minutes > 0:
             found = True
