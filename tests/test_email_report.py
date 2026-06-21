@@ -116,3 +116,24 @@ class EmailReportTests(unittest.TestCase):
         self.assertEqual(payload["to"], ["to@example.com"])
         self.assertEqual(payload["text"], "Body")
         conn.close.assert_called_once()
+
+    def test_format_actions_section_renders_minutes_and_storage(self):
+        from github_usage.email_report import _format_actions_section
+
+        data = {
+            "actions": {
+                "minutes": 1250.0,
+                "minutes_limit": 2000,
+                "minutes_percent": 62.5,
+                "storage_avg_mb": 312.0,
+                "storage_limit_mb": 500,
+                "storage_percent": 62.4,
+            },
+            "monthly_costs": {"actions": {"net": 1.23}},
+        }
+        lines = _format_actions_section(data)
+        self.assertEqual(lines[0], "Actions")
+        self.assertIn("1,250.0 / 2,000 (62.5%)", lines[1])
+        self.assertIn("312.0 MB / 500 MB (62.4%)", lines[2])
+        self.assertEqual(lines[3], "- Net cost: $1.2300")
+        self.assertEqual(lines[4], "")

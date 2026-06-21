@@ -207,6 +207,35 @@ class ExportXlsxTests(unittest.TestCase):
         # Row 3 is the second separator and must NOT be styled.
         self.assertNotIn("4472C4", ws[3][0].fill.fgColor.rgb.upper())
 
+    def test_write_actions_sheet_renders_minutes_and_storage(self):
+        # A4a: a section helper can be exercised in isolation by passing
+        # in a write_sheet closure bound to a real workbook.
+        import openpyxl
+
+        from github_usage.export_xlsx import _make_write_sheet, _write_actions_sheet
+
+        wb = openpyxl.Workbook()
+        wb.remove(wb.active)
+        write_sheet = _make_write_sheet(wb)
+        data = {
+            "actions": {
+                "minutes": 1250.0,
+                "minutes_limit": 2000,
+                "minutes_percent": 62.5,
+                "storage_avg_mb": 312.0,
+                "storage_limit_mb": 500,
+                "storage_percent": 62.4,
+            },
+        }
+        _write_actions_sheet(write_sheet, data)
+        self.assertIn("Actions", wb.sheetnames)
+        ws = wb["Actions"]
+        rows = list(ws.iter_rows(values_only=True))
+        # row 1 = top separator, row 2 = title, row 3 = bottom separator,
+        # row 4 = Minutes row, row 5 = Storage row.
+        self.assertEqual(rows[3], ("Minutes", 1250.0, 2000, 62.5))
+        self.assertEqual(rows[4][0], "Storage (avg MB)")
+
     def test_dependency_check_at_orchestrator(self):
         # The orchestrator raises RuntimeError when openpyxl is missing.
         from github_usage import export_report

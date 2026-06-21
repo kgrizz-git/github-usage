@@ -14,16 +14,30 @@ Invariants:
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 _MAX_SECTION_ROWS = 30
 
+AddSectionFn = Callable[[str, list], None]
 
-def write(data: dict, file_obj) -> None:
-    """Write the report data dict as a multi-page PDF to ``file_obj``."""
-    from fpdf import FPDF
+
+def _fmt_num(value) -> str:
+    if value is None:
+        return "N/A"
+    try:
+        return str(float(value))
+    except (ValueError, TypeError):
+        return str(value)
+
+
+def _make_pdf_writer(pdf):
+    """Return (add_section, fmt_num) closures bound to ``pdf``.
+
+    Module-level section helpers take ``add_section`` as their first
+    argument so they can render rows without constructing their own
+    fpdf2 PDF.
+    """
     from fpdf.enums import XPos, YPos
-
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=20)
 
     def add_section(title: str, rows: list) -> None:
         pdf.add_page()
@@ -45,13 +59,11 @@ def write(data: dict, file_obj) -> None:
                 new_y=YPos.NEXT,
             )
 
-    def fmt_num(value) -> str:
-        if value is None:
-            return "N/A"
-        try:
-            return str(float(value))
-        except (ValueError, TypeError):
-            return str(value)
+    return add_section, _fmt_num
+
+
+def _write_cover_page(pdf, data: dict) -> None:
+    from fpdf.enums import XPos, YPos
 
     pdf.add_page()
     pdf.set_font("Helvetica", style="B", size=18)
@@ -66,108 +78,157 @@ def write(data: dict, file_obj) -> None:
         pdf.cell(40, 7, f"{label}:", new_x=XPos.END)
         pdf.cell(0, 7, str(value), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+
+def _write_actions_page(add_section: AddSectionFn, data: dict) -> None:
     actions = data.get("actions") or {}
-    if actions:
-        minutes = actions.get("minutes")
-        storage = actions.get("storage_avg_mb")
-        add_section(
-            "Actions",
-            [
+    if not actions:
+        return
+    minutes = actions.get("minutes")
+    storage = actions.get("storage_avg_mb")
+    add_section(
+        "Actions",
+        [
+            (
+                "Minutes",
                 (
-                    "Minutes",
-                    (
-                        f"{fmt_num(minutes)} / {fmt_num(actions.get('minutes_limit'))} "
-                        f"({fmt_num(actions.get('minutes_percent'))}%)"
-                        if minutes is not None
-                        else "N/A"
-                    ),
+                    f"{_fmt_num(minutes)} / {_fmt_num(actions.get('minutes_limit'))} "
+                    f"({_fmt_num(actions.get('minutes_percent'))}%)"
+                    if minutes is not None
+                    else "N/A"
                 ),
+            ),
+            (
+                "Storage",
                 (
-                    "Storage",
-                    (
-                        f"{fmt_num(storage)} MB / {fmt_num(actions.get('storage_limit_mb'))} MB "
-                        f"({fmt_num(actions.get('storage_percent'))}%)"
-                        if storage is not None
-                        else "N/A"
-                    ),
+                    f"{_fmt_num(storage)} MB / {_fmt_num(actions.get('storage_limit_mb'))} MB "
+                    f"({_fmt_num(actions.get('storage_percent'))}%)"
+                    if storage is not None
+                    else "N/A"
                 ),
-            ],
-        )
+            ),
+        ],
+    )
 
+
+def _write_copilot_page(add_section: AddSectionFn, data: dict) -> None:
     copilot = data.get("copilot") or {}
-    copilot_rows = []
-    if copilot:
-        copilot_rows.append(("Total Requests", fmt_num(copilot.get("total_requests"))))
-        copilot_rows.append(("Total Gross", fmt_num(copilot.get("total_gross"))))
-        copilot_rows.append(("Total Discount", fmt_num(copilot.get("total_discount"))))
-        copilot_rows.append(("Total Net", fmt_num(copilot.get("total_net"))))
-    if copilot_rows:
-        add_section("Copilot", copilot_rows)
+    if not copilot:
+        return
+    add_section(
+        "Copilot",
+        [
+            ("Total Requests", _fmt_num(copilot.get("total_requests"))),
+            ("Total Gross", _fmt_num(copilot.get("total_gross"))),
+            ("Total Discount", _fmt_num(copilot.get("total_discount"))),
+            ("Total Net", _fmt_num(copilot.get("total_net"))),
+        ],
+    )
 
+
+def _write_git_lfs_page(add_section: AddSectionFn, data: dict) -> None:
     git_lfs = data.get("git_lfs") or {}
-    git_lfs_rows = []
-    if git_lfs:
-        git_lfs_rows.append(("Total Gross", fmt_num(git_lfs.get("total_gross"))))
-        git_lfs_rows.append(("Total Discount", fmt_num(git_lfs.get("total_discount"))))
-        git_lfs_rows.append(("Total Net", fmt_num(git_lfs.get("total_net"))))
-    if git_lfs_rows:
-        add_section("Git LFS", git_lfs_rows)
+    if not git_lfs:
+        return
+    add_section(
+        "Git LFS",
+        [
+            ("Total Gross", _fmt_num(git_lfs.get("total_gross"))),
+            ("Total Discount", _fmt_num(git_lfs.get("total_discount"))),
+            ("Total Net", _fmt_num(git_lfs.get("total_net"))),
+        ],
+    )
 
+
+def _write_monthly_costs_page(add_section: AddSectionFn, data: dict) -> None:
     costs = data.get("monthly_costs") or {}
-    cost_rows = []
+    rows = []
     for category in ("actions", "copilot", "git_lfs", "total"):
         cat = costs.get(category) or {}
         if cat:
-            cost_rows.append(
+            rows.append(
                 (
                     category,
-                    f"gross {fmt_num(cat.get('gross', 0))}, "
-                    f"discount {fmt_num(cat.get('discount', 0))}, "
-                    f"net {fmt_num(cat.get('net', 0))}",
+                    f"gross {_fmt_num(cat.get('gross', 0))}, "
+                    f"discount {_fmt_num(cat.get('discount', 0))}, "
+                    f"net {_fmt_num(cat.get('net', 0))}",
                 )
             )
-    if cost_rows:
-        add_section("Monthly Costs", cost_rows)
+    if rows:
+        add_section("Monthly Costs", rows)
 
+
+def _write_consumers_page(add_section: AddSectionFn, data: dict) -> None:
     consumers = data.get("repo_consumers") or {}
     by_minutes = consumers.get("by_minutes") or []
     if by_minutes:
         rows = [
-            (entry.get("repo", "unknown"), f"{fmt_num(entry.get('minutes'))} minutes")
+            (entry.get("repo", "unknown"), f"{_fmt_num(entry.get('minutes'))} minutes")
             for entry in by_minutes
         ]
         add_section("Top Repos by Minutes", rows)
     by_cost = consumers.get("by_cost") or []
     if by_cost:
         rows = [
-            (entry.get("repo", "unknown"), f"${fmt_num(entry.get('gross'))}") for entry in by_cost
+            (entry.get("repo", "unknown"), f"${_fmt_num(entry.get('gross'))}") for entry in by_cost
         ]
         add_section("Top Repos by Cost", rows)
 
+
+def _write_artifact_storage_page(add_section: AddSectionFn, data: dict) -> None:
     artifacts = data.get("artifact_storage") or {}
     artifact_repos = artifacts.get("top_repos") or []
     if artifact_repos:
         rows = [
-            (entry.get("repo", "unknown"), f"{fmt_num(entry.get('artifact_bytes'))} bytes")
+            (entry.get("repo", "unknown"), f"{_fmt_num(entry.get('artifact_bytes'))} bytes")
             for entry in artifact_repos
         ]
         add_section("Artifact Storage", rows)
 
+
+def _write_release_assets_page(add_section: AddSectionFn, data: dict) -> None:
     releases = data.get("release_assets") or {}
     release_repos = releases.get("top_repos") or []
     if release_repos:
         rows = [
-            (entry.get("repo", "unknown"), f"{fmt_num(entry.get('release_asset_bytes'))} bytes")
+            (entry.get("repo", "unknown"), f"{_fmt_num(entry.get('release_asset_bytes'))} bytes")
             for entry in release_repos
         ]
         add_section("Release Assets", rows)
 
+
+def _write_insights_page(add_section: AddSectionFn, data: dict) -> None:
     insights = data.get("insights") or []
     if insights:
         add_section("Key Insights", [("Finding", insight) for insight in insights])
 
+
+def _write_errors_page(add_section: AddSectionFn, data: dict) -> None:
     errors = data.get("errors") or {}
     if errors:
         add_section("Unavailable Data", list(errors.items()))
 
+
+_SECTION_PAGES = (
+    _write_actions_page,
+    _write_copilot_page,
+    _write_git_lfs_page,
+    _write_monthly_costs_page,
+    _write_consumers_page,
+    _write_artifact_storage_page,
+    _write_release_assets_page,
+    _write_insights_page,
+    _write_errors_page,
+)
+
+
+def write(data: dict, file_obj) -> None:
+    """Write the report data dict as a multi-page PDF to ``file_obj``."""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=20)
+    add_section, _ = _make_pdf_writer(pdf)
+    _write_cover_page(pdf, data)
+    for page_writer in _SECTION_PAGES:
+        page_writer(add_section, data)
     pdf.output(file_obj)

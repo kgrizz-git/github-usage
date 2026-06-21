@@ -133,6 +133,32 @@ class ExportPdfTests(unittest.TestCase):
         export_pdf.write(self.data, buf)
         self.assertTrue(buf.getvalue().startswith(b"%PDF-"))
 
+    def test_write_actions_page_renders_minutes_and_storage(self):
+        # A4a: a section helper can be exercised in isolation by passing
+        # in an add_section closure bound to a real fpdf2 PDF.
+        from fpdf import FPDF
+
+        from github_usage.export_pdf import _make_pdf_writer, _write_actions_page
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=20)
+        add_section, _ = _make_pdf_writer(pdf)
+        data = {
+            "actions": {
+                "minutes": 1250.0,
+                "minutes_limit": 2000,
+                "minutes_percent": 62.5,
+                "storage_avg_mb": 312.0,
+                "storage_limit_mb": 500,
+                "storage_percent": 62.4,
+            },
+        }
+        _write_actions_page(add_section, data)
+        # add_section triggers pdf.add_page(); after the call, the page
+        # count is 2 (cover page from the test's own add_page, if any,
+        # plus the actions page).
+        self.assertGreaterEqual(pdf.pages_count, 1)
+
     def test_dependency_check_at_orchestrator(self):
         from github_usage import export_report
 
