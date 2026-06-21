@@ -46,6 +46,18 @@ class SafeIntSizeTests(unittest.TestCase):
     def test_returns_none_for_unexpected_type(self):
         self.assertIsNone(_safe_int_size({"unexpected": "type"}))
 
+    def test_safe_int_size_rejects_booleans(self):
+        # In Python int(True) == 1; without this guard, a release asset with
+        # size: true would be counted as 1 byte instead of skipped.
+        self.assertIsNone(_safe_int_size(True))
+        self.assertIsNone(_safe_int_size(False))
+
+    def test_safe_int_size_still_parses_zero_and_one(self):
+        # The bool guard must not over-reject int 0 or int 1 (since in
+        # Python, bool is a subclass of int and the order of checks matters).
+        self.assertEqual(_safe_int_size(0), 0)
+        self.assertEqual(_safe_int_size(1), 1)
+
 
 class GetArtifactStorageDetailsTests(unittest.TestCase):
     def test_skips_items_with_non_numeric_size(self):

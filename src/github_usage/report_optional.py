@@ -8,9 +8,9 @@ from .report_helpers import gb_hours_to_avg_mb
 
 def _safe_int_size(value) -> int | None:
     """Return ``int(value)`` for numeric inputs, ``None`` for missing,
-    ``None``, or unparseable values. Used to skip artifacts / release
-    assets whose size is not a clean integer."""
-    if value is None:
+    ``None``, booleans, or unparseable values. Used to skip artifacts /
+    release assets whose size is not a clean integer."""
+    if value is None or isinstance(value, bool):
         return None
     try:
         return int(value)
