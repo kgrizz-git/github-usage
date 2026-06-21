@@ -98,7 +98,7 @@ def generate_filename(
     else:
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         base = f"github-usage-{username + '-' if username else ''}{today}"
-    return f"{base}.{ext}"
+    return f"reports/{base}.{ext}"
 
 
 def _check_optional_deps(export_format: str) -> None:
@@ -122,6 +122,7 @@ def _check_optional_deps(export_format: str) -> None:
 def _atomic_write_text(path: str, write_fn) -> str:
     """Write to ``path`` atomically via a UTF-8 text-mode temp file."""
     directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -137,6 +138,7 @@ def _atomic_write_text(path: str, write_fn) -> str:
 def _atomic_write_bytes(path: str, write_fn) -> str:
     """Write to ``path`` atomically via a binary-mode temp file."""
     directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
     try:
         with os.fdopen(fd, "wb") as f:

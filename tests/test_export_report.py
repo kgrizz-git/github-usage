@@ -191,26 +191,28 @@ class ExportReportFilenameTests(unittest.TestCase):
     def test_generate_filename_defaults(self):
         with mock.patch.object(export_report.datetime, "datetime") as dt:
             dt.now.return_value.strftime.return_value = "2026-06-15"
-            self.assertEqual(export_report.generate_filename("csv"), "github-usage-2026-06-15.csv")
+            self.assertEqual(
+                export_report.generate_filename("csv"), "reports/github-usage-2026-06-15.csv"
+            )
 
     def test_generate_filename_with_username(self):
         with mock.patch.object(export_report.datetime, "datetime") as dt:
             dt.now.return_value.strftime.return_value = "2026-06-15"
             self.assertEqual(
                 export_report.generate_filename("csv", username="octocat"),
-                "github-usage-octocat-2026-06-15.csv",
+                "reports/github-usage-octocat-2026-06-15.csv",
             )
 
     def test_generate_filename_with_month(self):
         self.assertEqual(
             export_report.generate_filename("csv", month="2026-05"),
-            "github-usage-2026-05.csv",
+            "reports/github-usage-2026-05.csv",
         )
 
     def test_generate_filename_with_username_and_month(self):
         self.assertEqual(
             export_report.generate_filename("csv", username="octocat", month="2026-05"),
-            "github-usage-octocat-2026-05.csv",
+            "reports/github-usage-octocat-2026-05.csv",
         )
 
     def test_generate_filename_extensions(self):

@@ -18,3 +18,10 @@ repos:
     rev: v8.24.0
     hooks:
       - id: gitleaks
+  - repo: local
+    hooks:
+      - id: forbid-generated-reports
+        name: Forbid generated reports
+        entry: Generated github-usage report files should not be committed.
+        language: fail
+        files: ^github-usage-.*\.json$
