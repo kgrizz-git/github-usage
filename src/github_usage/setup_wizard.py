@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import getpass
 import os
 import shutil
 import subprocess  # nosec B404
@@ -12,6 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import cli
+from .setup_ci import _configure_ci_secrets
 from .setup_config import (
     DEFAULT_EMAIL_REPORT,
     DEFAULT_SCHEDULE,
@@ -31,20 +31,7 @@ from .setup_launchd import (
     launch_agent_status,
     uninstall_launch_agent,
 )
-
-CI_SECRETS = (
-    (
-        "GH_USAGE_TOKEN",
-        (
-            "GitHub PAT that can read your personal repos and billing "
-            "(classic: `repo` scope; fine-grained: `Metadata: Read-only` + "
-            "`Plan: Read-only` on your user account)"
-        ),
-    ),
-    ("RESEND_API_KEY", "Resend API key"),
-    ("REPORT_EMAIL", "Recipient email address"),
-    ("RESEND_FROM", "Sender address on your verified Resend domain"),
-)
+from .setup_prompts import _prompt_int, _prompt_value, _prompt_yes_no, _wrap_description
 
 
 def _setup_parser() -> argparse.ArgumentParser:
@@ -79,80 +66,6 @@ def _setup_parser() -> argparse.ArgumentParser:
         help="Repository root (defaults to auto-detected repo root).",
     )
     return parser
-
-
-def _prompt_yes_no(message: str, default: bool = False) -> bool:
-    suffix = " [Y/n]: " if default else " [y/N]: "
-    answer = input(message + suffix).strip().lower()
-    if not answer:
-        return default
-    return answer in {"y", "yes"}
-
-
-def _prompt_secret(prompt: str) -> str:
-    """Prompt for a secret value, echoing * for each character typed.
-
-    Falls back to getpass.getpass on Windows or when stdin is not a TTY.
-    The fallback suppresses all echo (no per-character feedback).
-    """
-    sys.stdout.write(prompt)
-    sys.stdout.flush()
-    if sys.platform == "win32" or not sys.stdin.isatty():
-        return getpass.getpass("")
-    try:
-        import termios
-        import tty
-    except ImportError:
-        return getpass.getpass("")
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        chars: list[str] = []
-        while True:
-            ch = sys.stdin.read(1)
-            if ch in ("\r", "\n"):
-                break
-            if ch == "\x03":
-                raise KeyboardInterrupt
-            if ch in ("\x7f", "\x08"):
-                if chars:
-                    chars.pop()
-                    sys.stdout.write("\b \b")
-                    sys.stdout.flush()
-                continue
-            if ch and ord(ch) < 0x20:
-                continue
-            chars.append(ch)
-            sys.stdout.write("*")
-            sys.stdout.flush()
-        sys.stdout.write(f" ({len(chars)} chars)\n")
-        sys.stdout.flush()
-        return "".join(chars)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-
-
-def _prompt_value(label: str, default: str = "", secret: bool = False) -> str:
-    if secret:
-        value = _prompt_secret(f"{label} (hidden): ")
-    else:
-        prompt = f"{label} [{default}]: " if default else f"{label}: "
-        value = input(prompt).strip()
-    if not value and default:
-        return default
-    return value
-
-
-def _prompt_int(label: str, default: int) -> int:
-    while True:
-        raw = input(f"{label} [{default}]: ").strip()
-        if not raw:
-            return default
-        try:
-            return int(raw)
-        except ValueError:
-            print("Enter an integer.")
 
 
 def _load_or_create_config(paths: SetupPaths) -> dict:
@@ -297,58 +210,6 @@ def _configure_launchd(paths: SetupPaths) -> int:
     return 0
 
 
-def _set_ci_gh_token() -> subprocess.CompletedProcess:
-    """Set GH_USAGE_TOKEN, offering to pipe the current gh auth token."""
-    try:
-        gh_result = subprocess.run(  # nosec
-            ["gh", "auth", "token"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if (
-            gh_result.returncode == 0
-            and gh_result.stdout.strip()
-            and _prompt_yes_no("Use token from `gh auth token`?", True)
-        ):
-            return subprocess.run(  # nosec
-                ["gh", "secret", "set", "GH_USAGE_TOKEN"],
-                input=gh_result.stdout.strip(),
-                text=True,
-                check=False,
-            )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    return subprocess.run(["gh", "secret", "set", "GH_USAGE_TOKEN"], check=False)  # nosec
-
-
-def _configure_ci_secrets() -> None:
-    if not shutil.which("gh"):
-        print("Install GitHub CLI (`gh`) and authenticate to set repository secrets.")
-        return
-    print("\nGitHub Actions secrets (stored in GitHub, not in this repo):")
-    for name, description in CI_SECRETS:
-        print(f"  {name}: {description}")
-    if not _prompt_yes_no("Set secrets with `gh secret set` now?", False):
-        print("Skipped CI secret setup.")
-        print("Manual test after setting secrets: gh workflow run email-report.yml")
-        return
-    for name, description in CI_SECRETS:
-        print(f"\n{name} — {description}")
-        if not _prompt_yes_no(f"Set {name}?", True):
-            continue
-        if name == "GH_USAGE_TOKEN":
-            result = _set_ci_gh_token()
-        else:
-            result = subprocess.run(["gh", "secret", "set", name], check=False)  # nosec
-        if result.returncode != 0:
-            print(f"Failed to set {name}.")
-            return
-    print("\nCI secrets updated.")
-    print("Enable Secret Scanning and Push Protection in GitHub: Settings > Code security.")
-    print("Manual test: gh workflow run email-report.yml")
-
-
 def _configure_dev_hooks() -> None:
     if not shutil.which("pre-commit"):
         print("Install dev tools first: python3 -m pip install -e '.[dev]'")
@@ -391,135 +252,138 @@ def _full_setup(paths: SetupPaths) -> int:
     return 0
 
 
-def _wrap_description(text: str, width: int = 66) -> list[str]:
-    """Word-wrap a description string to the given width."""
-    words = text.split()
-    if not words:
-        return [""]
-    lines: list[str] = []
-    current = words[0]
-    for word in words[1:]:
-        if len(current) + 1 + len(word) <= width:
-            current = f"{current} {word}"
-        else:
-            lines.append(current)
-            current = word
-    lines.append(current)
-    return lines
+# Module-level menu handlers (lifted from inner closures of _interactive_menu
+# to keep the dispatcher small). Each takes a SetupPaths (some ignore it)
+# and returns an exit code.
+def _secrets_only(paths: SetupPaths) -> int:
+    _configure_env_secrets(paths)
+    return 0
 
 
-def _interactive_menu(paths: SetupPaths) -> int:
-    def _secrets_only(paths_arg: SetupPaths) -> int:
-        _configure_env_secrets(paths_arg)
-        return 0
+def _options_only(paths: SetupPaths) -> int:
+    _configure_email_options(paths)
+    return 0
 
-    def _options_only(paths_arg: SetupPaths) -> int:
-        _configure_email_options(paths_arg)
-        return 0
 
-    def _hooks_only(_paths: SetupPaths) -> int:
-        _configure_dev_hooks()
-        return 0
+def _hooks_only(_paths: SetupPaths) -> int:
+    _configure_dev_hooks()
+    return 0
 
-    def _ci_only(_paths: SetupPaths) -> int:
-        _configure_ci_secrets()
-        return 0
 
-    def _status_only(_paths: SetupPaths) -> int:
-        _print_status(_paths)
-        return 0
+def _ci_only(_paths: SetupPaths) -> int:
+    _configure_ci_secrets()
+    return 0
 
-    options = {
-        "1": (
-            "Recommended full setup",
-            (
-                "Walk through every step: local secrets, report options, schedule, "
-                "verification, and (optionally) install launchd, CI secrets, and "
-                "developer hooks. Best for first-time setup."
-            ),
-            _full_setup,
+
+def _status_only(paths: SetupPaths) -> int:
+    _print_status(paths)
+    return 0
+
+
+_MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
+    (
+        "1",
+        "Recommended full setup",
+        (
+            "Walk through every step: local secrets, report options, schedule, "
+            "verification, and (optionally) install launchd, CI secrets, and "
+            "developer hooks. Best for first-time setup."
         ),
-        "2": (
-            "Local email secrets only",
-            (
-                "Write .env.email-report (mode 600) with GITHUB_TOKEN, RESEND_API_KEY, "
-                "REPORT_EMAIL, and RESEND_FROM. Use this if you only run reports locally."
-            ),
-            _secrets_only,
+        _full_setup,
+    ),
+    (
+        "2",
+        "Local email secrets only",
+        (
+            "Write .env.email-report (mode 600) with GITHUB_TOKEN, RESEND_API_KEY, "
+            "REPORT_EMAIL, and RESEND_FROM. Use this if you only run reports locally."
         ),
-        "3": (
-            "Report options only",
-            (
-                "Configure which sections appear in the email (consumers, artifact "
-                "storage, release assets) and the max repositories to scan, stored in "
-                ".github-usage/config.toml."
-            ),
-            _options_only,
+        _secrets_only,
+    ),
+    (
+        "3",
+        "Report options only",
+        (
+            "Configure which sections appear in the email (consumers, artifact "
+            "storage, release assets) and the max repositories to scan, stored in "
+            ".github-usage/config.toml."
         ),
-        "4": (
-            "macOS launchd schedule",
-            (
-                "Generate, install, or remove the LaunchAgent plist that runs "
-                "scripts/send-email-report.sh on your weekly schedule. macOS only."
-            ),
-            _configure_launchd,
+        _options_only,
+    ),
+    (
+        "4",
+        "macOS launchd schedule",
+        (
+            "Generate, install, or remove the LaunchAgent plist that runs "
+            "scripts/send-email-report.sh on your weekly schedule. macOS only."
         ),
-        "5": (
-            "GitHub Actions secrets",
-            (
-                "Push secrets to this repository with `gh secret set` so the scheduled "
-                "GitHub Actions workflow can send the report. The GitHub token must be "
-                "able to read your personal repos and user-billing endpoints "
-                "(classic `repo`, or fine-grained with `Metadata: Read-only` and the "
-                "account permission `Plan: Read-only`). Requires `gh` CLI auth."
-            ),
-            _ci_only,
+        _configure_launchd,
+    ),
+    (
+        "5",
+        "GitHub Actions secrets",
+        (
+            "Push secrets to this repository with `gh secret set` so the scheduled "
+            "GitHub Actions workflow can send the report. The GitHub token must be "
+            "able to read your personal repos and user-billing endpoints "
+            "(classic `repo`, or fine-grained with `Metadata: Read-only` and the "
+            "account permission `Plan: Read-only`). Requires `gh` CLI auth."
         ),
-        "6": (
-            "Developer security hooks",
-            (
-                "Install pre-commit and pre-push hooks (ruff, ruff-format, gitleaks) "
-                "to catch issues and leaked secrets before they leave your machine."
-            ),
-            _hooks_only,
+        _ci_only,
+    ),
+    (
+        "6",
+        "Developer security hooks",
+        (
+            "Install pre-commit and pre-push hooks (ruff, ruff-format, gitleaks) "
+            "to catch issues and leaked secrets before they leave your machine."
         ),
-        "7": (
-            "Verify configuration",
-            (
-                "Run `email-report --dry-run` against your local config to confirm it "
-                "works end-to-end without actually sending an email."
-            ),
-            _verify_setup,
+        _hooks_only,
+    ),
+    (
+        "7",
+        "Verify configuration",
+        (
+            "Run `email-report --dry-run` against your local config to confirm it "
+            "works end-to-end without actually sending an email."
         ),
-        "8": (
-            "Show status",
-            (
-                "Print where setup files live, which env values are set (masked), and "
-                "the LaunchAgent state. Exits non-zero if not minimally configured."
-            ),
-            _status_only,
+        _verify_setup,
+    ),
+    (
+        "8",
+        "Show status",
+        (
+            "Print where setup files live, which env values are set (masked), and "
+            "the LaunchAgent state. Exits non-zero if not minimally configured."
         ),
-    }
+        _status_only,
+    ),
+]
+
+
+def _print_menu() -> None:
     print("github-usage setup")
     print("==================")
     print("Configure local secrets, report options, schedules, CI secrets, and dev hooks.")
     print("First time? Choose option 1 to walk through everything in order.")
     print()
-    for key, (label, description, _) in options.items():
+    for key, label, description, _ in _MENU_OPTIONS:
         print(f"  {key}) {label}")
         for line in _wrap_description(description):
             print(f"     {line}")
     print("  q) Quit")
+
+
+def _interactive_menu(paths: SetupPaths) -> int:
+    _print_menu()
     choice = input("\nChoose an option [1]: ").strip().lower() or "1"
     if choice in {"q", "quit"}:
         return 0
-    action = options.get(choice)
-    if not action:
-        print("Unknown option.")
-        return 1
-    _, _, handler = action
-    result = handler(paths)
-    return int(result or 0)
+    for key, _, _, handler in _MENU_OPTIONS:
+        if key == choice:
+            return int(handler(paths) or 0)
+    print("Unknown option.")
+    return 1
 
 
 def _print_status(paths: SetupPaths) -> None:
