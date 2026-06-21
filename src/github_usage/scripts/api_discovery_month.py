@@ -61,6 +61,52 @@ def _summarize(data) -> str:
     return type(data).__name__
 
 
+def _print_endpoint_results(report_lines: list[str], findings: list[dict]) -> None:
+    """Append the per-endpoint section to ``report_lines`` in place."""
+    for finding in findings:
+        same_shape = (
+            finding["without_range"]["status"] == finding["with_range"]["status"]
+            and finding["without_range"]["shape"] == finding["with_range"]["shape"]
+        )
+        verdict = "ignores date range" if same_shape else "responds differently (likely filtered)"
+        report_lines.extend(
+            [
+                f"### {finding['label']}",
+                "",
+                f"- Path: `{finding['path']}`",
+                f"- Base params: `{finding['params']}`",
+                f"- Without date range: status={finding['without_range']['status']}, "
+                f"shape={finding['without_range']['shape']}",
+                f"- With date range: status={finding['with_range']['status']}, "
+                f"shape={finding['with_range']['shape']}",
+                f"- Verdict: **{verdict}**",
+                "",
+            ]
+        )
+
+
+def _print_summary(report_lines: list[str], findings: list[dict]) -> str:
+    """Append the summary section to ``report_lines`` in place.
+
+    Returns the summary text so the caller can also print it to stdout
+    in the JSON dump.
+    """
+    all_same = all(
+        f["without_range"]["status"] == f["with_range"]["status"]
+        and f["without_range"]["shape"] == f["with_range"]["shape"]
+        for f in findings
+    )
+    summary = (
+        "All tested endpoints ignore the `since`/`until` parameters; --month must be **deferred** "
+        "for historical queries. The flag remains accepted for label/filename purposes only."
+        if all_same
+        else "At least one endpoint appears to filter by date range; --month can be implemented "
+        "for the endpoints that support it, with graceful fallback for those that do not."
+    )
+    report_lines.extend(["## Summary", "", summary, ""])
+    return summary
+
+
 def main() -> int:
     """Probe GitHub billing endpoints to discover month-filtering support."""
     _require_env("GITHUB_USAGE_API_DISCOVERY")
@@ -135,48 +181,8 @@ def main() -> int:
         "## Per-endpoint results",
         "",
     ]
-
-    for finding in findings:
-        same_shape = (
-            finding["without_range"]["status"] == finding["with_range"]["status"]
-            and finding["without_range"]["shape"] == finding["with_range"]["shape"]
-        )
-        verdict = "ignores date range" if same_shape else "responds differently (likely filtered)"
-        report_lines.extend(
-            [
-                f"### {finding['label']}",
-                "",
-                f"- Path: `{finding['path']}`",
-                f"- Base params: `{finding['params']}`",
-                f"- Without date range: status={finding['without_range']['status']}, "
-                f"shape={finding['without_range']['shape']}",
-                f"- With date range: status={finding['with_range']['status']}, "
-                f"shape={finding['with_range']['shape']}",
-                f"- Verdict: **{verdict}**",
-                "",
-            ]
-        )
-
-    all_same = all(
-        f["without_range"]["status"] == f["with_range"]["status"]
-        and f["without_range"]["shape"] == f["with_range"]["shape"]
-        for f in findings
-    )
-    summary = (
-        "All tested endpoints ignore the `since`/`until` parameters; --month must be **deferred** "
-        "for historical queries. The flag remains accepted for label/filename purposes only."
-        if all_same
-        else "At least one endpoint appears to filter by date range; --month can be implemented "
-        "for the endpoints that support it, with graceful fallback for those that do not."
-    )
-    report_lines.extend(
-        [
-            "## Summary",
-            "",
-            summary,
-            "",
-        ]
-    )
+    _print_endpoint_results(report_lines, findings)
+    summary = _print_summary(report_lines, findings)
 
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text("\n".join(report_lines))

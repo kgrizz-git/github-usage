@@ -145,6 +145,17 @@ def _resolve_export_format(args: argparse.Namespace) -> str | None:
     return args.export
 
 
+def _validate_email_flags(args: argparse.Namespace) -> int | None:
+    """Return non-zero exit code on invalid args, None if OK."""
+    if args.max_repos < 1:
+        print("Error: --max-repos must be at least 1.")
+        return 1
+    if args.email_format == "html":
+        print("Error: --email-format html is not yet supported.")
+        return 1
+    return None
+
+
 def _run_email_report(argv: Sequence[str]) -> int:
     parser = _email_parser()
     try:
@@ -152,13 +163,9 @@ def _run_email_report(argv: Sequence[str]) -> int:
     except SystemExit as exc:
         return _safe_exit_code(exc.code)
 
-    if args.max_repos < 1:
-        print("Error: --max-repos must be at least 1.")
-        return 1
-
-    if args.email_format == "html":
-        print("Error: --email-format html is not yet supported.")
-        return 1
+    error = _validate_email_flags(args)
+    if error is not None:
+        return error
 
     export_format = _resolve_export_format(args)
     error = _validate_export_args(args)
