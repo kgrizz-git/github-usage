@@ -54,6 +54,10 @@
 - [ ] Add Windows/PowerShell support for the setup script.
 - [ ] Add single entrypoint for guiding user through running report locally or to email once, as well as through guided setup.
 
+## Remaining Bug Fixes (from bug-report-20260621-000000.md)
+
+- [ ] Fix bugs found in the 2026-06-21 codebase audit: broken token pre-check, double API calls on legacy export, `get_all_pages` no early termination, zero-values from failed API calls indistinguishable from actual zero, progress bar overflow when usage >100%, CSV column order fragility, redundant fallback `/user` call. **[Plan](docs/superpowers/plans/2026-06-21-bug-fixes.md)**
+
 ## DEFERRED
 
 - [ ] Add clearly labeled end-of-month spend projections based on elapsed days in the billing period.
