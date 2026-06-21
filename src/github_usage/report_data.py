@@ -143,10 +143,7 @@ def _limited_repos(api: GitHubAPIClient, max_repos: int) -> tuple[list[dict], bo
     return repos[:max_repos], len(repos) > max_repos
 
 
-def get_warning_state(report_data: dict, warn_over: str | None) -> list[str]:
-    """Return warning messages if cost or usage exceeds the warn_over threshold; empty list otherwise."""
-    if not warn_over:
-        return []
+def _single_warning_state(report_data: dict, warn_over: str) -> list[str]:
     raw = warn_over.strip().removeprefix("$")
     if raw.endswith("%"):
         actions = report_data.get("actions")
@@ -168,6 +165,17 @@ def get_warning_state(report_data: dict, warn_over: str | None) -> list[str]:
             f"above the {fmt_price(threshold)} threshold."
         ]
     return []
+
+
+def get_warning_state(report_data: dict, warn_over: list[str] | str | None) -> list[str]:
+    """Return warning messages if cost or usage exceeds any warn_over threshold."""
+    if not warn_over:
+        return []
+    thresholds = [warn_over] if isinstance(warn_over, str) else warn_over
+    warnings = []
+    for threshold in thresholds:
+        warnings.extend(_single_warning_state(report_data, threshold))
+    return warnings
 
 
 def get_key_insights(report_data: dict) -> list[str]:
@@ -207,7 +215,7 @@ def build_report_data(
     include_artifact_storage: bool,
     include_release_assets: bool,
     max_repos: int,
-    warn_over: str | None,
+    warn_over: list[str] | str | None,
 ) -> dict:
     """Fetch and assemble all enabled billing sections into a single report dict."""
     errors = {}

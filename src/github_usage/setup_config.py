@@ -92,7 +92,10 @@ def read_env_file(path: Path) -> dict[str, str]:
         key = key.strip()
         value = raw.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            quote = value[0]
             value = value[1:-1]
+            if quote == '"':
+                value = _unescape_env_value(value)
         values[key] = value
     return values
 
@@ -114,6 +117,10 @@ def write_env_file(path: Path, values: dict[str, str]) -> None:
 
 def _escape_env_value(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _unescape_env_value(value: str) -> str:
+    return value.replace('\\"', '"').replace("\\\\", "\\")
 
 
 def load_config(path: Path) -> dict:

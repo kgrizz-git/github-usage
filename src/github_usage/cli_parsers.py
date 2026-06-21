@@ -43,7 +43,7 @@ def _email_parser() -> argparse.ArgumentParser:
     parser.add_argument("--yes-include-release-assets", action="store_true")
     parser.add_argument("--max-repos", type=int, default=100)
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--warn-over")
+    parser.add_argument("--warn-over", action="append")
     parser.add_argument("--skip-actions", action="store_true")
     parser.add_argument("--skip-copilot", action="store_true")
     parser.add_argument("--skip-lfs", action="store_true")
