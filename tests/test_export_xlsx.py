@@ -186,6 +186,27 @@ class ExportXlsxTests(unittest.TestCase):
         export_xlsx.write(self.data, captured)
         self.assertGreater(len(captured.getvalue()), 0)
 
+    def test_write_sheet_title_row_has_header_styling(self):
+        # The blue bold styling should be on the title row (row 2), not on
+        # the second "===" separator row (row 3). See bug A2 in
+        # bug-report-20260620-235700.md.
+        import openpyxl
+
+        from github_usage.export_xlsx import write
+
+        buf = io.BytesIO()
+        write(self.data, buf)
+        buf.seek(0)
+        wb = openpyxl.load_workbook(buf)
+        ws = wb.worksheets[0]  # first sheet is "Metadata" per write() order
+        # openpyxl serialises fill colors as "004472C4" (alpha 00), not
+        # "FF4472C4", so use substring assertions.
+        self.assertIn("4472C4", ws[2][0].fill.fgColor.rgb.upper())
+        self.assertIn("FFFFFF", ws[2][0].font.color.rgb.upper())
+        self.assertTrue(ws[2][0].font.bold)
+        # Row 3 is the second separator and must NOT be styled.
+        self.assertNotIn("4472C4", ws[3][0].fill.fgColor.rgb.upper())
+
     def test_dependency_check_at_orchestrator(self):
         # The orchestrator raises RuntimeError when openpyxl is missing.
         from github_usage import export_report

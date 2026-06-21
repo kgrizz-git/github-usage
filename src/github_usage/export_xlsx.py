@@ -25,19 +25,18 @@ def write(data: dict, file_obj) -> None:
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
 
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-
     def write_sheet(name: str, title: str, rows: list) -> None:
         ws = wb.create_sheet(title=_truncate_sheet_name(name))
-        ws.append([_safe_cell("=" * 50)])
-        ws.append([f" {title}"])
-        ws.append([_safe_cell("=" * 50)])
+        title_font = Font(bold=True, color="FFFFFF")
+        title_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        ws.append([_safe_cell("=" * 50)])  # row 1: top separator
+        ws.append([f" {title}"])  # row 2: title (styled below)
+        ws.append([_safe_cell("=" * 50)])  # row 3: bottom separator
         for row in rows:
             ws.append([_safe_cell(cell) for cell in row])
-        for cell in ws[3]:
-            cell.font = header_font
-            cell.fill = header_fill
+        for cell in ws[2]:  # row 2 (title), not row 3
+            cell.font = title_font
+            cell.fill = title_fill
 
     write_sheet(
         "Metadata",
