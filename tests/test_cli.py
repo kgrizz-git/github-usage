@@ -229,39 +229,18 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         api.request.assert_not_called()
 
-    def test_export_calls_user_when_legacy_main_returns_none(self):
-        # A3 fallback: when legacy_main returns None (early exit on
-        # --dry-run with no auth, for example), the export branch must
-        # still recover the username via /user.
+    def test_token_precheck_fails_when_resolve_token_returns_none(self):
+        # Fix #1: the pre-check now calls resolve_token(argv=([token] if token else []))
+        # so a missing token (no env var, no gh auth) returns exit code 1 immediately.
         from github_usage import cli
 
-        data = {
-            "username": "octocat",
-            "period": "current_month",
-            "generated_at": "2026-06-15T14:30:00Z",
-            "warnings": [],
-            "errors": {},
-            "actions": None,
-            "copilot": None,
-            "git_lfs": None,
-            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
-            "repo_consumers": None,
-            "artifact_storage": None,
-            "release_assets": None,
-            "api_estimate": {"notes": []},
-            "insights": [],
-        }
-        with (
-            mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.legacy_main", return_value=None),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
-            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
-        ):
-            api = api_cls.return_value
-            code = cli.main(["--export", "json", "--no-interactive"])
-        self.assertEqual(code, 0)
-        api.request.assert_called_once_with("GET", "/user")
+        with mock.patch("github_usage.cli.resolve_token", return_value=None):
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = cli.main(["--no-interactive"])
+
+        self.assertEqual(code, 1)
+        self.assertIn("No GitHub token found", stdout.getvalue())
 
 
 if __name__ == "__main__":

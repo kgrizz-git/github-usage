@@ -161,7 +161,7 @@ def _print_utilization(user_minutes, user_storage_gb_hours):
 
     # Actions minutes
     free_min_limit = 2000
-    min_pct = (user_minutes / free_min_limit * 100) if user_minutes else 0
+    min_pct = min(100, (user_minutes / free_min_limit * 100) if user_minutes else 0)
     bar_len = 40
     min_filled = int(min_pct / 100 * bar_len)
     print(
@@ -177,7 +177,7 @@ def _print_utilization(user_minutes, user_storage_gb_hours):
     # Actions storage
     free_storage_mb = 500
     avg_storage_mb = gb_hours_to_avg_mb(user_storage_gb_hours) if user_storage_gb_hours else 0
-    storage_pct = (avg_storage_mb / free_storage_mb * 100) if free_storage_mb > 0 else 0
+    storage_pct = min(100, (avg_storage_mb / free_storage_mb * 100) if free_storage_mb > 0 else 0)
     storage_filled = int(storage_pct / 100 * bar_len)
     print(
         f"    Actions Storage:     {avg_storage_mb:>8.1f} / {free_storage_mb} MB ({storage_pct:.1f}% of free tier)"

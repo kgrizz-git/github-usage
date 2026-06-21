@@ -133,3 +133,33 @@ class ApiTests(unittest.TestCase):
             result = api.get_all_pages("/resource")
 
         self.assertEqual(result, [{"id": 1}, {"id": 2}])
+
+    def test_get_all_pages_stops_early_when_limit_reached(self):
+        # Fix #3: a limit parameter stops pagination once enough items are collected.
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        call_count = 0
+
+        def mock_request_raw(method, path, params=None):
+            import http.client
+
+            from github_usage.http_retry import Response
+
+            nonlocal call_count
+            call_count += 1
+            headers = http.client.HTTPMessage()
+            # Always advertise a next page so the loop would run forever without limit
+            headers["Link"] = (
+                f'<https://api.github.com/resource?page={params["page"] + 1}>; rel="next"'
+            )
+            items = [{"id": params["page"]}]
+            return Response(
+                status=200, body=__import__("json").dumps(items).encode(), headers=headers
+            )
+
+        with mock.patch.object(api, "request_raw", side_effect=mock_request_raw):
+            result = api.get_all_pages("/resource", limit=2)
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(call_count, 2)

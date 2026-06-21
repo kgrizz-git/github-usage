@@ -20,7 +20,7 @@ class GitHubAPIClient(Protocol):
     ) -> object: ...
 
     def get_all_pages(
-        self, path: str, params: dict[str, object] | None = None
+        self, path: str, params: dict[str, object] | None = None, limit: int | None = None
     ) -> list[dict[str, object]]: ...
 
 
@@ -139,7 +139,7 @@ def get_monthly_costs(api: GitHubAPIClient, username: str) -> dict:
 
 
 def _limited_repos(api: GitHubAPIClient, max_repos: int) -> tuple[list[dict], bool]:
-    repos = api.get_all_pages("/user/repos", {"type": "all"})
+    repos = api.get_all_pages("/user/repos", {"type": "all"}, limit=max_repos + 1)
     return repos[:max_repos], len(repos) > max_repos
 
 

@@ -131,6 +131,31 @@ class ExportCsvTests(unittest.TestCase):
         rows = self._rows()
         self.assertEqual(rows[-1], [])
 
+    def test_write_nested_uses_canonical_column_order(self):
+        # Fix #6: values must be looked up by key, not by .values() order,
+        # so a dict with keys in a different insertion order doesn't misalign.
+        import csv
+        import io
+
+        from github_usage.export_csv import _write_nested
+
+        # Second item has keys in a different order than the first
+        nested = {
+            "sku_a": {"minutes": 10, "cost": 5},
+            "sku_b": {"cost": 99, "minutes": 1},  # reversed key order
+        }
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        _write_nested(writer, "section", "sku", nested)
+        rows = list(csv.reader(io.StringIO(buf.getvalue())))
+        # rows: ["section"], ["sku", "minutes", "cost"], ["sku_a", "10", "5"], ["sku_b", "1", "99"]
+        header = rows[1]
+        self.assertEqual(header, ["sku", "minutes", "cost"])
+        sku_b_row = next(r for r in rows if r[0] == "sku_b")
+        # minutes must be in position 1, cost in position 2 — regardless of insertion order
+        self.assertEqual(sku_b_row[1], "1")
+        self.assertEqual(sku_b_row[2], "99")
+
 
 if __name__ == "__main__":
     unittest.main()

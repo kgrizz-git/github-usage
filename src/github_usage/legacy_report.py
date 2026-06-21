@@ -76,7 +76,7 @@ def main(
             show_actions_summary(api, username, user_minutes, user_storage_gb, actions_sku)
 
         # Repos
-        repos = api.get_all_pages("/user/repos", {"type": "all"})
+        repos = api.get_all_pages("/user/repos", {"type": "all"}, limit=100)
         repo_data = show_actions_per_repo(api, repos)
         show_actions_top_consumers(repo_data)
         show_actions_os_breakdown(api, repos)

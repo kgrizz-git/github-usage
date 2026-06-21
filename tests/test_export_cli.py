@@ -160,11 +160,9 @@ class LegacyExportCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         legacy_main.assert_called_once()
         self.assertTrue(seen_argv)
-        # resolve_token is now called with the explicit argv slice, not by
-        # mutating sys.argv. The first call's argv should be
-        # ["github-usage", "ghp_fake", "--no-interactive"] and resolve_token
-        # reads the first element ("ghp_fake") as the token.
-        self.assertEqual(seen_argv[0], ["github-usage", "ghp_fake", "--no-interactive"])
+        # Fix #1: the pre-check now passes only the peeled token so resolve_token
+        # reads "ghp_fake" as the token, not the "github-usage" program name.
+        self.assertEqual(seen_argv[0], ["ghp_fake"])
 
     def test_token_positional_only(self):
         from github_usage import cli

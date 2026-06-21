@@ -279,7 +279,7 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
     export_format = _resolve_export_format(args)
 
     legacy_argv = ["github-usage", *([token] if token else []), *flag_argv]
-    if not resolve_token(argv=legacy_argv):
+    if not resolve_token(argv=([token] if token else [])):
         from .auth import print_missing_token_error
 
         print_missing_token_error()
@@ -289,14 +289,17 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
         export_format = _prompt_export_format()
 
     try:
-        username = legacy_main(
-            export=export_format,
-            output=args.output,
-            no_interactive=args.no_interactive,
-            month=None,
-            dry_run=args.dry_run,
-            timeout=getattr(args, "timeout", None),
-            max_retries=getattr(args, "max_retries", None),
+        username = (
+            legacy_main(
+                export=export_format,
+                output=args.output,
+                no_interactive=args.no_interactive,
+                month=None,
+                dry_run=args.dry_run,
+                timeout=getattr(args, "timeout", None),
+                max_retries=getattr(args, "max_retries", None),
+            )
+            or "unknown"
         )
     except SystemExit as exc:
         return _safe_exit_code(exc.code)
@@ -304,9 +307,6 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
     if export_format and export_format != "none":
         token = resolve_token(argv=legacy_argv)
         api = GitHubAPI(token)
-        if not username:  # fallback when legacy_main exited without returning one
-            user = api.request("GET", "/user")
-            username = user.get("login") or "unknown"
         data = report_data.build_report_data(
             api,
             username,

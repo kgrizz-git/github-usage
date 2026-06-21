@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .billing import get_actions_per_repo
+from .billing import BillingFetchError, get_actions_per_repo
 from .report_helpers import gb_hours_to_avg_mb
 
 
@@ -21,6 +21,7 @@ def _safe_int_size(value) -> int | None:
 def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 100) -> dict:
     """Return top repos ranked by Actions minutes and gross cost."""
     rows = []
+    errors: dict = {}
     considered = repos[:max_repos]
     for repo in considered:
         owner = repo.get("owner", {}).get("login", "")
@@ -28,7 +29,8 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
         full_name = repo.get("full_name") or f"{owner}/{name}"
         try:
             minutes, storage_gb_hours, sku = get_actions_per_repo(api, owner, name)
-        except RuntimeError:
+        except BillingFetchError as e:
+            errors[full_name] = str(e)
             continue
         rows.append(
             {
@@ -44,6 +46,7 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
         "truncated": len(repos) > max_repos,
         "by_minutes": sorted(rows, key=lambda row: row["minutes"], reverse=True)[:limit],
         "by_cost": sorted(rows, key=lambda row: row["gross"], reverse=True)[:limit],
+        "errors": errors,
     }
 
 

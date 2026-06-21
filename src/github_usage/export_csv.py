@@ -158,9 +158,10 @@ def _write_nested(writer: csv.writer, section_name: str, row_label: str, nested)
     writer.writerow([section_name])
     sample = next(iter(nested.values()), None)
     if isinstance(sample, dict):
-        writer.writerow([row_label, *sample.keys()])
+        cols = list(sample.keys())
+        writer.writerow([row_label, *cols])
         for key, sku_data in nested.items():
-            writer.writerow([key, *sku_data.values()])
+            writer.writerow([key, *(sku_data.get(c) for c in cols)])
     else:
         for key, value in nested.items():
             writer.writerow([key, value])

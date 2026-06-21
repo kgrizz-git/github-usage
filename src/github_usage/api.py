@@ -96,7 +96,7 @@ class GitHubAPI:
             max_retries=self.max_retries,
         )
 
-    def get_all_pages(self, path, params=None):
+    def get_all_pages(self, path, params=None, limit=None):
         all_items = []
         page = 1
         per_page = 100
@@ -130,6 +130,8 @@ class GitHubAPI:
                 break
 
             all_items.extend(result)
+            if limit and len(all_items) >= limit:
+                break
             link_header = response.headers.get("Link", "")
             if 'rel="next"' not in link_header:
                 break

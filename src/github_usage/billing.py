@@ -5,6 +5,10 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 
+class BillingFetchError(RuntimeError):
+    """Raised when a per-repo billing API call fails."""
+
+
 def get_billing_summary(api, username, product):
     """Get usage summary for a product. Returns parsed items dict keyed by sku."""
     try:
@@ -99,8 +103,8 @@ def get_actions_per_repo(api, owner, repo):
             f"/users/{owner}/settings/billing/usage/summary",
             {"product": "Actions", "repository": f"{owner}/{repo}"},
         )
-    except RuntimeError:
-        return 0.0, 0.0, {}
+    except RuntimeError as e:
+        raise BillingFetchError(f"{owner}/{repo}: {e}") from e
     if not billing:
         return 0.0, 0.0, {}
     total_minutes = 0.0
