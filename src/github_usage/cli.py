@@ -282,7 +282,7 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
         export_format = _prompt_export_format()
 
     try:
-        legacy_main(
+        username = legacy_main(
             export=export_format,
             output=args.output,
             no_interactive=args.no_interactive,
@@ -297,8 +297,9 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
     if export_format and export_format != "none":
         token = resolve_token(argv=legacy_argv)
         api = GitHubAPI(token)
-        user = api.request("GET", "/user")
-        username = user.get("login") or "unknown"
+        if not username:  # fallback when legacy_main exited without returning one
+            user = api.request("GET", "/user")
+            username = user.get("login") or "unknown"
         data = report_data.build_report_data(
             api,
             username,

@@ -195,6 +195,74 @@ class CliTests(unittest.TestCase):
         self.assertIn("github-usage", stdout.getvalue())
         resolve_token.assert_not_called()
 
+    def test_export_does_not_call_user_when_legacy_main_returns_username(self):
+        # A3: when legacy_main returns a username, _run_legacy_report must
+        # not make a redundant /user call (legacy_main already called it
+        # twice). See bug-report-20260620-235700.md#A3.
+        from github_usage import cli
+
+        data = {
+            "username": "octocat",
+            "period": "current_month",
+            "generated_at": "2026-06-15T14:30:00Z",
+            "warnings": [],
+            "errors": {},
+            "actions": None,
+            "copilot": None,
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        with (
+            mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
+            mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
+            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
+        ):
+            api = api_cls.return_value
+            code = cli.main(["--export", "json", "--no-interactive"])
+        self.assertEqual(code, 0)
+        api.request.assert_not_called()
+
+    def test_export_calls_user_when_legacy_main_returns_none(self):
+        # A3 fallback: when legacy_main returns None (early exit on
+        # --dry-run with no auth, for example), the export branch must
+        # still recover the username via /user.
+        from github_usage import cli
+
+        data = {
+            "username": "octocat",
+            "period": "current_month",
+            "generated_at": "2026-06-15T14:30:00Z",
+            "warnings": [],
+            "errors": {},
+            "actions": None,
+            "copilot": None,
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        with (
+            mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
+            mock.patch("github_usage.cli.legacy_main", return_value=None),
+            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
+        ):
+            api = api_cls.return_value
+            code = cli.main(["--export", "json", "--no-interactive"])
+        self.assertEqual(code, 0)
+        api.request.assert_called_once_with("GET", "/user")
+
 
 if __name__ == "__main__":
     unittest.main()

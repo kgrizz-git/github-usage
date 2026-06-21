@@ -30,13 +30,10 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
             mock.patch("github_usage.cli.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
-            api = api_cls.return_value
-            api.request.return_value = {"login": "octocat"}
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli.main(
@@ -59,13 +56,10 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
             mock.patch("github_usage.cli.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
-            api = api_cls.return_value
-            api.request.return_value = {"login": "octocat"}
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli.main(["--json", "--no-interactive"])
@@ -84,13 +78,10 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
             mock.patch("github_usage.cli.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
-            api = api_cls.return_value
-            api.request.return_value = {"login": "octocat"}
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli.main(["--json", "--no-interactive", "--output", path])
@@ -141,12 +132,8 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
         ):
-            api = api_cls.return_value
-            api.request.return_value = {"login": "octocat"}
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli.main(["--export", "none", "--no-interactive"])
@@ -158,7 +145,6 @@ class LegacyExportCliTests(unittest.TestCase):
     def test_token_positional_before_flags(self):
         from github_usage import cli
 
-        data = _report_data()
         seen_argv: list[list[str]] = []
 
         def capture_token(*, argv=None):
@@ -168,12 +154,7 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch("github_usage.cli.resolve_token", side_effect=capture_token),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat") as legacy_main,
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
-            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
-            api = api_cls.return_value
-            api.request.return_value = {"login": "octocat"}
             code = cli.main(["ghp_fake", "--no-interactive"])
 
         self.assertEqual(code, 0)
