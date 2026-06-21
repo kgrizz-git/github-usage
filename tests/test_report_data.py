@@ -104,6 +104,20 @@ class ReportDataTests(unittest.TestCase):
         warnings = get_warning_state(report_data, "80%")
         self.assertIn("Percentage warning threshold skipped", warnings[0])
 
+    def test_single_warning_state_invalid_dollar_value(self):
+        from github_usage.report_data import _single_warning_state
+
+        with self.assertRaisesRegex(ValueError, "invalid --warn-over"):
+            _single_warning_state({}, "abc")
+
+    def test_single_warning_state_invalid_percent_value(self):
+        from github_usage.report_data import _single_warning_state
+
+        # "abc%" must raise even with no actions data, because the
+        # try/except float() runs BEFORE the `if not actions` guard.
+        with self.assertRaisesRegex(ValueError, "invalid --warn-over"):
+            _single_warning_state({}, "abc%")
+
     def test_get_key_insights_reports_top_repo_share_when_consumers_present(self):
         from github_usage.report_data import get_key_insights
 

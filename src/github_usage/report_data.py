@@ -146,15 +146,25 @@ def _limited_repos(api: GitHubAPIClient, max_repos: int) -> tuple[list[dict], bo
 def _single_warning_state(report_data: dict, warn_over: str) -> list[str]:
     raw = warn_over.strip().removeprefix("$")
     if raw.endswith("%"):
+        try:
+            threshold = float(raw[:-1])
+        except ValueError:
+            raise ValueError(
+                f"invalid --warn-over value {warn_over!r} (expected a percentage like 80%)"
+            ) from None
         actions = report_data.get("actions")
         if not actions:
             return ["Percentage warning threshold skipped: Actions data not included in report."]
-        threshold = float(raw[:-1])
         usage = float(actions.get("minutes_percent", 0.0))
         if usage > threshold:
             return [f"Actions minutes usage is {usage:.1f}%, above the {threshold:.1f}% threshold."]
         return []
-    threshold = float(raw)
+    try:
+        threshold = float(raw)
+    except ValueError:
+        raise ValueError(
+            f"invalid --warn-over value {warn_over!r} (expected a dollar amount like 50 or $50)"
+        ) from None
     monthly_costs = report_data.get("monthly_costs")
     if not monthly_costs:
         return []
