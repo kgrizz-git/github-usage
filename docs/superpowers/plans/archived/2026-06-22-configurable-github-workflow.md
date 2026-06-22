@@ -1,6 +1,6 @@
 # [2026-06-22 00:00] Implementation Plan — Configurable GitHub Actions Workflow Options
 
-> **Status: PLANNED (not started).** Awaiting approval before implementation.
+> **Status: COMPLETE.** Implemented and merged 2026-06-22 (commit f16da7e).
 
 This plan addresses the request to make the scheduled GitHub Actions
 email-report workflow configurable via `./setup.sh` instead of having
@@ -84,7 +84,7 @@ the same way it drives the launchd configuration.
 
 ## Phase 1 — Template + Renderer Module
 
-- [ ] **Create the workflow template** (tracked in git, not gitignored).
+- [x] **Create the workflow template** (tracked in git, not gitignored).
   **First step:** copy the current `email-report.yml` to
   `.github/workflows/email-report.yml.template`, then apply token
   replacements in-place. Do not create the template from scratch —
@@ -130,7 +130,7 @@ the same way it drives the launchd configuration.
   check correctly evaluates to false. The `workflow_dispatch` input
   dropdowns in the GitHub UI continue to work as overrides.
 
-- [ ] **Add `src/github_usage/setup_workflow.py`.** New module
+- [x] **Add `src/github_usage/setup_workflow.py`.** New module
   (~80–120 lines) containing:
   - `DEFAULT_WORKFLOW_CONFIG` — dict with `cron`, `include_consumers`,
     `include_artifact_storage`, `include_release_assets`. (Distinct
@@ -177,7 +177,7 @@ the same way it drives the launchd configuration.
     Returns empty string when the file does not exist yet (first-time
     setup).
 
-- [ ] **Wire the renderer into `setup_config.py`.**
+- [x] **Wire the renderer into `setup_config.py`.**
   In `src/github_usage/setup_config.py`:
   - Import `DEFAULT_WORKFLOW_CONFIG` from the new module.
   - Extend `load_config` to merge a `github_actions` key
@@ -198,13 +198,13 @@ the same way it drives the launchd configuration.
     `(workflow file: present)`. Example:
     `GitHub Actions cron: 0 9 * * 1 (workflow file: present)`.
 
-- [ ] **Update `_load_or_create_config` in `setup_wizard.py`.**
+- [x] **Update `_load_or_create_config` in `setup_wizard.py`.**
   The fallback path (no config file yet) currently returns only
   `email_report` and `schedule` keys. Add `github_actions` here too,
   using `DEFAULT_WORKFLOW_CONFIG`, so the first-run wizard has the
   same defaults as subsequent runs.
 
-- [ ] **Update `.github-usage/config.example.toml`** with a commented
+- [x] **Update `.github-usage/config.example.toml`** with a commented
   `[github_actions]` block matching the defaults. Doing this in Phase 1
   (not Phase 4) keeps the example file in sync with what `write_config`
   now emits.
@@ -213,7 +213,7 @@ the same way it drives the launchd configuration.
 
 ## Phase 2 — Wizard Integration
 
-- [ ] **Add a wizard step `_configure_github_actions(paths)`.**
+- [x] **Add a wizard step `_configure_github_actions(paths)`.**
   In `src/github_usage/setup_wizard.py`:
   - Load or default `[github_actions]` via `load_config`.
   - Prompt:
@@ -227,7 +227,7 @@ the same way it drives the launchd configuration.
       defaults, mirroring `_configure_email_options`.
   - Save via `write_config`.
 
-- [ ] **Add a post-config step `_render_and_offer_commit(paths)`.**
+- [x] **Add a post-config step `_render_and_offer_commit(paths)`.**
   - Call `render_workflow(config)`.
   - Print `diff_workflow(root, rendered)` so the user sees what will
     change (diff is against the on-disk file).
@@ -239,7 +239,7 @@ the same way it drives the launchd configuration.
   - If the file would be unchanged, print
     `Workflow file already up to date.` and skip.
 
-- [ ] **Wire into `_full_setup` and the menu.**
+- [x] **Wire into `_full_setup` and the menu.**
   - In `_full_setup`, call `_configure_github_actions(paths)` after
     `_configure_schedule` (which is already there at line 237) and
     before `_verify_setup`. This keeps the order: env secrets →
@@ -261,7 +261,7 @@ the same way it drives the launchd configuration.
 
 ## Phase 3 — Tests
 
-- [ ] **New file `tests/test_setup_workflow.py`.** Cover:
+- [x] **New file `tests/test_setup_workflow.py`.** Cover:
   - `render_workflow` with default config (`include_consumers=False`)
     produces text containing `cron: '0 9 * * 1'` and
     `|| 'false'` in the consumers conditional.
@@ -285,7 +285,7 @@ the same way it drives the launchd configuration.
     exist before), and assert the temp file is removed by the
     `finally` block in the implementation (not left orphaned).
 
-- [ ] **Extend `tests/test_setup_wizard.py`.** Cover:
+- [x] **Extend `tests/test_setup_wizard.py`.** Cover:
   - `_configure_github_actions` writes a `[github_actions]` block
     when given a non-interactive `input=` stream.
   - Invalid cron input triggers a re-prompt and eventually accepts
@@ -293,7 +293,7 @@ the same way it drives the launchd configuration.
   - `_full_setup` invokes the renderer (mock
     `setup_workflow.write_workflow`) at least once.
 
-- [ ] **Extend `tests/test_setup_config.py`** (create if absent) to
+- [x] **Extend `tests/test_setup_config.py`** (create if absent) to
   round-trip `[github_actions]` through `load_config` /
   `write_config`, including the first-run fallback path via
   `_load_or_create_config`.
@@ -302,7 +302,7 @@ the same way it drives the launchd configuration.
 
 ## Phase 4 — Documentation
 
-- [ ] **Update `README.md`.** Add a short section under
+- [x] **Update `README.md`.** Add a short section under
   "Configuration" explaining:
   - The local launchd schedule vs the GitHub Actions cron are
     independent.
@@ -314,7 +314,7 @@ the same way it drives the launchd configuration.
     GitHub UI as before; the configured values act as fallbacks for
     scheduled runs only.
 
-- [ ] **Run `scripts/docs-check`.** Make sure the README changes pass
+- [x] **Run `scripts/docs-check`.** Make sure the README changes pass
   the existing doc-validation script (it checks help text / CLI
   docstrings, but flag if it also references config keys).
 
@@ -322,10 +322,10 @@ the same way it drives the launchd configuration.
 
 ## Phase 5 — Verification
 
-- [ ] `scripts/check` passes (syntax, unit tests, smoke, sizes).
-- [ ] `scripts/smoke` passes.
-- [ ] `scripts/docs-check` passes.
-- [ ] Manual: run `./setup.sh`, pick the new menu option, change
+- [x] `scripts/check` passes (syntax, unit tests, smoke, sizes).
+- [x] `scripts/smoke` passes.
+- [x] `scripts/docs-check` passes.
+- [x] Manual: run `./setup.sh`, pick the new menu option, change
   cron to `0 8 * * 1`, confirm:
   - `.github/workflows/email-report.yml` now has
     `cron: '0 8 * * 1'`.
@@ -333,7 +333,7 @@ the same way it drives the launchd configuration.
     one-line change.
   - Re-running the menu option with the same value prints
     `Workflow file already up to date.`
-- [ ] Manual: `gh workflow run email-report.yml` from a branch that
+- [x] Manual: `gh workflow run email-report.yml` from a branch that
   has the new file and confirm the workflow starts and the secrets
   are still wired.
 
