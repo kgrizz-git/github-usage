@@ -21,7 +21,7 @@ A change is done when relevant tests pass, the CLI still starts, docs are update
 - When completing a planned item, mark its checkbox `- [x]` in the plan file and prepend a `**Done:**` note with the date and a one-line summary of what was implemented and any deviations from the plan.
 - Update the plan's `> **Status:**` banner to `COMPLETE` and note the merge commit.
 - Completed, superseded, or archived plan files should be moved to `docs/superpowers/plans/archived/` so the active plans directory stays uncluttered.
-- After completing any user-visible feature or fix, add a bullet to `CHANGELOG.md` under the current open release section (currently `[Unreleased]`) in the appropriate subsection (`Added`, `Fixed`, or `Changed`).
+- After completing any user-visible feature or fix, add a bullet to `CHANGELOG.md` under the topmost release section in the appropriate subsection (`Added`, `Fixed`, or `Changed`). Read the file to find it — do not assume the heading name.
 - After completing a `TO_DO.md` item, mark it `- [x]`, append a `**Done <date>:**` note, and link to the archived plan if one exists.
 
 ## Code Style
