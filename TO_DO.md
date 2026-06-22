@@ -48,6 +48,7 @@
 
 ## Configuration & Setup
 
+- [x] Make the GitHub Actions `email-report.yml` workflow configurable via `./setup.sh` — cron schedule and report-section defaults. **Done 2026-06-22:** Added `setup_workflow.py`, `email-report.yml.template`, `[github_actions]` config section, and wizard menu option 5. **[Plan](docs/superpowers/plans/archived/2026-06-22-configurable-github-workflow.md)**
 - [ ] Add support for configuring multiple reports with different run frequencies, targets, and options.
 - [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules).
 - [x] Move the `setup` entrypoint to the root repo directory for easier discovery (or add a wrapper entrypoint). **Done:** 2026-06-20 — promoted to `./setup.sh` with `scripts/setup` retained as a backward-compat shim (plan 2026-06-20-move-setup-entrypoint).

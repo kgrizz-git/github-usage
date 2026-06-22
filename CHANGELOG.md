@@ -29,6 +29,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 - **API discovery script** (`src/github_usage/scripts/api_discovery_month.py`): gated by `GITHUB_USAGE_API_DISCOVERY=1`; tests whether billing endpoints honor `since`/`until` parameters and writes a sanitized report to `docs/api-discovery-month.md`.
 - **Schedule-only menu option:** Configure the report schedule (weekday, hour, minute) from the setup menu without running the full wizard; regenerates the LaunchAgent plist and reminds the user to reinstall it when a LaunchAgent is already installed.
 - **Full-setup plist sync:** Recommended full setup now regenerates the LaunchAgent plist after schedule prompts, even when launchd install is skipped.
+- **Configurable GitHub Actions workflow (`setup_workflow.py`):** `./setup.sh` option 5 now configures the GitHub Actions email-report schedule and report-section defaults. Adds `src/github_usage/setup_workflow.py` (cron validation, template renderer, atomic write, unified diff), a checked-in `.github/workflows/email-report.yml.template` with `__TOKEN__` placeholders, a `[github_actions]` section in `.github-usage/config.toml`, and a new wizard flow that renders the workflow file and prints a `git add/commit/push` suggestion. The local launchd schedule (`[schedule]`) and the GitHub Actions cron (`[github_actions]`) are stored and configured independently.
 
 ### Deferred
 
