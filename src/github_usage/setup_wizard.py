@@ -32,6 +32,13 @@ from .setup_launchd import (
     uninstall_launch_agent,
 )
 from .setup_prompts import _prompt_int, _prompt_value, _prompt_yes_no, _wrap_description
+from .setup_workflow import (
+    DEFAULT_WORKFLOW_CONFIG,
+    diff_workflow,
+    render_workflow,
+    validate_cron,
+    write_workflow,
+)
 
 
 def _setup_parser() -> argparse.ArgumentParser:
@@ -71,7 +78,11 @@ def _setup_parser() -> argparse.ArgumentParser:
 def _load_or_create_config(paths: SetupPaths) -> dict:
     if paths.config_file.is_file():
         return load_config(paths.config_file)
-    return {"email_report": dict(DEFAULT_EMAIL_REPORT), "schedule": dict(DEFAULT_SCHEDULE)}
+    return {
+        "email_report": dict(DEFAULT_EMAIL_REPORT),
+        "schedule": dict(DEFAULT_SCHEDULE),
+        "github_actions": dict(DEFAULT_WORKFLOW_CONFIG),
+    }
 
 
 def _configure_email_options(paths: SetupPaths) -> None:
@@ -99,6 +110,54 @@ def _configure_email_options(paths: SetupPaths) -> None:
     config["email_report"] = email
     write_config(paths.config_file, config)
     print(f"Wrote {paths.config_file.relative_to(paths.root)}")
+
+
+def _configure_github_actions(paths: SetupPaths) -> None:
+    config = _load_or_create_config(paths)
+    ga = config.get("github_actions", dict(DEFAULT_WORKFLOW_CONFIG))
+    print("\nGitHub Actions workflow (stored in .github-usage/config.toml):")
+    print("  Schedule always runs in UTC.")
+    print("  Weekday: 0 or 7 = Sunday, 1 = Monday, ..., 6 = Saturday.")
+    print("  Example cron expressions: '0 9 * * 1' (Mon 09:00), '0 14 * * 5' (Fri 14:00)")
+    while True:
+        raw = input(f"  Cron expression [{ga['cron']}]: ").strip()
+        expr = raw or ga["cron"]
+        try:
+            ga["cron"] = validate_cron(expr)
+            break
+        except ValueError as exc:
+            print(f"  {exc}")
+    ga["include_consumers"] = _prompt_yes_no(
+        "Include top repository breakdowns (consumers)?", ga["include_consumers"]
+    )
+    ga["include_artifact_storage"] = _prompt_yes_no(
+        "Include Actions artifact storage details?", ga["include_artifact_storage"]
+    )
+    ga["include_release_assets"] = _prompt_yes_no(
+        "Include release asset inventory?", ga["include_release_assets"]
+    )
+    config["github_actions"] = ga
+    write_config(paths.config_file, config)
+    print(f"Wrote {paths.config_file.relative_to(paths.root)}")
+
+
+def _render_and_offer_commit(paths: SetupPaths) -> None:
+    config = _load_or_create_config(paths)
+    rendered = render_workflow(config, paths.root)
+    diff = diff_workflow(paths.root, rendered)
+    if not diff:
+        print("Workflow file already up to date.")
+        return
+    print("\nProposed changes to .github/workflows/email-report.yml:")
+    print(diff)
+    if _prompt_yes_no("Write the updated workflow file?", True):
+        write_workflow(paths.root, rendered)
+        print("Wrote .github/workflows/email-report.yml")
+        print(
+            "  To apply: git add .github/workflows/email-report.yml"
+            " && git commit -m 'chore(workflow): update email-report schedule'"
+            " && git push"
+        )
 
 
 def _configure_schedule(paths: SetupPaths) -> None:
@@ -235,6 +294,8 @@ def _full_setup(paths: SetupPaths) -> int:
     _configure_env_secrets(paths)
     _configure_email_options(paths)
     _configure_schedule(paths)
+    _configure_github_actions(paths)
+    _render_and_offer_commit(paths)
     plist = generate_plist(paths)
     print(f"Generated {plist.relative_to(paths.root)}")
     code = _verify_setup(paths)
@@ -298,14 +359,21 @@ def _schedule_only(paths: SetupPaths) -> int:
     return 0
 
 
+def _github_actions_only(paths: SetupPaths) -> int:
+    """Configure GitHub Actions workflow options and offer to write the rendered file."""
+    _configure_github_actions(paths)
+    _render_and_offer_commit(paths)
+    return 0
+
+
 _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
     (
         "1",
         "Recommended full setup",
         (
             "Walk through every step: local secrets, report options, schedule, "
-            "verification, and (optionally) install launchd, CI secrets, and "
-            "developer hooks. Best for first-time setup."
+            "GitHub Actions workflow, verification, and (optionally) install launchd, "
+            "CI secrets, and developer hooks. Best for first-time setup."
         ),
         _full_setup,
     ),
@@ -334,13 +402,24 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         (
             "Configure the day of the week and time for your local reporting "
             "schedule and regenerate the LaunchAgent plist. Stored in "
-            ".github-usage/config.toml. The GitHub Actions workflow has its own "
-            "cron and ignores this value."
+            ".github-usage/config.toml. See option 5 to configure the separate "
+            "GitHub Actions cron."
         ),
         _schedule_only,
     ),
     (
         "5",
+        "GitHub Actions workflow",
+        (
+            "Configure the GitHub Actions cron schedule (UTC) and default report "
+            "sections, then render and optionally write .github/workflows/email-report.yml. "
+            "Manual workflow_dispatch runs in the GitHub UI still override these defaults "
+            "per-run."
+        ),
+        _github_actions_only,
+    ),
+    (
+        "6",
         "macOS launchd schedule",
         (
             "Generate, install, or remove the LaunchAgent plist that runs "
@@ -349,7 +428,7 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _configure_launchd,
     ),
     (
-        "6",
+        "7",
         "GitHub Actions secrets",
         (
             "Push secrets to this repository with `gh secret set` so the scheduled "
@@ -361,7 +440,7 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _ci_only,
     ),
     (
-        "7",
+        "8",
         "Developer security hooks",
         (
             "Install pre-commit and pre-push hooks (ruff, ruff-format, gitleaks) "
@@ -370,7 +449,7 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _hooks_only,
     ),
     (
-        "8",
+        "9",
         "Verify configuration",
         (
             "Run `email-report --dry-run` against your local config to confirm it "
@@ -379,7 +458,7 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _verify_setup,
     ),
     (
-        "9",
+        "0",
         "Show status",
         (
             "Print where setup files live, which env values are set (masked), and "

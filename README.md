@@ -78,6 +78,31 @@ Non-interactive helpers:
 
 Example templates (safe to commit): [`.env.email-report.example`](.env.email-report.example) and [`.github-usage/config.example.toml`](.github-usage/config.example.toml). Generated local files under `.github-usage/` and `.env.email-report` are gitignored.
 
+## Configuration
+
+### GitHub Actions workflow
+
+`./setup.sh` option **5** (GitHub Actions workflow) configures the scheduled
+GitHub Actions report and renders `.github/workflows/email-report.yml` from a
+checked-in template:
+
+- **Cron schedule** — always UTC. Example: `0 9 * * 1` = every Monday at 09:00 UTC.
+- **Default report sections** — `include_consumers`, `include_artifact_storage`,
+  `include_release_assets`. These become the fallback values for *scheduled* runs.
+- **`workflow_dispatch` manual runs** — the GitHub UI dropdowns still work as
+  per-run overrides. The configured defaults are only used when the workflow
+  fires on schedule (when `inputs.*` are `null`).
+- **Commit required** — the wizard writes the file locally and prints a
+  `git add … && git commit … && git push` line. Nothing is committed automatically.
+
+The local launchd schedule (option **4**) is independent of the GitHub Actions
+cron — they are stored in separate sections (`[schedule]` vs `[github_actions]`)
+of `.github-usage/config.toml` and drive separate scheduling systems.
+
+The four `gh` secrets (`GH_USAGE_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`,
+`RESEND_FROM`) are not touched by the workflow renderer; use option **7**
+(GitHub Actions secrets) to push them.
+
 ## Authentication
 
 The CLI resolves a token in this order:

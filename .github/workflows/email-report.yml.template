@@ -1,0 +1,70 @@
+name: GitHub Usage Report
+
+on:
+  schedule:
+    - cron: '__CRON__'
+  workflow_dispatch:
+    inputs:
+      include_consumers:
+        description: Include top repository breakdowns and key insights
+        required: false
+        default: '__INCLUDE_CONSUMERS_DEFAULT__'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      include_artifact_storage:
+        description: Include Actions artifact storage details
+        required: false
+        default: '__INCLUDE_ARTIFACT_STORAGE_DEFAULT__'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      include_release_assets:
+        description: Include release asset inventory
+        required: false
+        default: '__INCLUDE_RELEASE_ASSETS_DEFAULT__'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      report_email:
+        description: Override the REPORT_EMAIL secret for this manual run
+        required: false
+        type: string
+
+concurrency:
+  group: github-usage-email-report
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install -e .
+      - name: Send email report
+        env:
+          GH_USAGE_TOKEN: ${{ secrets.GH_USAGE_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORT_EMAIL: ${{ inputs.report_email || secrets.REPORT_EMAIL }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+        run: |
+          args=()
+          if [ "${{ inputs.include_consumers || '__INCLUDE_CONSUMERS_DEFAULT__' }}" = "true" ]; then
+            args+=(--include-consumers)
+          fi
+          if [ "${{ inputs.include_artifact_storage || '__INCLUDE_ARTIFACT_STORAGE_DEFAULT__' }}" = "true" ]; then
+            args+=(--include-artifact-storage)
+          fi
+          if [ "${{ inputs.include_release_assets || '__INCLUDE_RELEASE_ASSETS_DEFAULT__' }}" = "true" ]; then
+            args+=(--include-release-assets --yes-include-release-assets)
+          fi
+          python -m github_usage email-report "${args[@]}"

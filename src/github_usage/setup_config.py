@@ -8,6 +8,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from .setup_workflow import DEFAULT_WORKFLOW_CONFIG, workflow_path
+
 DEFAULT_ENV_FILE = ".env.email-report"
 DEFAULT_CONFIG_DIR = ".github-usage"
 DEFAULT_CONFIG_FILE = "config.toml"
@@ -129,11 +131,13 @@ def load_config(path: Path) -> dict:
         return {
             "email_report": dict(DEFAULT_EMAIL_REPORT),
             "schedule": dict(DEFAULT_SCHEDULE),
+            "github_actions": dict(DEFAULT_WORKFLOW_CONFIG),
         }
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     email_report = {**DEFAULT_EMAIL_REPORT, **data.get("email_report", {})}
     schedule = {**DEFAULT_SCHEDULE, **data.get("schedule", {})}
-    return {"email_report": email_report, "schedule": schedule}
+    github_actions = {**DEFAULT_WORKFLOW_CONFIG, **data.get("github_actions", {})}
+    return {"email_report": email_report, "schedule": schedule, "github_actions": github_actions}
 
 
 def write_config(path: Path, config: dict) -> None:
@@ -141,6 +145,7 @@ def write_config(path: Path, config: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     email = {**DEFAULT_EMAIL_REPORT, **config.get("email_report", {})}
     schedule = {**DEFAULT_SCHEDULE, **config.get("schedule", {})}
+    ga = {**DEFAULT_WORKFLOW_CONFIG, **config.get("github_actions", {})}
     warn_over = email.get("warn_over") or []
     if isinstance(warn_over, str):
         warn_over = [warn_over]
@@ -163,6 +168,12 @@ skip_lfs = {_bool(email.get("skip_lfs"))}
 weekday = {int(schedule.get("weekday", 1))}
 hour = {int(schedule.get("hour", 9))}
 minute = {int(schedule.get("minute", 0))}
+
+[github_actions]
+cron = "{ga.get("cron", DEFAULT_WORKFLOW_CONFIG["cron"])}"
+include_consumers = {_bool(ga.get("include_consumers"))}
+include_artifact_storage = {_bool(ga.get("include_artifact_storage"))}
+include_release_assets = {_bool(ga.get("include_release_assets"))}
 """
     path.write_text(text, encoding="utf-8")
 
@@ -217,6 +228,7 @@ def status_lines(paths: SetupPaths) -> list[str]:
         config = load_config(paths.config_file)
         email = config["email_report"]
         schedule = config["schedule"]
+        ga = config.get("github_actions", {})
         lines.append(f"  max_repos: {email.get('max_repos')}")
         lines.append(
             "  optional sections: "
@@ -228,6 +240,12 @@ def status_lines(paths: SetupPaths) -> list[str]:
             f"  schedule: weekday={schedule.get('weekday')} "
             f"{schedule.get('hour'):02d}:{schedule.get('minute'):02d} local"
         )
+        if ga:
+            cron = ga.get("cron", DEFAULT_WORKFLOW_CONFIG["cron"])
+            wf_status = "present" if workflow_path(paths.root).is_file() else "missing"
+            lines.append(f"  GitHub Actions cron: {cron} (workflow file: {wf_status})")
+        else:
+            lines.append("  GitHub Actions: not configured")
     plist_exists = paths.launchd_plist.is_file()
     lines.append(f"LaunchAgent plist: {'generated' if plist_exists else 'not generated'}")
     return lines

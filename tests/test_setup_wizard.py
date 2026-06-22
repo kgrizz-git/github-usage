@@ -26,6 +26,7 @@ from github_usage.setup_wizard import (
     _MENU_OPTIONS,
     _REINSTALL_REMINDER,
     _full_setup,
+    _github_actions_only,
     _schedule_only,
     _wrap_description,
     run_setup,
@@ -223,13 +224,14 @@ class ScheduleMenuOptionTests(unittest.TestCase):
             ("2", "Local email secrets only"),
             ("3", "Report options only"),
             ("4", "Report schedule only"),
-            ("5", "macOS launchd schedule"),
-            ("6", "GitHub Actions secrets"),
-            ("7", "Developer security hooks"),
-            ("8", "Verify configuration"),
-            ("9", "Show status"),
+            ("5", "GitHub Actions workflow"),
+            ("6", "macOS launchd schedule"),
+            ("7", "GitHub Actions secrets"),
+            ("8", "Developer security hooks"),
+            ("9", "Verify configuration"),
+            ("0", "Show status"),
         ]
-        self.assertEqual(len(_MENU_OPTIONS), 9)
+        self.assertEqual(len(_MENU_OPTIONS), 10)
         for index, (key, label) in enumerate(expected):
             self.assertEqual(_MENU_OPTIONS[index][0], key)
             self.assertEqual(_MENU_OPTIONS[index][1], label)
@@ -319,10 +321,25 @@ class ScheduleMenuOptionTests(unittest.TestCase):
         self.assertEqual(code, 0)
         schedule_only.assert_called_once()
 
-    def test_launchd_menu_option_still_dispatches_at_key_5(self):
+    def test_launchd_menu_option_dispatches_at_key_6(self):
         launchd = mock.Mock(return_value=0)
         patched_options = [
-            (key, label, desc, launchd if key == "5" else handler)
+            (key, label, desc, launchd if key == "6" else handler)
+            for key, label, desc, handler in _MENU_OPTIONS
+        ]
+        with (
+            mock.patch("builtins.input", return_value="6"),
+            mock.patch("github_usage.setup_wizard._MENU_OPTIONS", patched_options),
+            mock.patch("github_usage.setup_wizard.sys.stdin.isatty", return_value=True),
+        ):
+            code = run_setup(["--root", str(self.paths.root)])
+        self.assertEqual(code, 0)
+        launchd.assert_called_once()
+
+    def test_github_actions_menu_option_dispatches_at_key_5(self):
+        gh_actions = mock.Mock(return_value=0)
+        patched_options = [
+            (key, label, desc, gh_actions if key == "5" else handler)
             for key, label, desc, handler in _MENU_OPTIONS
         ]
         with (
@@ -332,7 +349,22 @@ class ScheduleMenuOptionTests(unittest.TestCase):
         ):
             code = run_setup(["--root", str(self.paths.root)])
         self.assertEqual(code, 0)
-        launchd.assert_called_once()
+        gh_actions.assert_called_once()
+
+    def test_status_menu_option_dispatches_at_key_0(self):
+        status = mock.Mock(return_value=0)
+        patched_options = [
+            (key, label, desc, status if key == "0" else handler)
+            for key, label, desc, handler in _MENU_OPTIONS
+        ]
+        with (
+            mock.patch("builtins.input", return_value="0"),
+            mock.patch("github_usage.setup_wizard._MENU_OPTIONS", patched_options),
+            mock.patch("github_usage.setup_wizard.sys.stdin.isatty", return_value=True),
+        ):
+            code = run_setup(["--root", str(self.paths.root)])
+        self.assertEqual(code, 0)
+        status.assert_called_once()
 
 
 class FullSetupPlistSyncTests(unittest.TestCase):
@@ -369,6 +401,14 @@ class FullSetupPlistSyncTests(unittest.TestCase):
                 "github_usage.setup_wizard._configure_schedule", side_effect=record_schedule
             ),
             mock.patch(
+                "github_usage.setup_wizard._configure_github_actions",
+                side_effect=lambda _p: order.append("github_actions"),
+            ),
+            mock.patch(
+                "github_usage.setup_wizard._render_and_offer_commit",
+                side_effect=lambda _p: order.append("render"),
+            ),
+            mock.patch(
                 "github_usage.setup_wizard.generate_plist", side_effect=record_plist
             ) as plist,
             mock.patch("github_usage.setup_wizard._verify_setup", side_effect=record_verify),
@@ -378,7 +418,8 @@ class FullSetupPlistSyncTests(unittest.TestCase):
             code = _full_setup(self.paths)
         self.assertEqual(code, 0)
         plist.assert_called_once()
-        self.assertLess(order.index("schedule"), order.index("plist"))
+        self.assertLess(order.index("schedule"), order.index("github_actions"))
+        self.assertLess(order.index("github_actions"), order.index("plist"))
         self.assertLess(order.index("plist"), order.index("verify"))
 
     def test_full_setup_regenerates_plist_even_when_verify_fails(self):
@@ -386,6 +427,8 @@ class FullSetupPlistSyncTests(unittest.TestCase):
             mock.patch("github_usage.setup_wizard._configure_env_secrets"),
             mock.patch("github_usage.setup_wizard._configure_email_options"),
             mock.patch("github_usage.setup_wizard._configure_schedule"),
+            mock.patch("github_usage.setup_wizard._configure_github_actions"),
+            mock.patch("github_usage.setup_wizard._render_and_offer_commit"),
             mock.patch("github_usage.setup_wizard.generate_plist") as plist,
             mock.patch("github_usage.setup_wizard._verify_setup", return_value=1),
             mock.patch("github_usage.setup_wizard._prompt_yes_no", return_value=False),
@@ -394,6 +437,70 @@ class FullSetupPlistSyncTests(unittest.TestCase):
             code = _full_setup(self.paths)
         self.assertEqual(code, 1)
         plist.assert_called_once()
+
+
+class GitHubActionsWizardTests(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.root = Path(self.tmpdir)
+        self.paths = SetupPaths.from_root(self.root)
+        write_config(self.paths.config_file, load_config(self.paths.config_file))
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def test_configure_github_actions_writes_github_actions_block(self):
+        inputs = iter(["0 14 * * 5", "n", "n", "n"])
+        with (
+            mock.patch("builtins.input", side_effect=lambda _: next(inputs)),
+            mock.patch("builtins.print"),
+        ):
+            from github_usage.setup_wizard import _configure_github_actions
+
+            _configure_github_actions(self.paths)
+        config = load_config(self.paths.config_file)
+        self.assertEqual(config["github_actions"]["cron"], "0 14 * * 5")
+        self.assertFalse(config["github_actions"]["include_consumers"])
+
+    def test_configure_github_actions_reprompts_on_invalid_cron(self):
+        inputs = iter(["bad cron", "0 9 * * 1", "n", "n", "n"])
+        with (
+            mock.patch("builtins.input", side_effect=lambda _: next(inputs)),
+            mock.patch("builtins.print"),
+        ):
+            from github_usage.setup_wizard import _configure_github_actions
+
+            _configure_github_actions(self.paths)
+        config = load_config(self.paths.config_file)
+        self.assertEqual(config["github_actions"]["cron"], "0 9 * * 1")
+
+    def test_github_actions_only_calls_configure_and_render(self):
+        with (
+            mock.patch("github_usage.setup_wizard._configure_github_actions") as cfg,
+            mock.patch("github_usage.setup_wizard._render_and_offer_commit") as render,
+        ):
+            code = _github_actions_only(self.paths)
+        self.assertEqual(code, 0)
+        cfg.assert_called_once_with(self.paths)
+        render.assert_called_once_with(self.paths)
+
+    def test_full_setup_calls_render_workflow(self):
+        with (
+            mock.patch("github_usage.setup_wizard._configure_env_secrets"),
+            mock.patch("github_usage.setup_wizard._configure_email_options"),
+            mock.patch("github_usage.setup_wizard._configure_schedule"),
+            mock.patch("github_usage.setup_wizard._configure_github_actions"),
+            mock.patch("github_usage.setup_wizard._render_and_offer_commit") as render,
+            mock.patch("github_usage.setup_wizard.generate_plist") as plist,
+            mock.patch("github_usage.setup_wizard._verify_setup", return_value=0),
+            mock.patch("github_usage.setup_wizard._prompt_yes_no", return_value=False),
+            mock.patch("builtins.print"),
+        ):
+            plist.return_value = self.paths.launchd_plist
+            _full_setup(self.paths)
+        render.assert_called_once_with(self.paths)
 
 
 if __name__ == "__main__":
