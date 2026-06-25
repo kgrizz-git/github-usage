@@ -1,6 +1,6 @@
 # [2026-06-19 02:35] Implementation Plan — Remaining Bug Report Items
 
-> **Status: COMPLETED 2026-06-19.** All 8 bug-fix tasks (Phases 1–3) and
+> **Status:** COMPLETE (2026-06-19). All 8 bug-fix tasks (Phases 1–3) and
 > the test-coverage / stale-fixture tasks are implemented. `bash scripts/check`,
 > `bash scripts/smoke`, and `bash scripts/docs-check` all pass. 187 unit tests
 > pass, including 33 new tests added as part of this plan.

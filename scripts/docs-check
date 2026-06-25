@@ -35,4 +35,26 @@ if [[ ${#stale[@]} -gt 0 ]]; then
   printf '  %s\n' "${stale[@]}"
 fi
 
+# Warn about completed plans still sitting in the active (non-archived) plans
+# directory. The pattern matches a blockquote status banner in either the
+# canonical "> **Status:** COMPLETE" or the legacy "COMPLETED" form. It is
+# anchored to the leading ">" so prose that merely quotes the banner format
+# (e.g. convention docs) does not false-trigger. Completed plans belong in
+# docs/superpowers/plans/archived/. Warn only (do not fail) so this never blocks
+# a commit mid-archive.
+# Manually verified by dropping a throwaway plan with a COMPLETE banner into
+# docs/superpowers/plans/ and confirming the warning fires while exit stays 0.
+banner_re='^>[[:space:]]*\*\*Status:\*\*[[:space:]]*COMPLET'
+completed=()
+while IFS= read -r -d '' f; do
+  if grep -Eq "$banner_re" "$f"; then
+    line="$(grep -En "$banner_re" "$f" | head -n1)"
+    completed+=("$f: $line")
+  fi
+done < <(find docs/superpowers/plans -maxdepth 1 -name "*.md" -print0 2>/dev/null)
+if [[ ${#completed[@]} -gt 0 ]]; then
+  echo "Warning: the following non-archived plans look COMPLETE and should be moved to docs/superpowers/plans/archived/:"
+  printf '  %s\n' "${completed[@]}"
+fi
+
 echo "docs check passed"

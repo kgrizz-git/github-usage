@@ -1,5 +1,9 @@
 # Scheduled Email Usage Reports Implementation Plan
 
+> **Status:** COMPLETE
+>
+> **Done (2026-06-25):** Implemented — `src/github_usage/email_report.py` exists and the `github-usage email-report` CLI subcommand works (Resend delivery, scheduled runner, GitHub Actions template). Archived from `docs/plan-email-report.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a scheduled plain-text GitHub billing email report that can run locally or from GitHub Actions without exposing tokens or generated reports.

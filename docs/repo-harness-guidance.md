@@ -186,6 +186,15 @@ Before release, run a release check:
 10. Add `CHANGELOG.md` and start at `0.1.0` while the CLI contract is still settling.
 11. Add `.gitignore` and docs/release hygiene checklists before the first tagged release.
 
+## Documentation Lifecycle
+
+This is the canonical workflow for plan, changelog, and TO_DO maintenance. `AGENTS.md` holds the authoritative short form; this section adds context.
+
+- **Plans:** Create in `docs/superpowers/plans/` with a `YYYY-MM-DD-<slug>.md` filename. Group related work (e.g., fixes from one bug report) into logical phases. Mark tasks `- [x]` with dated `**Done:**` notes as they land. When complete, set the canonical banner `> **Status:** COMPLETE` — the colon goes *outside* the bold so `scripts/docs-check` can detect it — and move the file to `docs/superpowers/plans/archived/`. `scripts/docs-check` warns when a COMPLETE plan is still in the active directory.
+- **CHANGELOG.md:** Record completed user-visible changes under `[Unreleased]` using the subsections `Added`, `Fixed`, `Changed`, or `Deferred` (the last for planned work intentionally not shipped, with a rationale). Entries stay under `[Unreleased]` until a release is tagged.
+- **TO_DO.md:** Remove items when completed — do not keep them marked `[x]`. The changelog and archived plans are the historical record.
+- **Releases:** Add a dated version section to `CHANGELOG.md`, move the `[Unreleased]` entries into it, and bump the version in both `src/github_usage/__init__.py` (`__version__`) and `pyproject.toml` (`version`).
+
 ## Periodic Maintenance Checklist
 
 Run these checks periodically (suggested: monthly or after any significant batch of changes) and record the results in an assessment doc under `docs/assessments/`.
@@ -195,6 +204,6 @@ Run these checks periodically (suggested: monthly or after any significant batch
 - [ ] Run `scripts/docs-check` — required docs exist, CLI help text is consistent with README, no stale assessment files (>30 days old) without a staleness note.
 - [ ] Run `scripts/security` — no new secrets or high-severity Bandit/pip-audit findings.
 - [ ] Review `docs/assessments/` — archive or update any file with a staleness notice.
-- [ ] Review `docs/superpowers/plans/` — move completed or superseded plans to `docs/superpowers/plans/archived/`.
+- [ ] Review `docs/superpowers/plans/` and archive completed/superseded plans per the [Documentation Lifecycle](#documentation-lifecycle) section above (`scripts/docs-check` flags stragglers).
 - [ ] Check `wc -l src/github_usage/*.py` — flag any file approaching 400 lines for proactive splitting (soft limit: 500 lines).
 - [ ] Review `AGENTS.md` and `docs/repo-harness-guidance.md` — ensure guidance still reflects actual repo conventions.

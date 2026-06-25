@@ -1,5 +1,9 @@
 # Report Export Implementation Plan
 
+> **Status:** COMPLETE
+>
+> **Done (2026-06-25):** Implemented — all `export_*.py` modules exist and the `--export csv|xlsx|pdf|json|text|none`, `--output`, `--json`, and `--no-interactive` flags work, with a redaction layer applied before file writes. The `--month YYYY-MM` flag remains deferred (see `docs/api-discovery-month.md`). Archived from `docs/plan-export-reports.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add export support so users can save GitHub usage reports as CSV, XLSX, PDF, JSON, or plain text files. The CLI adds `--export FORMAT`, `--output PATH`, `--json`, `--no-interactive`, and `--dry-run` flags. Exported files go through a redaction layer before writing. A planned `--month YYYY-MM` flag for historical billing queries is **deferred**: see `docs/api-discovery-month.md` for the discovery results and rollback rationale.

@@ -4,10 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project follows the structure from Keep a Changelog and intends to use Semantic Versioning once the CLI contract stabilizes.
 
+**Format:** In-progress changes stay under `[Unreleased]` until a release is tagged. Allowed subsections are `Added`, `Fixed`, `Changed`, and `Deferred` (for planned work intentionally not shipped, with a rationale).
+
 ## [Unreleased]
 
 ### Added
 
+- **`scripts/docs-check` plan-hygiene warning:** warns (without failing) when a plan whose status banner reads `COMPLETE`/`COMPLETED` is still in the active `docs/superpowers/plans/` directory instead of `archived/`.
+- **`QWEN.md`** pointer file directing agents to `AGENTS.md`.
 - `github-usage email-report` subcommand for plain-text scheduled billing reports.
 - Resend email delivery support using stdlib HTTP calls.
 - GitHub Actions workflow template for scheduled email reports using `GH_USAGE_TOKEN`.
@@ -54,6 +58,8 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Documentation lifecycle standardized:** `AGENTS.md` now defines a single plan → complete → archive workflow plus changelog, `TO_DO.md`, and release conventions (mirrored in `docs/repo-harness-guidance.md`). `GEMINI.md` slimmed to point at `AGENTS.md`. `CHANGELOG.md` gained a format note sanctioning the `Deferred` subsection.
+- **Plan housekeeping:** archived all completed plans into `docs/superpowers/plans/archived/`, normalized their status banners to the canonical `> **Status:** COMPLETE` form, and gave the two previously untimestamped archived plans timestamped filenames. `TO_DO.md` trimmed to open items only.
 - **Setup entrypoint moved to `./setup.sh`:** The guided setup entry point now lives at the repo root as `setup.sh` for easier discovery. The previous `scripts/setup` path is preserved as a thin wrapper that forwards to the new root script.
 - **Refactored `report_summary.py`:** Split large `show_final_summary` function into smaller, testable sub-functions.
 - **Unified Error Messaging:** Shared `print_missing_token_error` helper for consistent CLI feedback.

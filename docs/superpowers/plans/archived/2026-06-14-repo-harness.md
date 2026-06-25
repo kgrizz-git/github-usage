@@ -1,5 +1,7 @@
 # Repo Harness Implementation Plan
 
+> **Status:** COMPLETE
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Convert the folder of scripts into a reusable Python CLI repository with tests, docs, local scripts, CI, security checks, and git ignore hygiene.
@@ -18,4 +20,4 @@
 - [x] Add `pyproject.toml` package metadata and console script.
 - [x] Add local harness scripts under `scripts/`.
 - [x] Add README, changelog, license, gitignore, AGENTS.md, pre-commit config, CI, security workflow, and Dependabot config.
-- [ ] Run verification and initialize git.
+- [x] Run verification and initialize git.

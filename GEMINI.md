@@ -1,13 +1,3 @@
-# Project Instructions - github-usage
+# GEMINI.md
 
-## Documentation Conventions
-
-### Implementation Plans
-- All new implementation plans must be stored in `docs/superpowers/plans/`.
-- Filenames must follow the timestamped convention: `YYYY-MM-DD-<slug>.md`.
-- Example: `2026-06-16-bug-fixes.md`.
-
-## Development Workflow
-- Follow the Research -> Strategy -> Execution lifecycle.
-- Fixes for bugs identified in reports should be grouped into logical phases.
-- Always add unit tests for any bug fixes.
+See `AGENTS.md` for all repository guidance and rules — repository expectations, done criteria, the documentation lifecycle (plans, changelog, TO_DO, releases), and code style.
