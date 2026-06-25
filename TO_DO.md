@@ -11,12 +11,16 @@
 
 - [ ] Add unit tests for remaining uncovered code: `report_account.py` (deeper coverage), `report_summary.py` (remaining helpers), `billing.get_actions_from_runs`, and `billing.get_full_billing`. (Other previously listed modules — `report_optional.*`, `report_data.get_key_insights`, `auth.check_user_scope` — now have coverage.)
 
+## Code Health
+
+- [ ] Refactor large Python modules/functions flagged by `scripts/check-sizes`: split `setup_wizard.py` (~534 lines, over the 500-line soft limit) into focused submodules, and trim the functions approaching the 100-line limit — `cli._run_email_report` (~97), `legacy_report.main` (~96), `scripts/api_discovery_month.main` (~82), and `report_data.build_report_data` (~81).
+
 ## Configuration & Setup
 
 - [ ] Add support for configuring multiple reports with different run frequencies, targets, and options.
 - [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules).
-- [ ] Add Windows/PowerShell support for the setup script.
-- [ ] Add single entrypoint for guiding the user through running a report locally or by email once, as well as through guided setup.
+- [ ] Write Windows-compatible PowerShell versions of all scripts (setup, check, smoke, docs-check, etc.).
+- [ ] Create a `start.sh` entrypoint script with options to set up (delegating to `setup.sh`) or run a one-off report (with report settings, export format, and filename selection, using sensible defaults). Once created, move `setup.sh` into the `scripts/` folder.
 
 ## Deferred
 

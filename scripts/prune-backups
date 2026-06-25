@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#
+# prune-backups — remove stale code backups from backups/.
+#
+# What it does:
+#   Deletes tracked `backups/*.bak` files whose most recent commit is NOT among
+#   the last 5 commits (i.e., backups that have gone untouched for more than 5
+#   commits). This keeps the backups/ folder from growing without bound while
+#   preserving recent safety copies.
+#
+# What it does NOT touch:
+#   - Non-`.bak` files in backups/ (if any are added later).
+#   - Untracked or never-committed backups (they have no history to age against).
+#
+# Inputs:  the git repository (history of backups/*.bak files).
+# Outputs: `git rm` of stale backups (staged for the current commit); a summary
+#          line per pruned file. Exit code is always 0 so it never blocks a
+#          commit; when run as a pre-commit hook that stages removals, the
+#          pre-commit framework will report the modified index and ask you to
+#          re-run the commit (same as ruff/end-of-file-fixer).
+#
+# Env:
+#   PRUNE_BACKUPS_DRYRUN=1  Print what would be pruned without removing anything.
+#   PRUNE_BACKUPS_KEEP=N    Override the number of recent commits to keep (default 5).
+#
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+BACKUP_DIR="backups"
+KEEP="${PRUNE_BACKUPS_KEEP:-5}"
+DRYRUN="${PRUNE_BACKUPS_DRYRUN:-0}"
+
+# Nothing to do if the backups dir or any git history is absent.
+[ -d "$BACKUP_DIR" ] || exit 0
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+
+# The most recent $KEEP commit hashes (one per line). May be fewer in a young repo.
+recent_commits="$(git rev-list -n "$KEEP" HEAD 2>/dev/null || true)"
+[ -n "$recent_commits" ] || exit 0
+
+removed=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  case "$f" in
+    *.bak) ;;            # only consider .bak backups
+    *) continue ;;
+  esac
+
+  # Last commit that touched this file; empty if staged but never committed.
+  last_commit="$(git log -1 --format=%H -- "$f" 2>/dev/null || true)"
+  [ -n "$last_commit" ] || continue
+
+  # Keep the file if its last commit is within the recent window.
+  if grep -qx "$last_commit" <<<"$recent_commits"; then
+    continue
+  fi
+
+  if [ "$DRYRUN" = "1" ]; then
+    echo "[dry-run] would prune stale backup (last touched in ${last_commit:0:8}): $f"
+  else
+    git rm --quiet -- "$f"
+    echo "Pruned stale backup (last touched in ${last_commit:0:8}): $f"
+  fi
+  removed=$((removed + 1))
+done < <(git ls-files "$BACKUP_DIR")
+
+if [ "$removed" -gt 0 ] && [ "$DRYRUN" != "1" ]; then
+  echo "prune-backups: removed $removed stale backup file(s); they are staged for removal."
+fi
+
+exit 0

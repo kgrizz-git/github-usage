@@ -3,7 +3,7 @@
 ## Repository Expectations
 
 - Active package code lives in `src/github_usage/`.
-- Historical scripts live in `backups/` and should not be treated as active implementation.
+- `backups/` holds only transient pre-modification backups (`*.bak`), pruned by `scripts/prune-backups`; it is not active implementation.
 - Use `scripts/check` as the default verification command before claiming a code change is complete.
 - Use `scripts/smoke` after CLI entrypoint changes.
 - Use `scripts/docs-check` after README, docs, or CLI help changes.

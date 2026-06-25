@@ -67,7 +67,7 @@ github-usage/
 └── backups/
 ```
 
-Keep `backups/` for historical reference only. New development should happen in `src/github_usage/`, with a console entry point such as `github-usage = "github_usage.cli:main"`.
+`backups/` holds only transient pre-modification backups (`*.bak`), pruned by `scripts/prune-backups`. New development should happen in `src/github_usage/`, with a console entry point such as `github-usage = "github_usage.cli:main"`.
 
 ### Harness Principles
 
@@ -150,7 +150,7 @@ Repo hygiene:
 
 - Add `.gitignore` for virtualenvs, caches, build outputs, coverage files, generated reports, and local secret files.
 - Keep generated output out of source control unless it is a curated fixture under `tests/fixtures/`.
-- Keep `backups/` out of normal package discovery and CI except for explicit historical-reference checks.
+- Keep `backups/` out of normal package discovery and CI; it holds only transient `*.bak` backups.
 - Prefer one canonical command per task. If humans and agents need the same recipe twice, move it into `scripts/`.
 - Schedule a monthly maintenance pass: update dependencies, prune stale docs, review ignored files, run the security workflow, and verify the release checklist still reflects reality.
 

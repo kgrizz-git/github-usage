@@ -10,6 +10,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Added
 
+- **`scripts/prune-backups` + pre-commit hook:** prunes tracked `backups/*.bak` files whose last commit is older than the most recent 5 commits (non-`.bak` files and untracked/new backups are preserved). Supports `PRUNE_BACKUPS_DRYRUN=1` and `PRUNE_BACKUPS_KEEP=N`.
 - **`scripts/docs-check` plan-hygiene warning:** warns (without failing) when a plan whose status banner reads `COMPLETE`/`COMPLETED` is still in the active `docs/superpowers/plans/` directory instead of `archived/`.
 - **`QWEN.md`** pointer file directing agents to `AGENTS.md`.
 - `github-usage email-report` subcommand for plain-text scheduled billing reports.
@@ -58,6 +59,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Removed legacy backup scripts:** deleted the original `backups/github-usage`, `backups/github-usage-v2`, and `backups/github-usage.sh` (still recoverable via git history). `backups/` now holds only transient `*.bak` modification backups; `AGENTS.md`, `README.md`, and `docs/repo-harness-guidance.md` updated to match.
 - **Documentation lifecycle standardized:** `AGENTS.md` now defines a single plan → complete → archive workflow plus changelog, `TO_DO.md`, and release conventions (mirrored in `docs/repo-harness-guidance.md`). `GEMINI.md` slimmed to point at `AGENTS.md`. `CHANGELOG.md` gained a format note sanctioning the `Deferred` subsection.
 - **Plan housekeeping:** archived all completed plans into `docs/superpowers/plans/archived/`, normalized their status banners to the canonical `> **Status:** COMPLETE` form, and gave the two previously untimestamped archived plans timestamped filenames. `TO_DO.md` trimmed to open items only.
 - **Setup entrypoint moved to `./setup.sh`:** The guided setup entry point now lives at the repo root as `setup.sh` for easier discovery. The previous `scripts/setup` path is preserved as a thin wrapper that forwards to the new root script.

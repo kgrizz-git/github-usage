@@ -328,7 +328,7 @@ scripts/docs-check
 - `tests/`: unit tests and future fixtures
 - `scripts/`: canonical local automation commands
 - `docs/`: maintainer guidance
-- `backups/`: historical script versions, not active code
+- `backups/`: transient pre-modification backups (`*.bak`), pruned by `scripts/prune-backups`; not active code
 
 ## Roadmap
 
