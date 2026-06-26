@@ -20,24 +20,69 @@ The `--email-format text|html` flag was added to `cli_parsers.py` with HTML rend
 - `email_report.py` — Contains `format_report_email()` (plain-text) and `send_email()` (Resend, sends `text` field only).
 - Resend API supports both `text` and `html` fields on the email payload.
 
+## Definition of Done
+
+- `scripts/check` exits 0
+- `scripts/smoke` exits 0
+- `scripts/docs-check` exits 0
+- All new tests pass; no existing tests start failing (the planned `test_email_report_html_format_errors` → `test_email_report_html_format_success` rename in Phase 2a is the only allowed change to an existing test, and the renamed test must pass)
+- Manual dry-run produces an HTML body for `--email-format html`
+- Manual dry-run produces a plain-text body for the default format
+- `CHANGELOG.md` and `TO_DO.md` are updated; the plan is archived with the canonical `> **Status:** COMPLETE` banner
+
+## Design Decisions
+
+### Wrapper vs section formatters
+
+Mirroring `format_report_email()`, the `format_html_report()` wrapper handles three things directly (outside `_SECTION_HTML_FORMATTERS`):
+1. The report header (username, generated date, period)
+2. Warnings (styled as a highlighted alert box)
+3. REST API Quota Notes (footnote-style)
+
+The per-section formatters in `_SECTION_HTML_FORMATTERS` handle only the individual data sections. Their element order **must match** `_SECTION_FORMATTERS`.
+
+### Period text
+
+The data dict carries `period: "current_month"` (with an underscore; see `report_data.py:255`). The plain-text formatter hardcodes the literal string `"Period: current month"` (with a space) — `format_html_report()` must match this literal to stay consistent with the plain-text body, not surface the raw `current_month` value.
+
+### Helper-function strategy
+
+- **Reuse as-is:**
+  - `_bytes_to_mb()` (line 29) — the HTML formatter wraps its return value in a `<td>`.
+  - `fmt_price()` (from `report_helpers`) — output is inherently safe to insert into HTML without additional escaping.
+- **Add HTML counterpart:**
+  - `_cost_line()` (line 33) — the HTML path needs a corresponding `_html_cost_line()` helper that returns a table row string fragment (called by `_format_html_monthly_costs_section()`).
+- **Inline in wrapper:**
+  - `_generated_line()` (line 17) — used directly by `format_report_email()` (the wrapper), not inside a section formatter. Its HTML equivalent is inlined directly inside `format_html_report()` (wrapping the output in a `<span class="meta">` element), not extracted into a separate helper.
+
+### Size budget
+
+`email_report.py` is currently 248 lines. The nine `_format_html_*_section()` functions plus the wrapper and tuple will add roughly 120-160 lines, keeping the file well under the 500-line soft limit. If a section formatter exceeds ~30 lines, factor a small inner helper rather than letting one function balloon. `cli.py` grows by only a handful of lines and stays under 400.
+
+### HTML escaping — required
+
+All user-supplied and untrusted data interpolated into the HTML output must be escaped using `html.escape()` from Python's standard library (default `quote=True`, which escapes `<`, `>`, `&`, `"`, and `'`). This includes:
+- `username` (header)
+- `repo` names (consumers, artifact storage, release assets)
+- `insight` strings (key insights)
+- `warning` strings
+- `model` names (copilot by-model breakdown)
+- `section` / `message` strings (unavailable data errors)
+- `note` strings (REST API quota notes)
+
+Without escaping, a repo name like `org/foo&bar` would produce invalid HTML. Add `import html` to `email_report.py` for `html.escape()`.
+
+### Email-client CSS
+
+Some email clients (Gmail mobile app, Outlook on Windows) strip `<style>` blocks in `<head>`. For production, use inline `style` attributes on elements (e.g., `<td style="padding: 6px 10px; border: 1px solid #d0d7de;">`) or run the output through a CSS-inliner like `premailer`. For this first pass, the `<style>` block in `<head>` is acceptable for most modern clients.
+
 ## Proposed Implementation
 
 ### 1. Add `format_html_report()` to `email_report.py`
 
 Create a new function `format_html_report(data: dict) -> str` that renders the same report data as an HTML document. The HTML should be self-contained (inline styles, no external CSS) and responsive.
 
-> **Size budget:** `email_report.py` is currently 248 lines. The nine `_format_html_*_section()` functions plus the wrapper and tuple will add roughly 120-160 lines, keeping the file well under the 500-line soft limit. If a section formatter exceeds ~30 lines, factor a small inner helper rather than letting one function balloon. `cli.py` grows by only a handful of lines and stays under 400.
-
 Each `_format_*_section()` function in `email_report.py` should get a corresponding `_format_html_*_section()` that returns a list of HTML string fragments. A new `_SECTION_HTML_FORMATTERS` tuple drives the generation — its element order **must match** `_SECTION_FORMATTERS`.
-
-> **Structure note:** Mirroring `format_report_email()`, the `format_html_report()` wrapper handles three things directly (outside `_SECTION_HTML_FORMATTERS`):
-> 1. The report header (username, generated date, period)
-> 2. Warnings (styled as a highlighted alert box)
-> 3. REST API Quota Notes (footnote-style)
->
-> The per-section formatters in `_SECTION_HTML_FORMATTERS` handle only the individual data sections.
-
-> **Period text:** The data dict carries `period: "current_month"` (with an underscore; see `report_data.py:255`). The plain-text formatter hardcodes the literal string `"Period: current month"` (with a space) — `format_html_report()` must match this literal to stay consistent with the plain-text body, not surface the raw `current_month` value.
 
 The HTML structure mirrors the plain-text sections:
 
@@ -65,25 +110,6 @@ The HTML structure mirrors the plain-text sections:
 </body>
 </html>
 ```
-
-> **Email-client CSS note:** Some email clients (Gmail mobile app, Outlook on Windows) strip `<style>` blocks in `<head>`. For production, use inline `style` attributes on elements (e.g., `<td style="padding: 6px 10px; border: 1px solid #d0d7de;">`) or run the output through a CSS-inliner like `premailer`. For this first pass, the `<style>` block in `<head>` is acceptable for most modern clients.
-
-> **HTML escaping — required:** All user-supplied and untrusted data interpolated into the HTML output must be escaped using `html.escape()` from Python's standard library (default `quote=True`, which escapes `<`, `>`, `&`, `"`, and `'`). This includes:
-> - `username` (header)
-> - `repo` names (consumers, artifact storage, release assets)
-> - `insight` strings (key insights)
-> - `warning` strings
-> - `model` names (copilot by-model breakdown)
-> - `section` / `message` strings (unavailable data errors)
-> - `note` strings (REST API quota notes)
->
-> Without escaping, a repo name like `org/foo&bar` would produce invalid HTML. Add `import html` to `email_report.py` for `html.escape()`.
-
-Reusable helpers:
-- `_cost_line()` (line 33) — plain-text cost string. The HTML path needs a corresponding `_html_cost_line()` helper that returns a table row string fragment (called by `_format_html_monthly_costs_section()`).
-- `_bytes_to_mb()` (line 29) — remains usable as-is; the HTML formatter wraps its return value in a `<td>`.
-- `fmt_price()` (from `report_helpers`) — formats numeric floats, output is inherently safe to insert into HTML without additional escaping; should be reused as-is.
-- `_generated_line()` (line 17) — used directly by `format_report_email()` (the wrapper), not inside a section formatter. Its HTML equivalent is inlined directly inside `format_html_report()` (wrapping the output in a `<span class="meta">` element), not extracted into a separate helper.
 
 Key sections to render:
 - Header (username, generated date, period) — handled directly by `format_html_report()`
@@ -123,6 +149,7 @@ def send_email(
     }
     if html:
         payload["html"] = html
+    # Then json.dumps(payload) and pass to http_retry.request_with_retries, as today.
     ...
 ```
 
@@ -150,9 +177,7 @@ Update the `email_report.send_email()` call in the dispatch flow to include `htm
         )
 ```
 
-> **Export interaction (no change needed):** The export path (lines 227-236) uses `body` (plain-text) for `--export text` and `data` for other formats. This behavior is correct regardless of `--email-format` — the `html_body` variable is only for email delivery, never for export. Do not change the export path.
-
-> **Dry-run path:** The current `print(body, end="")` on line 238 prints the plain-text body. When `args.email_format == "html"`, this must print the HTML body instead. Since `html_body` is unconditionally defined, the dry-run block works without `NameError`:
+Update the dry-run block to print the HTML body when format is `html`:
 
 ```python
         if args.dry_run:
@@ -161,6 +186,8 @@ Update the `email_report.send_email()` call in the dispatch flow to include `htm
 ```
 
 The change in `_validate_email_flags()` should remove the HTML blocking logic.
+
+> **Export interaction (no change needed):** The export path (lines 227-236) uses `body` (plain-text) for `--export text` and `data` for other formats. This behavior is correct regardless of `--email-format` — the `html_body` variable is only for email delivery, never for export. Do not change the export path.
 
 ### 4. Update module docstring and CLI text
 
@@ -226,13 +253,15 @@ CLI dry-run and integration:
 
 ## Implementation Order
 
+Phases are sequential — do them in order.
+
 ### Phase 1: HTML rendering function
 
 - [ ] Add `format_html_report()` to `email_report.py` with all section renderers (and the new `import html` for `html.escape()`)
 - [ ] Add tests for `format_html_report()`, including `HTMLParser` validation
 - [ ] Add `test_section_html_formatters_order_matches_text_formatters`
 
-### Phase 2: Wire through email dispatch
+### Phase 2a: Wire HTML through dispatch (code & test changes)
 
 - [ ] Update `send_email()` to accept and send `html` parameter
 - [ ] Update `_run_email_report()` to generate HTML and pass it to `send_email()`
@@ -240,10 +269,13 @@ CLI dry-run and integration:
 - [ ] Update `_validate_email_flags()` to remove HTML blocking
 - [ ] Update `test_email_report_html_format_errors` to `test_email_report_html_format_success` in `tests/test_export_cli.py`
 - [ ] Add `test_email_report_default_format_sends_text_only` regression test to verify text-only payload by default
+- [ ] Add tests for `send_email()` HTML parameter
+
+### Phase 2b: User-visible text updates
+
 - [ ] Update CLI HELP string in `cli.py:42`
 - [ ] Update parser description in `cli_parsers.py:38` (remove "plain-text")
 - [ ] Update module docstring in `email_report.py:1`
-- [ ] Add tests for `send_email()` HTML parameter
 - [ ] Update `CHANGELOG.md`: change the existing `[Unreleased] → Added` entry from `--email-format text|html flag on email-report (HTML rendering deferred)` to reflect that the flag is now fully implemented (HTML renderer in `format_html_report`, both `text` and `html` sent through Resend).
 - [ ] Extend `scripts/smoke` with a flag-presence check for `--email-format` (mirror the existing `--timeout` / `--max-retries` greps) so the help-string update is regression-protected.
 
