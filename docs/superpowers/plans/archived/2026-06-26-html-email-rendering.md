@@ -1,8 +1,10 @@
 # Plan: HTML email rendering for `--email-format html`
 
-> **Status:** IN PROGRESS
+> **Status:** COMPLETE
 >
-> **Date:** 2026-06-26
+> Implemented and merged 2026-06-26 (commit `f0b71a6`).
+
+**Date:** 2026-06-26
 
 ## Objective
 
@@ -307,46 +309,23 @@ Phases are sequential — do them in order.
 
 ### Phase 1: HTML rendering function
 
-- [ ] Add `format_html_report()` to `email_report.py` with all section renderers (and the new `import html` for `html.escape()`)
-- [ ] Add tests for `format_html_report()`, including `HTMLParser` validation
-- [ ] Add `test_section_html_formatters_order_matches_text_formatters`
+**Done:** 2026-06-26 — HTML renderer. Added `format_html_report()`, `_html_cost_row()`, 9 `_format_html_*_section()` formatters, `_SECTION_HTML_FORMATTERS` tuple, `_HTML_DOCUMENT_HEAD` / `_HTML_DOCUMENT_TAIL` constants, and `import html` to `email_report.py`. Tests: 6 new in `test_email_report.py` (sections, structure, minimal data, escape coverage with `quote=True`, void-element-aware `HTMLParser` well-formedness, formatter-order parity).
 
 ### Phase 2a: Wire HTML through dispatch (code & test changes)
 
-- [ ] Update `send_email()` to accept and send `html` parameter
-- [ ] Update `_run_email_report()` to generate HTML and pass it to `send_email()`
-- [ ] Update `_run_email_report()` dry-run path to print HTML body when format is `html`
-- [ ] Update `_validate_email_flags()` to remove HTML blocking
-- [ ] Update `test_email_report_html_format_errors` to `test_email_report_html_format_success` in `tests/test_export_cli.py`
-- [ ] Add `test_email_report_default_format_sends_text_only` regression test to verify text-only payload by default
-- [ ] Add tests for `send_email()` HTML parameter
-- [ ] Surface `email_format` in the guided setup (see section 4 of Proposed Implementation): add to `DEFAULT_EMAIL_REPORT`, update `email_report_args()`, add the key to `write_config()`, add prompt to `_configure_email_options()`, and extend the existing `SetupConfigTests` class in `tests/test_setup_wizard.py` (do **not** create a new `tests/test_setup_config.py`)
+**Done:** 2026-06-26 — CLI + dispatch wiring. `send_email()` gained `html` kwarg emitting `text` + `html` in the Resend payload when provided. `cli._run_email_report()` defines `html_body` unconditionally, threads it into `send_email`, and switches the dry-run print. `cli._validate_email_flags()` no longer rejects `html`. Tests: 2 new `send_email` payload tests in `test_email_report.py`, renamed `test_email_report_html_format_errors → test_email_report_html_format_success` and added `test_email_report_default_format_sends_text_only` in `test_export_cli.py`, plus 5 new `SetupConfigTests` in `test_setup_wizard.py` (default, html, text, default fallback, write_config round-trip) and 6 new wizard-prompt tests in a new `EmailFormatWizardTests` class. Setup integration: `setup_config.DEFAULT_EMAIL_REPORT["email_format"] = "text"`, `email_report_args()` always emits `--email-format <value>`, `write_config()` writes the new key into TOML, `setup_wizard._configure_email_options()` now prompts for the format with a `_prompt_email_format` helper that re-prompts on invalid input.
 
 ### Phase 2b: User-visible text updates
 
-- [ ] Update CLI HELP string in `cli.py:42`
-- [ ] Update parser description in `cli_parsers.py:38` (remove "plain-text")
-- [ ] Update module docstring in `email_report.py:1`
-- [ ] Update `.github-usage/config.example.toml` `[email_report]` section to include the new `email_format` key with a brief comment
-- [ ] Update `CHANGELOG.md`: change the existing `[Unreleased] → Added` entry from `--email-format text|html flag on email-report (HTML rendering deferred)` to reflect that the flag is now fully implemented (HTML renderer in `format_html_report`, both `text` and `html` sent through Resend, and `email_format` exposed through the guided setup wizard and persisted in `config.toml`).
-- [ ] Extend `scripts/smoke` with a flag-presence check for `--email-format` (mirror the existing `--timeout` / `--max-retries` greps) so the help-string update is regression-protected.
+**Done:** 2026-06-26 — Documentation + smoke. `cli.py:HELP` no longer says `(html deferred)`. `cli_parsers._email_parser` description dropped "plain-text". `email_report.py` module docstring updated. `.github-usage/config.example.toml` `[email_report]` includes the new `email_format` key with a comment. `CHANGELOG.md` `[Unreleased] → Added` entry rewritten. `scripts/smoke` now greps for `--email-format` alongside `--timeout` / `--max-retries`.
 
 ### Phase 3: Verification
 
-- [ ] Run `scripts/check`
-- [ ] Run `scripts/smoke`
-- [ ] Manual test — dry-run prints HTML: `python -m github_usage email-report --email-format html --dry-run`
-- [ ] Manual test — dry-run prints plain-text (default): `python -m github_usage email-report --dry-run`
-- [ ] Confirm that `scripts/check` exits cleanly and no test failures are introduced
-- [ ] Run `scripts/docs-check` to verify that documentation checks pass after CLI HELP updates
-- [ ] Remove the `Email Report Follow-Ups → "Add --email-format text|html HTML rendering"` line from `TO_DO.md` (per AGENTS.md; the changelog and archived plan are the historical record)
+**Done:** 2026-06-26 — Verification + TO_DO cleanup. `scripts/check` (with `scripts/check-sizes` advisory) passes — `email_report.py` is 515 lines and `setup_wizard.py` is 545 lines, both over the 500-line soft limit; both are pre-existing or noted overshoots (email_report is 15 over due to underestimating the CSS block + section-formatter verbosity; setup_wizard is 11 over due to the new prompt) and `check` is explicitly advisory. `scripts/smoke` passes (exit 0). `scripts/docs-check` passes. Manual dry-runs verified end-to-end: `email-report --email-format html --dry-run` prints a well-formed HTML body starting with `<!DOCTYPE html>`; `email-report --dry-run` prints plain text. `./start.sh setup --print-args` includes `--email-format text` from the default config, confirming setup wiring round-trips. `TO_DO.md` line removed per AGENTS.md.
 
 ### Phase 4: Plan close-out
 
-- [ ] Set the plan status banner to the canonical `> **Status:** COMPLETE` (colon outside the bold, as required by `scripts/docs-check`).
-- [ ] Add a `**Done:**` note per phase with date, one-line summary, files touched, and tests added.
-- [ ] Move the plan to `docs/superpowers/plans/archived/` so the active plans directory stays uncluttered.
-- [ ] Note the merge commit at the top of the archived plan.
+**Done:** 2026-06-26 — Plan archived. Status banner set to canonical `> **Status:** COMPLETE`. Done notes added per phase. Plan moved to `docs/superpowers/plans/archived/`. Implementation merged in commit `f0b71a6`.
 
 ## Out of Scope
 
