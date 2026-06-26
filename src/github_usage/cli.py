@@ -39,7 +39,7 @@ Legacy report options:
 Email-report options:
   --export FORMAT         Export the report to a file in the given format
   --output PATH           Output file path (auto-generated if omitted)
-  --email-format FMT      Email body format: text | html (html deferred)
+  --email-format FMT      Email body format: text | html
   --include-consumers, --include-artifact-storage, --include-release-assets,
   --yes-include-release-assets, --max-repos N, --warn-over VALUE,
   --skip-actions, --skip-copilot, --skip-lfs, --dry-run,
@@ -150,9 +150,6 @@ def _validate_email_flags(args: argparse.Namespace) -> int | None:
     if args.max_repos < 1:
         print("Error: --max-repos must be at least 1.")
         return 1
-    if args.email_format == "html":
-        print("Error: --email-format html is not yet supported.")
-        return 1
     return None
 
 
@@ -224,6 +221,7 @@ def _run_email_report(argv: Sequence[str]) -> int:
             warn_over=args.warn_over,
         )
         body = email_report.format_report_email(data)
+        html_body = email_report.format_html_report(data) if args.email_format == "html" else None
         if export_format and export_format != "none":
             payload = body if export_format == "text" else data
             path = export_report.export(
@@ -235,7 +233,7 @@ def _run_email_report(argv: Sequence[str]) -> int:
             )
             print(f"Exported to: {path}")
         if args.dry_run:
-            print(body, end="")
+            print(html_body if args.email_format == "html" else body, end="")
             return 0
         subject = os.environ.get("REPORT_SUBJECT", "").strip() or email_report.default_subject(
             username, data.get("generated_at")
@@ -246,6 +244,7 @@ def _run_email_report(argv: Sequence[str]) -> int:
             os.environ["REPORT_EMAIL"],
             subject,
             body,
+            html=html_body,
             timeout=args.timeout,
             max_retries=args.max_retries,
         )

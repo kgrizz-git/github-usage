@@ -24,6 +24,7 @@ DEFAULT_EMAIL_REPORT = {
     "include_artifact_storage": False,
     "include_release_assets": False,
     "max_repos": 100,
+    "email_format": "text",
     "warn_over": ["25", "80%"],
     "skip_actions": False,
     "skip_copilot": False,
@@ -157,6 +158,7 @@ include_consumers = {_bool(email.get("include_consumers"))}
 include_artifact_storage = {_bool(email.get("include_artifact_storage"))}
 include_release_assets = {_bool(email.get("include_release_assets"))}
 max_repos = {int(email.get("max_repos", 100))}
+email_format = "{email.get("email_format", "text")}"
 warn_over = [
 {warn_lines}
 ]
@@ -194,6 +196,7 @@ def email_report_args(config: dict) -> list[str]:
         args.extend(["--include-release-assets", "--yes-include-release-assets"])
     max_repos = int(email.get("max_repos", 100))
     args.extend(["--max-repos", str(max_repos)])
+    args.extend(["--email-format", str(email.get("email_format", "text"))])
     warn_over = email.get("warn_over") or []
     if isinstance(warn_over, str):
         warn_over = [warn_over]

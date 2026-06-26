@@ -4,7 +4,6 @@
 
 ## Email Report Follow-Ups
 
-- [ ] Add `--email-format text|html` HTML rendering. **[Plan](docs/superpowers/plans/2026-06-26-html-email-rendering.md)**
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
 
 ## Test Coverage Gaps

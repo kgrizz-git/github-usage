@@ -8,6 +8,9 @@ include_consumers = false
 include_artifact_storage = false
 include_release_assets = false
 max_repos = 100
+# Email body format: "text" (default) or "html". HTML requires the renderer
+# in github_usage.email_report.format_html_report; text uses format_report_email.
+email_format = "text"
 warn_over = [
   "25",
   "80%",

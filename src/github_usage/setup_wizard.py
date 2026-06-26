@@ -104,12 +104,23 @@ def _configure_email_options(paths: SetupPaths) -> None:
         "Max repositories to scan (caps API work; higher = slower, more complete)",
         int(email["max_repos"]),
     )
+    email["email_format"] = _prompt_email_format(email["email_format"])
     email["skip_actions"] = _prompt_yes_no("Skip Actions section?", email["skip_actions"])
     email["skip_copilot"] = _prompt_yes_no("Skip Copilot section?", email["skip_copilot"])
     email["skip_lfs"] = _prompt_yes_no("Skip Git LFS section?", email["skip_lfs"])
     config["email_report"] = email
     write_config(paths.config_file, config)
     print(f"Wrote {paths.config_file.relative_to(paths.root)}")
+
+
+def _prompt_email_format(default: str) -> str:
+    """Prompt for --email-format value, re-prompting on invalid input."""
+    while True:
+        raw = input(f"  Email body format (text | html)? [{default}]: ").strip()
+        choice = (raw or default).lower()
+        if choice in ("text", "html"):
+            return choice
+        print(f"  Invalid choice: {raw!r}. Enter 'text' or 'html'.")
 
 
 def _configure_github_actions(paths: SetupPaths) -> None:

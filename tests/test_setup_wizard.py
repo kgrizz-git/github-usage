@@ -61,6 +61,7 @@ class SetupConfigTests(unittest.TestCase):
             "email_report": {
                 "include_consumers": True,
                 "max_repos": 50,
+                "email_format": "html",
                 "warn_over": ["10", "90%"],
             },
             "schedule": {"weekday": 2, "hour": 8, "minute": 30},
@@ -69,7 +70,38 @@ class SetupConfigTests(unittest.TestCase):
         loaded = load_config(self.paths.config_file)
         self.assertTrue(loaded["email_report"]["include_consumers"])
         self.assertEqual(loaded["email_report"]["max_repos"], 50)
+        self.assertEqual(loaded["email_report"]["email_format"], "html")
         self.assertEqual(loaded["schedule"]["hour"], 8)
+
+    def test_default_email_report_has_email_format_text(self):
+        from github_usage.setup_config import DEFAULT_EMAIL_REPORT
+
+        self.assertEqual(DEFAULT_EMAIL_REPORT["email_format"], "text")
+
+    def test_email_report_args_emits_email_format_html(self):
+        args = email_report_args({"email_report": {"email_format": "html"}})
+        idx = args.index("--email-format")
+        self.assertEqual(args[idx + 1], "html")
+
+    def test_email_report_args_emits_email_format_text_when_explicit(self):
+        args = email_report_args({"email_report": {"email_format": "text"}})
+        idx = args.index("--email-format")
+        self.assertEqual(args[idx + 1], "text")
+
+    def test_email_report_args_defaults_to_text_when_email_format_absent(self):
+        args = email_report_args({})
+        idx = args.index("--email-format")
+        self.assertEqual(args[idx + 1], "text")
+
+    def test_write_config_includes_email_format_line(self):
+        write_config(
+            self.paths.config_file,
+            {"email_report": {"email_format": "html"}},
+        )
+        text = self.paths.config_file.read_text(encoding="utf-8")
+        self.assertIn('email_format = "html"', text)
+        loaded = load_config(self.paths.config_file)
+        self.assertEqual(loaded["email_report"]["email_format"], "html")
 
     def test_email_report_args_from_config(self):
         config = {
@@ -501,6 +533,65 @@ class GitHubActionsWizardTests(unittest.TestCase):
             plist.return_value = self.paths.launchd_plist
             _full_setup(self.paths)
         render.assert_called_once_with(self.paths)
+
+
+class EmailFormatWizardTests(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.root = Path(self.tmpdir)
+        self.paths = SetupPaths.from_root(self.root)
+        write_config(self.paths.config_file, load_config(self.paths.config_file))
+
+    def tearDown(self):
+        import shutil
+
+        shutil.rmtree(self.tmpdir)
+
+    def test_prompt_email_format_default_keeps_text(self):
+        from github_usage.setup_wizard import _prompt_email_format
+
+        with mock.patch("builtins.input", return_value=""):
+            self.assertEqual(_prompt_email_format("text"), "text")
+
+    def test_prompt_email_format_accepts_html(self):
+        from github_usage.setup_wizard import _prompt_email_format
+
+        with mock.patch("builtins.input", return_value="html"):
+            self.assertEqual(_prompt_email_format("text"), "html")
+
+    def test_prompt_email_format_normalises_case(self):
+        from github_usage.setup_wizard import _prompt_email_format
+
+        with mock.patch("builtins.input", return_value="HTML"):
+            self.assertEqual(_prompt_email_format("text"), "html")
+
+    def test_prompt_email_format_reprompts_on_invalid(self):
+        from github_usage.setup_wizard import _prompt_email_format
+
+        with mock.patch("builtins.input", side_effect=["txt", "pdf", "html"]):
+            self.assertEqual(_prompt_email_format("text"), "html")
+
+    def test_configure_email_options_persists_email_format(self):
+        from github_usage.setup_wizard import _configure_email_options
+
+        with (
+            mock.patch("builtins.input", side_effect=["n", "n", "n", "100", "html", "n", "n", "n"]),
+            mock.patch("builtins.print"),
+        ):
+            _configure_email_options(self.paths)
+        config = load_config(self.paths.config_file)
+        self.assertEqual(config["email_report"]["email_format"], "html")
+
+    def test_configure_email_options_writes_email_format_to_file(self):
+        from github_usage.setup_wizard import _configure_email_options
+
+        with (
+            mock.patch("builtins.input", side_effect=["n", "n", "n", "100", "html", "n", "n", "n"]),
+            mock.patch("builtins.print"),
+        ):
+            _configure_email_options(self.paths)
+        text = self.paths.config_file.read_text(encoding="utf-8")
+        self.assertIn('email_format = "html"', text)
 
 
 if __name__ == "__main__":

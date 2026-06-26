@@ -8,6 +8,7 @@ PYTHONPATH=src scripts/python -m github_usage --help
 PYTHONPATH=src scripts/python -m github_usage --version
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--timeout"
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--max-retries"
+PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--email-format"
 
 ./start.sh --help >/dev/null
 ./start.sh report --help >/dev/null

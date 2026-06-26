@@ -35,7 +35,7 @@ def _legacy_parser() -> argparse.ArgumentParser:
 def _email_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="github-usage email-report",
-        description="Send or preview a scheduled plain-text GitHub usage email report.",
+        description="Send or preview a scheduled GitHub usage email report.",
     )
     parser.add_argument("--include-consumers", action="store_true")
     parser.add_argument("--include-artifact-storage", action="store_true")

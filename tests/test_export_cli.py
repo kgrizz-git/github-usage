@@ -309,22 +309,63 @@ class EmailReportExportCliTests(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.tmpdir, "auto.csv")))
         self.assertIn("Exported to:", stdout.getvalue())
 
-    def test_email_report_html_format_errors(self):
+    def test_email_report_html_format_success(self):
         from github_usage import cli
 
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            code = cli.main(
-                [
-                    "email-report",
-                    "--dry-run",
-                    "--email-format",
-                    "html",
-                ]
-            )
+        data = _report_data()
+        with (
+            mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
+            mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
+            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
+        ):
+            api = api_cls.return_value
+            api.request.return_value = {"login": "octocat"}
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = cli.main(
+                    [
+                        "email-report",
+                        "--dry-run",
+                        "--email-format",
+                        "html",
+                    ]
+                )
 
-        self.assertEqual(code, 1)
-        self.assertIn("not yet supported", stdout.getvalue())
+        self.assertEqual(code, 0)
+        output = stdout.getvalue()
+        self.assertIn("<!DOCTYPE html>", output)
+        self.assertNotIn("not yet supported", output)
+
+    def test_email_report_default_format_sends_text_only(self):
+        from github_usage import cli
+
+        data = _report_data()
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_TOKEN": "fake-token",
+                    "RESEND_API_KEY": "re_key",
+                    "REPORT_EMAIL": "user@example.com",
+                    "RESEND_FROM": "reports@example.com",
+                },
+                clear=True,
+            ),
+            mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
+            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
+            mock.patch("github_usage.cli.email_report.send_email") as mock_send,
+        ):
+            api = api_cls.return_value
+            api.request.return_value = {"login": "octocat"}
+            code = cli.main(["email-report"])
+
+        self.assertEqual(code, 0)
+        mock_send.assert_called_once()
+        self.assertIsNone(mock_send.call_args.kwargs["html"])
 
 
 if __name__ == "__main__":

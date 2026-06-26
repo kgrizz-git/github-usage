@@ -26,7 +26,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 - **File output path:** `--output PATH` flag for specifying the export file path.
 - **`--json` shorthand:** prints JSON to stdout (or to `--output` if set); mutually exclusive with `--export`.
 - **`--no-interactive` flag:** skips interactive export-format prompts in CI/script contexts.
-- **`--email-format text|html` flag** on `email-report` (HTML rendering deferred).
+- **`--email-format text|html` flag** on `email-report`: now fully implemented. Renders a self-contained HTML email body via `email_report.format_html_report` (one section per plain-text section, with `html.escape` on all user-supplied and untrusted data), and sends both `text` and `html` fields through Resend so clients render the rich version with a plain-text fallback. Surfaced through the guided setup wizard (`scripts/setup` / `./start.sh setup`) as an `email_format` key in `[email_report]` config; defaults to `"text"`. `[Unreleased]`.
 - **Redaction layer** (`src/github_usage/redact.py`): masks usernames, repository names, email addresses, and dollar amounts in file exports. Interactive terminal output and the email body are not redacted.
 - **XLSX writer** (`openpyxl`): one sheet per major section; sheet names truncated to 31 chars; values starting with `=`, `+`, `-`, `@` are prefixed to prevent Excel formula injection.
 - **PDF writer** (`fpdf2>=2.7`): cover page plus one page per section; sections over 30 rows are truncated with a note; uses `XPos`/`YPos` enums.
