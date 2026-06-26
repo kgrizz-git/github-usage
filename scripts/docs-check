@@ -19,10 +19,11 @@ for path in "${required[@]}"; do
   }
 done
 
-PYTHONPATH=src python3 -m github_usage --help | grep -q "GITHUB_TOKEN"
+PYTHONPATH=src scripts/python -m github_usage --help | grep -q "GITHUB_TOKEN"
 grep -q "github-usage" README.md
-grep -qE '(^|[[:space:]])\./setup\.sh([[:space:]]|$)' README.md
-test -x setup.sh
+grep -qE '(^|[[:space:]])\./start\.sh([[:space:]]|$)' README.md
+test -x start.sh
+test -x scripts/setup.sh
 test -x scripts/setup
 
 # Warn about assessment files older than 30 days (they may be stale)

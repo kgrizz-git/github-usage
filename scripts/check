@@ -11,9 +11,11 @@ echo "==> Unit tests"
 PYTHONPATH=src scripts/python -m unittest discover -s tests -v
 
 echo "==> CLI smoke"
+test -x start.sh
+./start.sh --help >/dev/null
 PYTHONPATH=src scripts/python -m github_usage --help >/dev/null
 SMOKE_HOME="$(mktemp -d)"
-env -u GITHUB_TOKEN HOME="$SMOKE_HOME" PYTHONPATH=src .venv/bin/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
+env -u GITHUB_TOKEN HOME="$SMOKE_HOME" PYTHONPATH=src scripts/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
   cat /tmp/github-usage-smoke.out
   echo "Expected no-token smoke command to fail"
   exit 1

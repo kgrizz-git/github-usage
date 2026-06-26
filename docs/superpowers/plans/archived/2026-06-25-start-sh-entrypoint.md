@@ -1,9 +1,8 @@
-# Plan: Create `start.sh` Entrypoint Script
+# Plan: start.sh entrypoint
 
-> **Status:** APPROVED
+> **Status:** COMPLETE
 >
-> **DO NOT implement yet.** This plan is a proposal and needs review before
-> any code is written.
+> This plan has been implemented.
 
 **Date:** 2026-06-25
 

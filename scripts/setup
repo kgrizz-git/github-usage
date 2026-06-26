@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
-# Legacy entrypoint: forwards to the root setup script.
+# DEPRECATED: legacy shim. Use "./start.sh setup" instead.
+# Kept temporarily for callers that still invoke "scripts/setup" directly.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$ROOT_DIR/setup.sh" "$@"
+exec "$ROOT_DIR/scripts/setup.sh" "$@"

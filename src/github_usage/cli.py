@@ -22,7 +22,7 @@ Usage:
   github-usage setup [options]
 
 Setup:
-  ./setup.sh                  Guided setup for secrets, options, launchd, CI, hooks
+  ./start.sh setup            Guided setup for secrets, options, launchd, CI, hooks
   github-usage setup --status Show configured paths without printing secrets
   github-usage setup --verify Run email-report --dry-run using local config
   github-usage setup --print-args Print email-report CLI args from config.toml

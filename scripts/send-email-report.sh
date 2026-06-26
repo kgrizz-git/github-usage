@@ -2,7 +2,7 @@
 # send-email-report.sh
 #
 # Runs `github-usage email-report` for local or launchd scheduled delivery.
-# Configuration is managed by `./setup.sh` (single setup entry point).
+# Configuration is managed by `./start.sh setup` (single setup entry point).
 #
 # Inputs:
 #   - Optional env file (default: .env.email-report in the repo root)

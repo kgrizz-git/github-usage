@@ -1,4 +1,4 @@
-"""Tests for guided setup (./setup.sh / github-usage setup)."""
+"""Tests for guided setup (./start.sh setup / github-usage setup)."""
 
 from __future__ import annotations
 

@@ -57,7 +57,7 @@ Use one entry point to configure local secrets, report options, macOS launchd sc
 
 ```sh
 python3 -m pip install -e '.[dev]'
-./setup.sh
+./start.sh setup
 ```
 
 The guided wizard can:
@@ -72,8 +72,8 @@ The guided wizard can:
 Non-interactive helpers:
 
 ```sh
-./setup.sh --status    # show configured paths (secrets masked)
-./setup.sh --verify    # dry-run using local config
+./start.sh setup --status    # show configured paths (secrets masked)
+./start.sh setup --verify    # dry-run using local config
 ```
 
 Example templates (safe to commit): [`.env.email-report.example`](.env.email-report.example) and [`.github-usage/config.example.toml`](.github-usage/config.example.toml). Generated local files under `.github-usage/` and `.env.email-report` are gitignored.
@@ -82,7 +82,7 @@ Example templates (safe to commit): [`.env.email-report.example`](.env.email-rep
 
 ### GitHub Actions workflow
 
-`./setup.sh` option **5** (GitHub Actions workflow) configures the scheduled
+`./start.sh` option **5** (GitHub Actions workflow) configures the scheduled
 GitHub Actions report and renders `.github/workflows/email-report.yml` from a
 checked-in template:
 
@@ -129,7 +129,7 @@ Passing a token as a command-line argument is supported, but it can expose the t
 
 ## Scheduled Email Reports
 
-Run `./setup.sh` for guided configuration, or configure manually.
+Run `./start.sh` for guided configuration, or configure manually.
 
 `github-usage email-report` collects the current-month billing data, renders a plain-text email body, and sends it with Resend. Use `--dry-run` first to preview the message without requiring email settings:
 
@@ -231,7 +231,7 @@ queries are not feasible with the current GitHub API.
 
 ### GitHub Actions Setup
 
-This repo includes [`.github/workflows/email-report.yml`](.github/workflows/email-report.yml) as a workflow template. Run `./setup.sh` and choose **GitHub Actions secrets** to set these with `gh secret set`:
+This repo includes [`.github/workflows/email-report.yml`](.github/workflows/email-report.yml) as a workflow template. Run `./start.sh` and choose **GitHub Actions secrets** to set these with `gh secret set`:
 
 - `GH_USAGE_TOKEN`: a personal access token that can read your personal repos
   and your user-level billing data
@@ -255,7 +255,7 @@ After secrets are set, test with `gh workflow run email-report.yml`.
 
 ### macOS launchd Setup
 
-Run `./setup.sh` and choose **macOS launchd schedule** (or the recommended full setup). The wizard writes `.github-usage/config.toml`, generates a LaunchAgent plist, and can install it for Monday 9:00 in your local timezone.
+Run `./start.sh` and choose **macOS launchd schedule** (or the recommended full setup). The wizard writes `.github-usage/config.toml`, generates a LaunchAgent plist, and can install it for Monday 9:00 in your local timezone.
 
 To change only the report schedule after initial setup, choose **Report schedule only** from the main menu. It updates `[schedule]` in `config.toml` and regenerates the LaunchAgent plist. If a LaunchAgent is already installed, the wizard reminds you to rerun the macOS launchd option and choose install to apply the new schedule.
 
@@ -306,7 +306,7 @@ pre-commit install
 pre-commit install --hook-type pre-push
 ```
 
-Or run `./setup.sh` and choose **Developer security hooks** to install commit and push hooks (including Gitleaks).
+Or run `./start.sh` and choose **Developer security hooks** to install commit and push hooks (including Gitleaks).
 
 Run local security checks:
 

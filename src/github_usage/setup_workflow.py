@@ -1,4 +1,4 @@
-"""GitHub Actions workflow template renderer for ./setup.sh."""
+"""GitHub Actions workflow template renderer for ./start.sh setup."""
 
 from __future__ import annotations
 

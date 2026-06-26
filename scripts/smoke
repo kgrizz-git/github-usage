@@ -8,12 +8,61 @@ PYTHONPATH=src scripts/python -m github_usage --help
 PYTHONPATH=src scripts/python -m github_usage --version
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--timeout"
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--max-retries"
-./setup.sh --help
-scripts/setup --help
+
+./start.sh --help >/dev/null
+./start.sh report --help >/dev/null
+./start.sh email-report --help >/dev/null
+./start.sh setup --help >/dev/null
+./start.sh --version | grep -q "github-usage"
+
+# Bare-token & routing smoke tests
+./start.sh report ghp_fake --dry-run >/tmp/fake-dry.out 2>&1 || {
+  grep -q "not valid" /tmp/fake-dry.out || {
+    echo "Expected token validation failure"
+    cat /tmp/fake-dry.out
+    exit 1
+  }
+}
+
+./start.sh report ghp_fake -- --export json --dry-run >/tmp/fake-dash.out 2>&1 || {
+  grep -q "unrecognized arguments" /tmp/fake-dash.out || {
+    echo "Expected unrecognized arguments error"
+    cat /tmp/fake-dash.out
+    exit 1
+  }
+}
+
+# --month rejection
+./start.sh report --month 2025-01 >/tmp/start-sh-month.out 2>&1 && {
+  cat /tmp/start-sh-month.out
+  echo "Expected --month to fail"
+  exit 1
+}
+grep -q "unsupported" /tmp/start-sh-month.out
+
+# empty token failure
+./start.sh report --token >/tmp/start-sh-token.out 2>&1 && {
+  cat /tmp/start-sh-token.out
+  echo "Expected empty token to fail"
+  exit 1
+}
+grep -q "requires a non-empty value" /tmp/start-sh-token.out
+
+scripts/setup --help >/dev/null
+(cd /tmp && "$ROOT_DIR/scripts/setup" --help >/dev/null)
+
 SMOKE_HOME="$(mktemp -d)"
-env -u GITHUB_TOKEN HOME="$SMOKE_HOME" PYTHONPATH=src .venv/bin/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
+
+env -u GITHUB_TOKEN HOME="$SMOKE_HOME" PYTHONPATH=src scripts/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
   cat /tmp/github-usage-smoke.out
   echo "Expected no-token smoke command to fail"
   exit 1
 }
 grep -q "No GitHub token found" /tmp/github-usage-smoke.out
+
+env -u GITHUB_TOKEN HOME="$SMOKE_HOME" ./start.sh report >/tmp/start-sh-smoke.out 2>&1 && {
+  cat /tmp/start-sh-smoke.out
+  echo "Expected no-token start.sh command to fail"
+  exit 1
+}
+grep -q "No GitHub token found" /tmp/start-sh-smoke.out

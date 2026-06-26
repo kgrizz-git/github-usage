@@ -20,7 +20,7 @@
 - [ ] Add support for configuring multiple reports with different run frequencies, targets, and options.
 - [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules).
 - [ ] Write Windows-compatible PowerShell versions of all scripts (setup, check, smoke, docs-check, etc.).
-- [ ] Create a `start.sh` entrypoint script with options to set up (delegating to `setup.sh`) or run a one-off report (with report settings, export format, and filename selection, using sensible defaults). Once created, move `setup.sh` into the `scripts/` folder. **[Plan](docs/superpowers/plans/2026-06-25-start-sh-entrypoint.md)**
+- [ ] Create a `start.ps1` PowerShell entrypoint script for Windows.
 
 ## Deferred
 

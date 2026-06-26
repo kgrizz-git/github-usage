@@ -1,4 +1,4 @@
-"""Interactive guided setup for github-usage (./setup.sh entry point)."""
+"""Interactive guided setup for github-usage (./start.sh setup entry point)."""
 
 from __future__ import annotations
 
@@ -311,7 +311,7 @@ def _full_setup(paths: SetupPaths) -> int:
         _configure_ci_secrets()
     if _prompt_yes_no("\nInstall developer pre-commit/pre-push hooks?", True):
         _configure_dev_hooks()
-    print("\nSetup complete. Re-run `./setup.sh` anytime to change options.")
+    print("\nSetup complete. Re-run `./start.sh setup` anytime to change options.")
     return 0
 
 

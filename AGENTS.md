@@ -7,7 +7,7 @@
 - Use `scripts/check` as the default verification command before claiming a code change is complete.
 - Use `scripts/smoke` after CLI entrypoint changes.
 - Use `scripts/docs-check` after README, docs, or CLI help changes.
-- Use `./setup.sh` as the single entry point for guided local/CI email-report configuration.
+- Use `./start.sh` as the primary entry point for setup, one-off reports, and email-report configuration.
 - The project uses `pyproject.toml` for all dependency declarations. Do not create a `requirements.txt` unless a specific tool requires it.
 - Do not print, commit, or store real GitHub tokens, raw private API responses, or generated billing reports.
 - Tests should use fake tokens, mocks, and fixtures rather than live GitHub API calls.

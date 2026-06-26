@@ -10,6 +10,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Added
 
+- **`start.sh` entrypoint script:** Root-level unified CLI for setup, one-off legacy reports, and email-report runs.
 - **`scripts/prune-backups` + pre-commit hook:** prunes tracked `backups/*.bak` files whose last commit is older than the most recent 5 commits (non-`.bak` files and untracked/new backups are preserved). Supports `PRUNE_BACKUPS_DRYRUN=1` and `PRUNE_BACKUPS_KEEP=N`.
 - **`scripts/docs-check` plan-hygiene warning:** warns (without failing) when a plan whose status banner reads `COMPLETE`/`COMPLETED` is still in the active `docs/superpowers/plans/` directory instead of `archived/`.
 - **`QWEN.md`** pointer file directing agents to `AGENTS.md`.
@@ -59,6 +60,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Unified entrypoint via `start.sh`:** Added a root-level `start.sh` wrapper that dispatches to `setup`, `report`, and `email-report` modes, and moved the guided setup script from `./setup.sh` to `scripts/setup.sh` (reached via `start.sh setup`). The previous root entrypoint remains as a thin `scripts/setup` shim.
 - **Removed legacy backup scripts:** deleted the original `backups/github-usage`, `backups/github-usage-v2`, and `backups/github-usage.sh` (still recoverable via git history). `backups/` now holds only transient `*.bak` modification backups; `AGENTS.md`, `README.md`, and `docs/repo-harness-guidance.md` updated to match.
 - **Documentation lifecycle standardized:** `AGENTS.md` now defines a single plan → complete → archive workflow plus changelog, `TO_DO.md`, and release conventions (mirrored in `docs/repo-harness-guidance.md`). `GEMINI.md` slimmed to point at `AGENTS.md`. `CHANGELOG.md` gained a format note sanctioning the `Deferred` subsection.
 - **Plan housekeeping:** archived all completed plans into `docs/superpowers/plans/archived/`, normalized their status banners to the canonical `> **Status:** COMPLETE` form, and gave the two previously untimestamped archived plans timestamped filenames. `TO_DO.md` trimmed to open items only.
