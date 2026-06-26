@@ -11,6 +11,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 ### Changed
 
 - **Module refactor for size compliance** ([plan](docs/superpowers/plans/archived/2026-06-26-module-refactor.md)): split `setup_wizard.py` (545 → 325 lines) into six focused submodules (`setup_email_config`, `setup_secrets`, plus additions to `setup_workflow`, `setup_config`, `setup_ci`, `setup_launchd`); extracted `cli_email_report` sub-module for the `_run_email_report` helpers; trimmed `legacy_report.main`, `api_discovery_month.main`, and `report_data.build_report_data` to bring all targets under the `scripts/check-sizes` warn thresholds. Test mocks updated to follow the new module paths. No behavioral changes.
+- **`email_report.py` split for size compliance** ([plan](docs/superpowers/plans/archived/2026-06-26-email-report-split.md)): the 511-line file is now a 12-line re-export facade over four focused sub-modules — `email_report_text` (plain-text formatters), `email_report_html` (HTML formatters), `email_report_send` (Resend delivery), and `_email_report_common` (shared helpers). Public API preserved: `format_report_email`, `format_html_report`, `default_subject`, and `send_email` still resolve via `from github_usage.email_report import …` (the facade re-exports use the `name as name` alias form to survive `ruff --fix`; no `__all__` was added — the project does not use it elsewhere). Direct test imports of `_generated_line` and the section-formatter tuples were updated to point at the new sub-modules. No behavioral changes.
 
 ### Added
 

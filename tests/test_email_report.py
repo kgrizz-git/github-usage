@@ -32,7 +32,7 @@ class EmailReportTests(unittest.TestCase):
     def test_generated_line_handles_none_empty_and_unparseable(self):
         from datetime import UTC, datetime
 
-        from github_usage.email_report import _generated_line
+        from github_usage._email_report_common import _generated_line
 
         today_prefix = datetime.now(tz=UTC).strftime("%Y-%m-%d")
 
@@ -44,7 +44,7 @@ class EmailReportTests(unittest.TestCase):
             self.assertTrue(line.startswith("Generated: "))
 
     def test_generated_line_renders_valid_iso_string(self):
-        from github_usage.email_report import _generated_line
+        from github_usage._email_report_common import _generated_line
 
         line = _generated_line("2026-06-15T14:30:00Z")
 
@@ -118,7 +118,7 @@ class EmailReportTests(unittest.TestCase):
         conn.close.assert_called_once()
 
     def test_format_actions_section_renders_minutes_and_storage(self):
-        from github_usage.email_report import _format_actions_section
+        from github_usage.email_report_text import _format_actions_section
 
         data = {
             "actions": {
@@ -279,10 +279,10 @@ class EmailReportTests(unittest.TestCase):
         self.assertEqual(validator.stack, [], msg=f"Unclosed tags: {validator.stack}")
 
     def test_section_html_formatters_order_matches_text_formatters(self):
-        from github_usage import email_report
+        from github_usage import email_report_html, email_report_text
 
-        text_formatters = email_report._SECTION_FORMATTERS
-        html_formatters = email_report._SECTION_HTML_FORMATTERS
+        text_formatters = email_report_text._SECTION_FORMATTERS
+        html_formatters = email_report_html._SECTION_HTML_FORMATTERS
         self.assertEqual(len(text_formatters), len(html_formatters))
         for text_fn, html_fn in zip(text_formatters, html_formatters, strict=False):
             text_name = text_fn.__name__

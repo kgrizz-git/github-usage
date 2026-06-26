@@ -1,6 +1,6 @@
-> **Status:** NEEDS REVIEW
+> **Status:** COMPLETE
 >
-> Draft plan for splitting `email_report.py` (511 lines, over the 500-line file limit) into focused sub-modules. Awaiting review.
+> All 5 phases implemented: `email_report.py` is now a 12-line re-export facade over `email_report_text` (186 lines), `email_report_html` (267 lines), `email_report_send` (50 lines), and `_email_report_common` (20 lines). `scripts/check`, `scripts/smoke`, `scripts/docs-check`, `pre-commit run --all-files`, and the 274-test suite all pass.
 
 **Date:** 2026-06-26
 
