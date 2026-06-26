@@ -28,6 +28,7 @@ The `--email-format text|html` flag was added to `cli_parsers.py` with HTML rend
 - All new tests pass; no existing tests start failing (the planned `test_email_report_html_format_errors` → `test_email_report_html_format_success` rename in Phase 2a is the only allowed change to an existing test, and the renamed test must pass)
 - Manual dry-run produces an HTML body for `--email-format html`
 - Manual dry-run produces a plain-text body for the default format
+- `./start.sh setup --print-args` includes `--email-format html` (or `text`) when the persisted `config.toml` sets `email_format` accordingly, confirming the setup wiring round-trips
 - `CHANGELOG.md` and `TO_DO.md` are updated; the plan is archived with the canonical `> **Status:** COMPLETE` banner
 
 ## Design Decisions
@@ -59,6 +60,8 @@ The data dict carries `period: "current_month"` (with an underscore; see `report
 
 `email_report.py` is currently 248 lines. The nine `_format_html_*_section()` functions plus the wrapper and tuple will add roughly 120-160 lines, keeping the file well under the 500-line soft limit. If a section formatter exceeds ~30 lines, factor a small inner helper rather than letting one function balloon. `cli.py` grows by only a handful of lines and stays under 400.
 
+`setup_wizard.py` is currently 534 lines and already over the 500-line soft limit (the broader refactor is tracked as a `TO_DO.md` item — split into focused submodules). The new `email_format` prompt in `_configure_email_options()` adds only ~5-10 lines and lives at the natural home for the email-report knobs. Do not extract a new module as part of this plan; the prompt is small enough to inline. The plan intentionally does not address the broader `setup_wizard.py` split — that is a separate, pre-existing concern with its own scope.
+
 ### HTML escaping — required
 
 All user-supplied and untrusted data interpolated into the HTML output must be escaped using `html.escape()` from Python's standard library (default `quote=True`, which escapes `<`, `>`, `&`, `"`, and `'`). This includes:
@@ -75,6 +78,38 @@ Without escaping, a repo name like `org/foo&bar` would produce invalid HTML. Add
 ### Email-client CSS
 
 Some email clients (Gmail mobile app, Outlook on Windows) strip `<style>` blocks in `<head>`. For production, use inline `style` attributes on elements (e.g., `<td style="padding: 6px 10px; border: 1px solid #d0d7de;">`) or run the output through a CSS-inliner like `premailer`. For this first pass, the `<style>` block in `<head>` is acceptable for most modern clients.
+
+### HTML5 void elements in the well-formed-HTML test
+
+The plan renders `<meta charset="utf-8">` (and may render other void elements like `<br>`, `<hr>`, `<link>`, `<img>`, `<input>` if any future section uses them). Python's stdlib `html.parser.HTMLParser` does **not** know about HTML5 void elements by default — `handle_startendtag` is only called for XHTML-style `<foo />` self-closing tags, not HTML5 void elements. The `test_format_html_report_well_formed_html` test must therefore use a custom `HTMLParser` subclass that maintains a tag stack and treats the standard HTML5 void set as self-closing (no push to the stack on `handle_starttag`, no expectation of a matching `handle_endtag`):
+
+```python
+from html.parser import HTMLParser
+
+VOID_ELEMENTS = frozenset({"area", "base", "br", "col", "embed", "hr",
+                            "img", "input", "link", "meta", "source",
+                            "track", "wbr"})
+
+class _WellFormedHTMLValidator(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.stack: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs):
+        if tag not in VOID_ELEMENTS:
+            self.stack.append(tag)
+
+    def handle_endtag(self, tag: str):
+        if tag in VOID_ELEMENTS:
+            return
+        if not self.stack:
+            raise AssertionError(f"Unexpected close tag: </{tag}>")
+        expected = self.stack.pop()
+        if expected != tag:
+            raise AssertionError(f"Mismatched tag: expected </{expected}>, got </{tag}>")
+```
+
+The test feeds `format_html_report(data)`'s output to this validator; if parsing raises (or the stack is non-empty at end-of-input), the test fails. Without the void-element allowlist the test would fail on its own example output (`<meta charset="utf-8">` in the `<head>` of every report).
 
 ## Proposed Implementation
 
@@ -189,7 +224,22 @@ The change in `_validate_email_flags()` should remove the HTML blocking logic.
 
 > **Export interaction (no change needed):** The export path (lines 227-236) uses `body` (plain-text) for `--export text` and `data` for other formats. This behavior is correct regardless of `--email-format` — the `html_body` variable is only for email delivery, never for export. Do not change the export path.
 
-### 4. Update module docstring and CLI text
+### 4. Surface the option in the guided setup
+
+The CLI unblocks `--email-format html` once sections 1-3 land, but a user who configures their scheduled email via the wizard (and the launchd / GitHub Actions schedules driven by it) would still receive plain-text unless we wire the format into the persisted config. The wizard already collects every other email-report knob in `config.toml`; `email_format` must join that list.
+
+- **`src/github_usage/setup_config.py`:**
+  - Add `"email_format": "text"` to `DEFAULT_EMAIL_REPORT` (line 22) so first-run configs include the new key.
+  - In `email_report_args()` (line 185), append `["--email-format", str(email.get("email_format", "text"))]` to the returned args. Emit the flag unconditionally rather than only on non-default values, so the user's explicit choice round-trips through `--print-args`, the `verify-setup` dry-run, and any out-of-band inspection of the rendered command line.
+  - In `write_config()` (line 143), add `email_format = "{email.get('email_format', 'text')}"` to the rendered `[email_report]` template (placement: after `max_repos` and before `warn_over`, matching the existing field order in the source). Without this, the on-disk TOML would be missing the key even though `load_config()` still resolves it from `DEFAULT_EMAIL_REPORT` — round-tripping works but the file is not self-describing for users editing it directly or for tools that read the TOML without merging defaults.
+- **`src/github_usage/setup_wizard.py`:**
+  - In `_configure_email_options()` (line 88), add a prompt after `max_repos` (before the `skip_*` group) asking `"Email body format (text | html)? [text]"` with the current value as the default. Re-prompt on invalid input; accept `text` and `html` only (case-insensitive comparison, then store the canonical lowercase form).
+- **Example config:** The `[email_report]` section in `.github-usage/config.example.toml` (and any rendered config the wizard produces) should include `email_format = "text"` with a one-line comment explaining the choice and that `html` requires the new renderer (this plan).
+- **Tests:**
+  - Extend the existing `SetupConfigTests` class in `tests/test_setup_wizard.py` (which is where the `DEFAULT_EMAIL_REPORT` / `email_report_args` / `write_config` round-trip tests already live — see `test_email_report_args_from_config` at line 74 and `test_write_and_load_config_round_trip` at line 59): add assertions for the new `email_format` key — `DEFAULT_EMAIL_REPORT["email_format"] == "text"`, `email_report_args(...)` emits `--email-format html` when the config sets `email_format: "html"`, `--email-format text` when set to `"text"`, and `--email-format text` when the key is absent (default fallback). Also extend the round-trip test to assert the rendered TOML contains `email_format = "..."` and that `load_config()` reads it back. Do **not** create a separate `tests/test_setup_config.py` — keeping all config-unit tests in `test_setup_wizard.py::SetupConfigTests` matches the existing convention and avoids a second home for the same surface.
+  - Extend `tests/test_setup_wizard.py` (the wizard-prompt tests, separate from `SetupConfigTests`): add cases for the new `_configure_email_options` prompt — empty input keeps the current value, `"html"` is stored as `"html"`, `"txt"` (or any other value) is rejected and the user is re-prompted.
+
+### 5. Update module docstring and CLI text
 
 Update the module docstring in `email_report.py:1` from:
 ```
@@ -218,7 +268,7 @@ to:
 --email-format FMT      Email body format: text | html
 ```
 
-### 5. Tests
+### 6. Tests
 
 #### A. Unit Tests in `tests/test_email_report.py`
 
@@ -227,7 +277,7 @@ HTML rendering:
 - `test_format_html_report_contains_valid_html_structure` — verify `<!DOCTYPE html>`, `<html>`, `<body>`, `<style>` tags
 - `test_format_html_report_renders_minimal_data` — passes a minimal data dict (matching `test_format_report_email_renders_today_when_generated_at_missing`) and verifies no exceptions and valid HTML structure
 - `test_format_html_report_escapes_special_chars` — inject `<`, `>`, `&`, `"` into repo names, warnings, and insights; assert they appear as `&lt;`, `&gt;`, `&amp;`, `&quot;` in the output (validates that the default `html.escape()` `quote=True` is in effect, not just the three-char `<`/`>`/`&` form)
-- `test_format_html_report_well_formed_html` — parses the HTML output using `html.parser.HTMLParser` to programmatically verify that all opened tags are correctly closed and there are no parsing errors
+- `test_format_html_report_well_formed_html` — feeds the HTML output through a custom `HTMLParser` subclass (see "HTML5 void elements in the well-formed-HTML test" design decision for the void-element allowlist) that maintains a tag stack, asserts that all opened tags are matched in the correct order, and treats HTML5 void elements (`meta`, `br`, `hr`, `link`, `img`, `input`, etc.) as self-closing. The test fails if the stack is non-empty at end-of-input or if any close tag doesn't match its open.
 
 HTML formatter ordering:
 - `test_section_html_formatters_order_matches_text_formatters` — verifies that `_SECTION_HTML_FORMATTERS` and `_SECTION_FORMATTERS` have the same length and that each HTML formatter name maps to its text counterpart (e.g., `_format_actions_section` ↔ `_format_html_actions_section`)
@@ -270,13 +320,15 @@ Phases are sequential — do them in order.
 - [ ] Update `test_email_report_html_format_errors` to `test_email_report_html_format_success` in `tests/test_export_cli.py`
 - [ ] Add `test_email_report_default_format_sends_text_only` regression test to verify text-only payload by default
 - [ ] Add tests for `send_email()` HTML parameter
+- [ ] Surface `email_format` in the guided setup (see section 4 of Proposed Implementation): add to `DEFAULT_EMAIL_REPORT`, update `email_report_args()`, add the key to `write_config()`, add prompt to `_configure_email_options()`, and extend the existing `SetupConfigTests` class in `tests/test_setup_wizard.py` (do **not** create a new `tests/test_setup_config.py`)
 
 ### Phase 2b: User-visible text updates
 
 - [ ] Update CLI HELP string in `cli.py:42`
 - [ ] Update parser description in `cli_parsers.py:38` (remove "plain-text")
 - [ ] Update module docstring in `email_report.py:1`
-- [ ] Update `CHANGELOG.md`: change the existing `[Unreleased] → Added` entry from `--email-format text|html flag on email-report (HTML rendering deferred)` to reflect that the flag is now fully implemented (HTML renderer in `format_html_report`, both `text` and `html` sent through Resend).
+- [ ] Update `.github-usage/config.example.toml` `[email_report]` section to include the new `email_format` key with a brief comment
+- [ ] Update `CHANGELOG.md`: change the existing `[Unreleased] → Added` entry from `--email-format text|html flag on email-report (HTML rendering deferred)` to reflect that the flag is now fully implemented (HTML renderer in `format_html_report`, both `text` and `html` sent through Resend, and `email_format` exposed through the guided setup wizard and persisted in `config.toml`).
 - [ ] Extend `scripts/smoke` with a flag-presence check for `--email-format` (mirror the existing `--timeout` / `--max-retries` greps) so the help-string update is regression-protected.
 
 ### Phase 3: Verification
