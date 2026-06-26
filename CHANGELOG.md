@@ -8,6 +8,10 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ## [Unreleased]
 
+### Changed
+
+- **Module refactor for size compliance** ([plan](docs/superpowers/plans/archived/2026-06-26-module-refactor.md)): split `setup_wizard.py` (545 → 325 lines) into six focused submodules (`setup_email_config`, `setup_secrets`, plus additions to `setup_workflow`, `setup_config`, `setup_ci`, `setup_launchd`); extracted `cli_email_report` sub-module for the `_run_email_report` helpers; trimmed `legacy_report.main`, `api_discovery_month.main`, and `report_data.build_report_data` to bring all targets under the `scripts/check-sizes` warn thresholds. Test mocks updated to follow the new module paths. No behavioral changes.
+
 ### Added
 
 - **`start.sh` entrypoint script:** Root-level unified CLI for setup, one-off legacy reports, and email-report runs.

@@ -27,6 +27,67 @@ from .storage import get_storage_analysis
 from .terminal import print_header
 
 
+def _run_report_body(api: GitHubAPI, username: str) -> None:
+    """Drive the report sections in display order: Actions → repos → Copilot → LFS → costs → limits → final summary → what-else."""
+    # Actions
+    user_minutes, user_storage_gb, actions_sku = get_user_actions_billing(api, username)
+    actions_gross_total = sum(i.get("grossAmount", 0) for i in (actions_sku or {}).values())
+    actions_discount_total = sum(i.get("discountAmount", 0) for i in (actions_sku or {}).values())
+    actions_net_total = sum(i.get("netAmount", 0) for i in (actions_sku or {}).values())
+    if user_minutes is not None:
+        show_actions_summary(api, username, user_minutes, user_storage_gb, actions_sku)
+
+    # Repos
+    repos = api.get_all_pages("/user/repos", {"type": "all"}, limit=100)
+    repo_data = show_actions_per_repo(api, repos)
+    show_actions_top_consumers(repo_data)
+    show_actions_os_breakdown(api, repos)
+
+    # Copilot
+    show_copilot_summary(api, username)
+
+    # Git LFS
+    show_gitlfs_summary(api, username)
+
+    # Cost estimate
+    show_monthly_costs(repo_data, username, api)
+
+    # Full billing history
+    show_full_billing_history(api, username)
+
+    # Limits
+    show_limits_summary(username, user_minutes or 0, user_storage_gb or 0)
+
+    # Base costs (v3 addition — standalone section)
+    copilot_summary = get_billing_summary(api, username, "Copilot")
+    lfs_summary = get_billing_summary(api, username, "git_lfs")
+    if repos:
+        show_base_costs(api, username, actions_sku, copilot_summary, lfs_summary)
+
+    # Final summary (v3 addition)
+    storage_analysis = get_storage_analysis(api, repos) if repos else {"repos": []}
+    show_final_summary(
+        username,
+        user_minutes,
+        user_storage_gb,
+        actions_gross_total,
+        actions_discount_total,
+        actions_net_total,
+        repo_data,
+        copilot_summary,
+        lfs_summary,
+        storage_analysis,
+        api,
+    )
+
+    # What else is available
+    show_what_else(api, username)
+
+    print("=" * 70)
+    print("  End of Report v3")
+    print("=" * 70)
+
+
 def main(
     *,
     export: str | None = None,
@@ -55,75 +116,16 @@ def main(
     try:
         api = GitHubAPI(token, timeout=timeout, max_retries=max_retries)
 
-        # Check that the token is accepted on a user-scoped endpoint
         if not check_user_scope(api):
             print("Error: Your GitHub token is not valid for this operation.")
             sys.exit(1)
 
         # Account & rate limits
         print_header()
-        username, user_type = show_account_info(api)
+        username, _user_type = show_account_info(api)
         show_rate_limits(api)
 
-        # Actions
-        user_minutes, user_storage_gb, actions_sku = get_user_actions_billing(api, username)
-        actions_gross_total = sum(i.get("grossAmount", 0) for i in (actions_sku or {}).values())
-        actions_discount_total = sum(
-            i.get("discountAmount", 0) for i in (actions_sku or {}).values()
-        )
-        actions_net_total = sum(i.get("netAmount", 0) for i in (actions_sku or {}).values())
-        if user_minutes is not None:
-            show_actions_summary(api, username, user_minutes, user_storage_gb, actions_sku)
-
-        # Repos
-        repos = api.get_all_pages("/user/repos", {"type": "all"}, limit=100)
-        repo_data = show_actions_per_repo(api, repos)
-        show_actions_top_consumers(repo_data)
-        show_actions_os_breakdown(api, repos)
-
-        # Copilot
-        show_copilot_summary(api, username)
-
-        # Git LFS
-        show_gitlfs_summary(api, username)
-
-        # Cost estimate
-        show_monthly_costs(repo_data, username, api)
-
-        # Full billing history
-        show_full_billing_history(api, username)
-
-        # Limits
-        show_limits_summary(username, user_minutes or 0, user_storage_gb or 0)
-
-        # Base costs (v3 addition — standalone section)
-        copilot_summary = get_billing_summary(api, username, "Copilot")
-        lfs_summary = get_billing_summary(api, username, "git_lfs")
-        if repos:
-            show_base_costs(api, username, actions_sku, copilot_summary, lfs_summary)
-
-        # Final summary (v3 addition)
-        storage_analysis = get_storage_analysis(api, repos) if repos else {"repos": []}
-        show_final_summary(
-            username,
-            user_minutes,
-            user_storage_gb,
-            actions_gross_total,
-            actions_discount_total,
-            actions_net_total,
-            repo_data,
-            copilot_summary,
-            lfs_summary,
-            storage_analysis,
-            api,
-        )
-
-        # What else is available
-        show_what_else(api, username)
-
-        print("=" * 70)
-        print("  End of Report v3")
-        print("=" * 70)
+        _run_report_body(api, username)
 
         return username
 

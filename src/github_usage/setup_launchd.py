@@ -92,3 +92,39 @@ def launch_agent_status() -> str:
     """Return whether the LaunchAgent plist is installed."""
     dest = launch_agent_dest()
     return "installed" if dest.is_file() else "not installed"
+
+
+def _configure_launchd(paths) -> int:
+    import sys
+
+    if sys.platform != "darwin":
+        print("LaunchAgent setup is only available on macOS.")
+        return 0
+    print(f"\nLaunchAgent status: {launch_agent_status()}")
+    print("The plist file controls when scripts/send-email-report.sh runs on this Mac.")
+    print("Choose an action:")
+    print("  i — install    (write the plist and load it into ~/Library/LaunchAgents)")
+    print("  u — uninstall  (unload and remove the loaded agent)")
+    print("  g — generate   (write the plist file but don't load it; review first)")
+    print("  s — skip       (leave launchd alone)")
+    action = input("Action [s]: ").strip().lower()
+    if action in {"", "s", "skip"}:
+        return 0
+    if action in {"g", "generate"}:
+        plist = generate_plist(paths)
+        print(f"Generated {plist.relative_to(paths.root)}")
+        return 0
+    if action in {"u", "uninstall"}:
+        code, message = uninstall_launch_agent()
+        print(message)
+        return code
+    if action in {"i", "install"}:
+        if not paths.config_file.is_file():
+            from .setup_config import _configure_schedule
+
+            _configure_schedule(paths)
+        code, message = install_launch_agent(paths)
+        print(message)
+        return code
+    print("Unknown action; skipped launchd changes.")
+    return 0

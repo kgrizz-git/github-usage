@@ -12,8 +12,6 @@
 
 ## Code Health
 
-- [ ] Refactor large Python modules/functions flagged by `scripts/check-sizes`: split `setup_wizard.py` (~534 lines, over the 500-line soft limit) into focused submodules, and trim the functions approaching the 100-line limit — `cli._run_email_report` (~97), `legacy_report.main` (~96), `src/github_usage/scripts/api_discovery_month.main` (~82), and `report_data.build_report_data` (~81). **[Plan](docs/superpowers/plans/2026-06-26-module-refactor.md)**
-
 ## Configuration & Setup
 
 - [ ] Add support for configuring multiple reports with different run frequencies, targets, and options.

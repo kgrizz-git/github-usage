@@ -1,6 +1,6 @@
-> **Status:** IN PROGRESS
+> **Status:** COMPLETE
 >
-> Refactor plan for the Code Health item in TO_DO.md. Reviewed; updates applied.
+> Refactor plan for the Code Health item in TO_DO.md. All 6 phases implemented; `scripts/check`, `scripts/smoke`, `scripts/docs-check` pass and 274 tests pass.
 
 **Date:** 2026-06-26
 

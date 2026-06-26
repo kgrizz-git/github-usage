@@ -214,9 +214,11 @@ def _rate_limit(api: GitHubAPIClient) -> tuple[int | None, int | None]:
     return core.get("limit"), core.get("remaining")
 
 
-def build_report_data(
+def _fetch_sections(
     api: GitHubAPIClient,
     username: str,
+    repos: list,
+    max_repos: int,
     *,
     include_actions: bool,
     include_copilot: bool,
@@ -224,49 +226,10 @@ def build_report_data(
     include_consumers: bool,
     include_artifact_storage: bool,
     include_release_assets: bool,
-    max_repos: int,
-    warn_over: list[str] | str | None,
-) -> dict:
-    """Fetch and assemble all enabled billing sections into a single report dict."""
-    errors = {}
-    repos = []
-    truncated = False
-    needs_repos = include_consumers or include_artifact_storage or include_release_assets
-    if needs_repos:
-        repos, truncated = _limited_repos(api, max_repos)
-    core_limit, core_remaining = _rate_limit(api)
-    api_estimate = estimate_api_request_count(
-        repo_count=len(repos) + (1 if truncated else 0),
-        include_consumers=include_consumers,
-        include_artifact_storage=include_artifact_storage,
-        include_release_assets=include_release_assets,
-        max_repos=max_repos,
-        core_limit=core_limit,
-        core_remaining=core_remaining,
-    )
-    if (
-        core_remaining is not None
-        and core_remaining < api_estimate["estimated_incremental_requests"]
-    ):
-        raise RuntimeError("GitHub REST API quota is too low for selected repo-level sections.")
-
-    report = {
-        "username": username,
-        "period": "current_month",
-        "generated_at": datetime.now(tz=UTC).isoformat().replace("+00:00", "Z"),
-        "warnings": [],
-        "errors": errors,
-        "actions": None,
-        "copilot": None,
-        "git_lfs": None,
-        "monthly_costs": None,
-        "repo_consumers": None,
-        "artifact_storage": None,
-        "release_assets": None,
-        "api_estimate": api_estimate,
-        "insights": [],
-    }
-
+    report: dict,
+    errors: dict,
+) -> None:
+    """Populate the per-section keys on ``report`` and record errors. Mutates both dicts in place."""
     for key, enabled, getter in [
         ("actions", include_actions, lambda: get_actions_usage(api, username)),
         ("copilot", include_copilot, lambda: get_copilot_usage(api, username)),
@@ -304,6 +267,75 @@ def build_report_data(
             report["release_assets"] = get_release_asset_details(api, repos, max_repos)
         except RuntimeError as exc:
             errors["release_assets"] = str(exc)
+
+
+def build_report_data(
+    api: GitHubAPIClient,
+    username: str,
+    *,
+    include_actions: bool,
+    include_copilot: bool,
+    include_lfs: bool,
+    include_consumers: bool,
+    include_artifact_storage: bool,
+    include_release_assets: bool,
+    max_repos: int,
+    warn_over: list[str] | str | None,
+) -> dict:
+    """Fetch and assemble all enabled billing sections into a single report dict."""
+    errors = {}
+    repos: list = []
+    truncated = False
+    needs_repos = include_consumers or include_artifact_storage or include_release_assets
+    if needs_repos:
+        repos, truncated = _limited_repos(api, max_repos)
+    core_limit, core_remaining = _rate_limit(api)
+    api_estimate = estimate_api_request_count(
+        repo_count=len(repos) + (1 if truncated else 0),
+        include_consumers=include_consumers,
+        include_artifact_storage=include_artifact_storage,
+        include_release_assets=include_release_assets,
+        max_repos=max_repos,
+        core_limit=core_limit,
+        core_remaining=core_remaining,
+    )
+    if (
+        core_remaining is not None
+        and core_remaining < api_estimate["estimated_incremental_requests"]
+    ):
+        raise RuntimeError("GitHub REST API quota is too low for selected repo-level sections.")
+
+    report = {
+        "username": username,
+        "period": "current_month",
+        "generated_at": datetime.now(tz=UTC).isoformat().replace("+00:00", "Z"),
+        "warnings": [],
+        "errors": errors,
+        "actions": None,
+        "copilot": None,
+        "git_lfs": None,
+        "monthly_costs": None,
+        "repo_consumers": None,
+        "artifact_storage": None,
+        "release_assets": None,
+        "api_estimate": api_estimate,
+        "insights": [],
+    }
+
+    _fetch_sections(
+        api,
+        username,
+        repos,
+        max_repos,
+        include_actions=include_actions,
+        include_copilot=include_copilot,
+        include_lfs=include_lfs,
+        include_consumers=include_consumers,
+        include_artifact_storage=include_artifact_storage,
+        include_release_assets=include_release_assets,
+        report=report,
+        errors=errors,
+    )
 
     report["insights"] = get_key_insights(report)
     report["warnings"] = get_warning_state(report, warn_over)

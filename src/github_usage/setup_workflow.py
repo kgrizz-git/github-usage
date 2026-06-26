@@ -7,6 +7,8 @@ import os
 import tempfile
 from pathlib import Path
 
+from .setup_prompts import _prompt_yes_no
+
 DEFAULT_WORKFLOW_CONFIG = {
     "cron": "0 9 * * 1",
     "include_consumers": False,
@@ -150,3 +152,55 @@ def diff_workflow(root: Path, new_text: str) -> str:
             tofile=f"b/{dest.name}",
         )
     )
+
+
+def _configure_github_actions(paths) -> None:
+    from .setup_config import _load_or_create_config, write_config
+
+    config = _load_or_create_config(paths)
+    ga = config.get("github_actions", dict(DEFAULT_WORKFLOW_CONFIG))
+    print("\nGitHub Actions workflow (stored in .github-usage/config.toml):")
+    print("  Schedule always runs in UTC.")
+    print("  Weekday: 0 or 7 = Sunday, 1 = Monday, ..., 6 = Saturday.")
+    print("  Example cron expressions: '0 9 * * 1' (Mon 09:00), '0 14 * * 5' (Fri 14:00)")
+    while True:
+        raw = input(f"  Cron expression [{ga['cron']}]: ").strip()
+        expr = raw or ga["cron"]
+        try:
+            ga["cron"] = validate_cron(expr)
+            break
+        except ValueError as exc:
+            print(f"  {exc}")
+    ga["include_consumers"] = _prompt_yes_no(
+        "Include top repository breakdowns (consumers)?", ga["include_consumers"]
+    )
+    ga["include_artifact_storage"] = _prompt_yes_no(
+        "Include Actions artifact storage details?", ga["include_artifact_storage"]
+    )
+    ga["include_release_assets"] = _prompt_yes_no(
+        "Include release asset inventory?", ga["include_release_assets"]
+    )
+    config["github_actions"] = ga
+    write_config(paths.config_file, config)
+    print(f"Wrote {paths.config_file.relative_to(paths.root)}")
+
+
+def _render_and_offer_commit(paths) -> None:
+    from .setup_config import _load_or_create_config
+
+    config = _load_or_create_config(paths)
+    rendered = render_workflow(config, paths.root)
+    diff = diff_workflow(paths.root, rendered)
+    if not diff:
+        print("Workflow file already up to date.")
+        return
+    print("\nProposed changes to .github/workflows/email-report.yml:")
+    print(diff)
+    if _prompt_yes_no("Write the updated workflow file?", True):
+        write_workflow(paths.root, rendered)
+        print("Wrote .github/workflows/email-report.yml")
+        print(
+            "  To apply: git add .github/workflows/email-report.yml"
+            " && git commit -m 'chore(workflow): update email-report schedule'"
+            " && git push"
+        )

@@ -77,3 +77,24 @@ def _configure_ci_secrets() -> None:
     print("\nCI secrets updated.")
     print("Enable Secret Scanning and Push Protection in GitHub: Settings > Code security.")
     print("Manual test: gh workflow run email-report.yml")
+
+
+def _configure_dev_hooks() -> None:
+    if not shutil.which("pre-commit"):
+        print("Install dev tools first: python3 -m pip install -e '.[dev]'")
+        return
+    print("\nDeveloper hooks:")
+    if _prompt_yes_no("Install pre-commit hooks (commit + push)?", True):
+        for args in (
+            ["pre-commit", "install"],
+            ["pre-commit", "install", "--hook-type", "pre-push"],
+        ):
+            result = subprocess.run(args, check=False)  # nosec
+            if result.returncode != 0:
+                print(f"Failed: {' '.join(args)}")
+                return
+        print("Installed pre-commit hooks for commit and push.")
+    if shutil.which("gitleaks"):
+        print("Gitleaks is available for local secret scanning.")
+    else:
+        print("Install gitleaks for local secret scanning (also bundled in pre-commit).")

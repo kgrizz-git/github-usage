@@ -78,8 +78,8 @@ class CliTests(unittest.TestCase):
         stdout = io.StringIO()
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.report_data.build_report_data", return_value=report_data),
             contextlib.redirect_stdout(stdout),
         ):
@@ -121,8 +121,8 @@ class CliTests(unittest.TestCase):
 
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=False),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=False),
         ):
             api = api_cls.return_value
             api.request.return_value = {"login": "octocat"}
@@ -220,8 +220,8 @@ class CliTests(unittest.TestCase):
         with (
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
             api = api_cls.return_value

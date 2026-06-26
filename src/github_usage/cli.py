@@ -10,7 +10,13 @@ from typing import Any
 
 from . import __version__, email_report, export_report, report_data
 from .api import GitHubAPI
-from .auth import check_user_scope, resolve_token
+from .auth import resolve_token
+from .cli_email_report import (
+    _export_report,
+    _init_github_api,
+    _send_email,
+    _validate_report_sections,
+)
 from .cli_parsers import _email_parser, _legacy_parser
 from .legacy_report import main as legacy_main
 
@@ -173,12 +179,11 @@ def _run_email_report(argv: Sequence[str]) -> int:
     include_actions = not args.skip_actions
     include_copilot = not args.skip_copilot
     include_lfs = not args.skip_lfs
-    if not any([include_actions, include_copilot, include_lfs, args.include_artifact_storage]):
-        print(
-            "Error: all default report sections were skipped. Enable at least one "
-            "billing/quota section or use --include-artifact-storage."
-        )
-        return 1
+    error = _validate_report_sections(
+        include_actions, include_copilot, include_lfs, args.include_artifact_storage
+    )
+    if error is not None:
+        return error
 
     token = resolve_token(argv=[])
     if not token:
@@ -187,7 +192,6 @@ def _run_email_report(argv: Sequence[str]) -> int:
         print_missing_token_error()
         return 1
 
-    api = GitHubAPI(token, timeout=args.timeout, max_retries=args.max_retries)
     if not args.dry_run:
         missing = _missing_env(["RESEND_API_KEY", "REPORT_EMAIL", "RESEND_FROM"])
         if missing:
@@ -199,15 +203,12 @@ def _run_email_report(argv: Sequence[str]) -> int:
     if not _confirm_release_assets(args):
         return 1
 
+    api_result = _init_github_api(token, args.timeout, args.max_retries)
+    if isinstance(api_result, int):
+        return api_result
+    api, username = api_result
+
     try:
-        user = api.request("GET", "/user")
-        username = user.get("login")
-        if not username:
-            print("Error: GitHub /user response did not include a login.")
-            return 1
-        if not check_user_scope(api, user=user):
-            print("Error: Your GitHub token is not valid for this operation.")
-            return 1
         data = report_data.build_report_data(
             api,
             username,
@@ -222,33 +223,11 @@ def _run_email_report(argv: Sequence[str]) -> int:
         )
         body = email_report.format_report_email(data)
         html_body = email_report.format_html_report(data) if args.email_format == "html" else None
-        if export_format and export_format != "none":
-            payload = body if export_format == "text" else data
-            path = export_report.export(
-                payload,
-                export_format,
-                output_path=args.output,
-                username=username,
-                redact_data=True,
-            )
-            print(f"Exported to: {path}")
+        _export_report(args, export_format, body, data, username)
         if args.dry_run:
             print(html_body if args.email_format == "html" else body, end="")
             return 0
-        subject = os.environ.get("REPORT_SUBJECT", "").strip() or email_report.default_subject(
-            username, data.get("generated_at")
-        )
-        email_report.send_email(
-            os.environ["RESEND_API_KEY"],
-            os.environ["RESEND_FROM"],
-            os.environ["REPORT_EMAIL"],
-            subject,
-            body,
-            html=html_body,
-            timeout=args.timeout,
-            max_retries=args.max_retries,
-        )
-        print(f"Email report sent to {os.environ['REPORT_EMAIL']}.")
+        _send_email(args, body, html_body, username, data.get("generated_at"))
         return 0
     except (RuntimeError, ValueError) as exc:
         print(f"Error: {exc}")

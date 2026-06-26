@@ -30,7 +30,7 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
@@ -56,7 +56,7 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
@@ -78,7 +78,7 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
@@ -193,8 +193,8 @@ class EmailReportExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
             api = api_cls.return_value
@@ -249,8 +249,8 @@ class EmailReportExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
             api = api_cls.return_value
@@ -283,8 +283,8 @@ class EmailReportExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
             mock.patch(
                 "github_usage.cli.export_report.generate_filename",
@@ -316,8 +316,8 @@ class EmailReportExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
         ):
             api = api_cls.return_value
@@ -354,8 +354,8 @@ class EmailReportExportCliTests(unittest.TestCase):
                 clear=True,
             ),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli.check_user_scope", return_value=True),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
             mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
             mock.patch("github_usage.cli.email_report.send_email") as mock_send,
         ):

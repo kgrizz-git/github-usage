@@ -8,6 +8,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from .setup_prompts import _prompt_int
 from .setup_workflow import DEFAULT_WORKFLOW_CONFIG, workflow_path
 
 DEFAULT_ENV_FILE = ".env.email-report"
@@ -260,3 +261,25 @@ def is_minimally_configured(paths: SetupPaths) -> bool:
         return False
     env_values = read_env_file(paths.env_file)
     return all(env_values.get(key, "").strip() for key in SECRET_ENV_KEYS)
+
+
+def _load_or_create_config(paths: SetupPaths) -> dict:
+    if paths.config_file.is_file():
+        return load_config(paths.config_file)
+    return {
+        "email_report": dict(DEFAULT_EMAIL_REPORT),
+        "schedule": dict(DEFAULT_SCHEDULE),
+        "github_actions": dict(DEFAULT_WORKFLOW_CONFIG),
+    }
+
+
+def _configure_schedule(paths: SetupPaths) -> None:
+    config = _load_or_create_config(paths)
+    schedule = config["schedule"]
+    print("\nSchedule (local timezone, used by launchd):")
+    schedule["weekday"] = _prompt_int("Weekday (0/7=Sun, 1=Mon)", int(schedule["weekday"]))
+    schedule["hour"] = _prompt_int("Hour (0-23)", int(schedule["hour"]))
+    schedule["minute"] = _prompt_int("Minute (0-59)", int(schedule["minute"]))
+    config["schedule"] = schedule
+    write_config(paths.config_file, config)
+    print(f"Updated schedule in {paths.config_file.relative_to(paths.root)}")

@@ -548,25 +548,25 @@ class EmailFormatWizardTests(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def test_prompt_email_format_default_keeps_text(self):
-        from github_usage.setup_wizard import _prompt_email_format
+        from github_usage.setup_email_config import _prompt_email_format
 
         with mock.patch("builtins.input", return_value=""):
             self.assertEqual(_prompt_email_format("text"), "text")
 
     def test_prompt_email_format_accepts_html(self):
-        from github_usage.setup_wizard import _prompt_email_format
+        from github_usage.setup_email_config import _prompt_email_format
 
         with mock.patch("builtins.input", return_value="html"):
             self.assertEqual(_prompt_email_format("text"), "html")
 
     def test_prompt_email_format_normalises_case(self):
-        from github_usage.setup_wizard import _prompt_email_format
+        from github_usage.setup_email_config import _prompt_email_format
 
         with mock.patch("builtins.input", return_value="HTML"):
             self.assertEqual(_prompt_email_format("text"), "html")
 
     def test_prompt_email_format_reprompts_on_invalid(self):
-        from github_usage.setup_wizard import _prompt_email_format
+        from github_usage.setup_email_config import _prompt_email_format
 
         with mock.patch("builtins.input", side_effect=["txt", "pdf", "html"]):
             self.assertEqual(_prompt_email_format("text"), "html")

@@ -107,25 +107,8 @@ def _print_summary(report_lines: list[str], findings: list[dict]) -> str:
     return summary
 
 
-def main() -> int:
-    """Probe GitHub billing endpoints to discover month-filtering support."""
-    _require_env("GITHUB_USAGE_API_DISCOVERY")
-    token = _require_env("GITHUB_TOKEN")
-
-    from github_usage.api import GitHubAPI  # local import to keep module cheap
-
-    api = GitHubAPI(token)
-    user_resp = api.request("GET", "/user")
-    username = (user_resp or {}).get("login")
-    if not username:
-        print("Error: GitHub /user response did not include a login.", file=sys.stderr)
-        return 1
-
-    now = datetime.now(tz=UTC)
-    prev_year = now.year if now.month > 1 else now.year - 1
-    prev_month = now.month - 1 if now.month > 1 else 12
-    since, until = _month_range(prev_year, prev_month)
-
+def _probe_endpoints(api, username: str, since: str, until: str) -> list[dict]:
+    """Run each endpoint twice (with and without date range) and return per-endpoint findings."""
     endpoints = [
         (
             "billing usage summary (Actions)",
@@ -170,6 +153,29 @@ def main() -> int:
                 },
             }
         )
+    return findings
+
+
+def main() -> int:
+    """Probe GitHub billing endpoints to discover month-filtering support."""
+    _require_env("GITHUB_USAGE_API_DISCOVERY")
+    token = _require_env("GITHUB_TOKEN")
+
+    from github_usage.api import GitHubAPI  # local import to keep module cheap
+
+    api = GitHubAPI(token)
+    user_resp = api.request("GET", "/user")
+    username = (user_resp or {}).get("login")
+    if not username:
+        print("Error: GitHub /user response did not include a login.", file=sys.stderr)
+        return 1
+
+    now = datetime.now(tz=UTC)
+    prev_year = now.year if now.month > 1 else now.year - 1
+    prev_month = now.month - 1 if now.month > 1 else 12
+    since, until = _month_range(prev_year, prev_month)
+
+    findings = _probe_endpoints(api, username, since, until)
 
     report_lines = [
         "# API discovery: --month date-range support",
