@@ -171,7 +171,8 @@ class SetupLaunchdTests(unittest.TestCase):
     def test_generate_plist_uses_repo_path_and_schedule(self):
         plist_path = generate_plist(self.paths)
         payload = plistlib.loads(plist_path.read_bytes())
-        self.assertEqual(payload["Label"], "com.github.github-usage.email-report")
+        self.assertEqual(payload["Label"], "com.github.github-usage.email-report.default")
+        self.assertEqual(payload["ProgramArguments"][1:], ["--profile", "default"])
         self.assertIn("send-email-report.sh", payload["ProgramArguments"][0])
         self.assertEqual(payload["WorkingDirectory"], str(self.root.resolve()))
         interval = payload["StartCalendarInterval"]
@@ -261,9 +262,10 @@ class ScheduleMenuOptionTests(unittest.TestCase):
             ("7", "GitHub Actions secrets"),
             ("8", "Developer security hooks"),
             ("9", "Verify configuration"),
+            ("m", "Manage report profiles"),
             ("0", "Show status"),
         ]
-        self.assertEqual(len(_MENU_OPTIONS), 10)
+        self.assertEqual(len(_MENU_OPTIONS), 11)
         for index, (key, label) in enumerate(expected):
             self.assertEqual(_MENU_OPTIONS[index][0], key)
             self.assertEqual(_MENU_OPTIONS[index][1], label)
@@ -286,28 +288,26 @@ class ScheduleMenuOptionTests(unittest.TestCase):
     def test_schedule_only_regenerates_plist_and_prints_reminder_when_installed(self):
         with (
             mock.patch("github_usage.setup_wizard._configure_schedule") as schedule,
-            mock.patch("github_usage.setup_wizard.generate_plist") as plist,
+            mock.patch("github_usage.setup_wizard._regenerate_scheduled_artifacts") as regen,
             mock.patch(
                 "github_usage.setup_wizard.launch_agent_status",
-                return_value="installed",
+                return_value="installed: default",
             ),
             mock.patch("github_usage.setup_wizard.sys.platform", "darwin"),
             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
         ):
-            plist.return_value = self.paths.launchd_plist
             code = _schedule_only(self.paths)
         self.assertEqual(code, 0)
         schedule.assert_called_once_with(self.paths)
-        plist.assert_called_once_with(self.paths)
+        regen.assert_called_once_with(self.paths)
         output = stdout.getvalue()
-        self.assertIn("Generated", output)
         self.assertIn(_REINSTALL_REMINDER, output)
         self.assertEqual(output.count(_REINSTALL_REMINDER), 1)
 
     def test_schedule_only_skips_reminder_when_not_installed(self):
         with (
             mock.patch("github_usage.setup_wizard._configure_schedule"),
-            mock.patch("github_usage.setup_wizard.generate_plist") as plist,
+            mock.patch("github_usage.setup_wizard._regenerate_scheduled_artifacts") as regen,
             mock.patch(
                 "github_usage.setup_wizard.launch_agent_status",
                 return_value="not installed",
@@ -315,27 +315,25 @@ class ScheduleMenuOptionTests(unittest.TestCase):
             mock.patch("github_usage.setup_wizard.sys.platform", "darwin"),
             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
         ):
-            plist.return_value = self.paths.launchd_plist
             code = _schedule_only(self.paths)
         self.assertEqual(code, 0)
-        plist.assert_called_once_with(self.paths)
+        regen.assert_called_once_with(self.paths)
         self.assertNotIn(_REINSTALL_REMINDER, stdout.getvalue())
 
     def test_schedule_only_skips_reminder_on_non_macos(self):
         with (
             mock.patch("github_usage.setup_wizard._configure_schedule"),
-            mock.patch("github_usage.setup_wizard.generate_plist") as plist,
+            mock.patch("github_usage.setup_wizard._regenerate_scheduled_artifacts") as regen,
             mock.patch(
                 "github_usage.setup_wizard.launch_agent_status",
-                return_value="installed",
+                return_value="installed: default",
             ),
             mock.patch("github_usage.setup_wizard.sys.platform", "linux"),
             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
         ):
-            plist.return_value = self.paths.launchd_plist
             code = _schedule_only(self.paths)
         self.assertEqual(code, 0)
-        plist.assert_called_once_with(self.paths)
+        regen.assert_called_once_with(self.paths)
         self.assertNotIn(_REINSTALL_REMINDER, stdout.getvalue())
 
     def test_schedule_menu_option_dispatches_option_4(self):
@@ -412,11 +410,10 @@ class FullSetupPlistSyncTests(unittest.TestCase):
         def record_schedule(_paths):
             order.append("schedule")
 
-        def record_plist(_paths):
-            order.append("plist")
-            return self.paths.launchd_plist
+        def record_regen(_paths):
+            order.append("regen")
 
-        def record_verify(_paths):
+        def record_verify(_paths, profile_name=None):
             order.append("verify")
             return 0
 
@@ -437,22 +434,18 @@ class FullSetupPlistSyncTests(unittest.TestCase):
                 side_effect=lambda _p: order.append("github_actions"),
             ),
             mock.patch(
-                "github_usage.setup_wizard._render_and_offer_commit",
-                side_effect=lambda _p: order.append("render"),
+                "github_usage.setup_wizard._regenerate_scheduled_artifacts",
+                side_effect=record_regen,
             ),
-            mock.patch(
-                "github_usage.setup_wizard.generate_plist", side_effect=record_plist
-            ) as plist,
             mock.patch("github_usage.setup_wizard._verify_setup", side_effect=record_verify),
             mock.patch("github_usage.setup_wizard._prompt_yes_no", return_value=False),
             mock.patch("builtins.print"),
         ):
             code = _full_setup(self.paths)
         self.assertEqual(code, 0)
-        plist.assert_called_once()
         self.assertLess(order.index("schedule"), order.index("github_actions"))
-        self.assertLess(order.index("github_actions"), order.index("plist"))
-        self.assertLess(order.index("plist"), order.index("verify"))
+        self.assertLess(order.index("github_actions"), order.index("regen"))
+        self.assertLess(order.index("regen"), order.index("verify"))
 
     def test_full_setup_regenerates_plist_even_when_verify_fails(self):
         with (
@@ -460,15 +453,14 @@ class FullSetupPlistSyncTests(unittest.TestCase):
             mock.patch("github_usage.setup_wizard._configure_email_options"),
             mock.patch("github_usage.setup_wizard._configure_schedule"),
             mock.patch("github_usage.setup_wizard._configure_github_actions"),
-            mock.patch("github_usage.setup_wizard._render_and_offer_commit"),
-            mock.patch("github_usage.setup_wizard.generate_plist") as plist,
+            mock.patch("github_usage.setup_wizard._regenerate_scheduled_artifacts") as regen,
             mock.patch("github_usage.setup_wizard._verify_setup", return_value=1),
             mock.patch("github_usage.setup_wizard._prompt_yes_no", return_value=False),
             mock.patch("builtins.print"),
         ):
             code = _full_setup(self.paths)
         self.assertEqual(code, 1)
-        plist.assert_called_once()
+        regen.assert_called_once()
 
 
 class GitHubActionsWizardTests(unittest.TestCase):

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .setup_prompts import _prompt_int
-from .setup_workflow import DEFAULT_WORKFLOW_CONFIG, workflow_path
+from .setup_workflow import DEFAULT_PROFILE_NAME, DEFAULT_WORKFLOW_CONFIG, workflow_path
 
 DEFAULT_ENV_FILE = ".env.email-report"
 DEFAULT_CONFIG_DIR = ".github-usage"
@@ -62,6 +62,10 @@ class SetupPaths:
             launchd_dir=config_dir / "launchd",
             launchd_plist=config_dir / "launchd" / "com.github.github-usage.email-report.plist",
         )
+
+    def launchd_plist_for(self, profile_name: str) -> Path:
+        """Return the generated plist path for a named report profile."""
+        return self.launchd_dir / f"com.github.github-usage.email-report.{profile_name}.plist"
 
 
 def repo_root() -> Path:
@@ -127,34 +131,133 @@ def _unescape_env_value(value: str) -> str:
     return value.replace('\\"', '"').replace("\\\\", "\\")
 
 
+def _default_profile(
+    name: str = DEFAULT_PROFILE_NAME,
+    email_report: dict | None = None,
+    schedule: dict | None = None,
+    github_actions: dict | None = None,
+    target_email: str = "",
+    target_subject: str = "",
+) -> dict:
+    """Return a normalized report profile dict."""
+    return {
+        "name": name,
+        "target_email": target_email,
+        "target_subject": target_subject,
+        "email_report": {**DEFAULT_EMAIL_REPORT, **(email_report or {})},
+        "schedule": {**DEFAULT_SCHEDULE, **(schedule or {})},
+        "github_actions": {**DEFAULT_WORKFLOW_CONFIG, **(github_actions or {})},
+    }
+
+
+def load_report_profiles(data: dict) -> list[dict]:
+    """Parse report profiles from raw config data (TOML dict or in-memory config)."""
+    if "reports" in data:
+        profiles: list[dict] = []
+        seen: set[str] = set()
+        for entry in data["reports"]:
+            name = entry.get("name")
+            if not name or not str(name).strip():
+                raise KeyError("reports entry missing required 'name'")
+            name = str(name).strip()
+            if name in seen:
+                raise ValueError(f"duplicate profile name: {name!r}")
+            seen.add(name)
+            profiles.append(
+                _default_profile(
+                    name=name,
+                    target_email=str(entry.get("target_email", "")),
+                    target_subject=str(entry.get("target_subject", "")),
+                    email_report=entry.get("email_report", {}),
+                    schedule=entry.get("schedule", {}),
+                    github_actions=entry.get("github_actions", {}),
+                )
+            )
+        return profiles
+
+    return [
+        _default_profile(
+            email_report=data.get("email_report", {}),
+            schedule=data.get("schedule", {}),
+            github_actions=data.get("github_actions", {}),
+        )
+    ]
+
+
+def find_profile(config: dict, profile_name: str) -> dict:
+    """Return the profile dict for ``profile_name`` or raise ``KeyError``."""
+    profiles = config.get("profiles") or load_report_profiles(config)
+    for profile in profiles:
+        if profile["name"] == profile_name:
+            return profile
+    raise KeyError(profile_name)
+
+
+def ensure_profiles(config: dict) -> dict:
+    """Migrate legacy top-level config into a ``reports`` list when adding profiles."""
+    if config.get("reports"):
+        config["profiles"] = load_report_profiles(config)
+        return config
+    if config.get("profiles") and len(config["profiles"]) > 1:
+        config["reports"] = [_profile_to_report_entry(p) for p in config["profiles"]]
+        return config
+    profile = _default_profile(
+        email_report=config.get("email_report", {}),
+        schedule=config.get("schedule", {}),
+        github_actions=config.get("github_actions", {}),
+    )
+    config["reports"] = [_profile_to_report_entry(profile)]
+    config["profiles"] = load_report_profiles(config)
+    return config
+
+
+def _profile_to_report_entry(profile: dict) -> dict:
+    """Convert an in-memory profile dict to a TOML ``reports`` array entry."""
+    return {
+        "name": profile["name"],
+        "target_email": profile.get("target_email", ""),
+        "target_subject": profile.get("target_subject", ""),
+        "email_report": dict(profile.get("email_report", {})),
+        "schedule": dict(profile.get("schedule", {})),
+        "github_actions": dict(profile.get("github_actions", {})),
+    }
+
+
+def _config_with_legacy_keys(config: dict, profiles: list[dict]) -> dict:
+    """Attach legacy top-level keys from the first profile for backward compat."""
+    first = profiles[0]
+    return {
+        **config,
+        "email_report": dict(first["email_report"]),
+        "schedule": dict(first["schedule"]),
+        "github_actions": dict(first["github_actions"]),
+        "profiles": profiles,
+    }
+
+
 def load_config(path: Path) -> dict:
     """Load config.toml or return defaults."""
     if not path.is_file():
-        return {
-            "email_report": dict(DEFAULT_EMAIL_REPORT),
-            "schedule": dict(DEFAULT_SCHEDULE),
-            "github_actions": dict(DEFAULT_WORKFLOW_CONFIG),
-        }
+        profiles = [_default_profile()]
+        return _config_with_legacy_keys({}, profiles)
+
     data = tomllib.loads(path.read_text(encoding="utf-8"))
-    email_report = {**DEFAULT_EMAIL_REPORT, **data.get("email_report", {})}
-    schedule = {**DEFAULT_SCHEDULE, **data.get("schedule", {})}
-    github_actions = {**DEFAULT_WORKFLOW_CONFIG, **data.get("github_actions", {})}
-    return {"email_report": email_report, "schedule": schedule, "github_actions": github_actions}
+    profiles = load_report_profiles(data)
+    return _config_with_legacy_keys(data, profiles)
 
 
-def write_config(path: Path, config: dict) -> None:
-    """Write config.toml from a nested dict."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    email = {**DEFAULT_EMAIL_REPORT, **config.get("email_report", {})}
-    schedule = {**DEFAULT_SCHEDULE, **config.get("schedule", {})}
-    ga = {**DEFAULT_WORKFLOW_CONFIG, **config.get("github_actions", {})}
+def _bool(value: object) -> str:
+    return "true" if bool(value) else "false"
+
+
+def _emit_email_report_block(email: dict, *, prefix: str = "") -> str:
+    """Emit a TOML ``[email_report]`` or ``[reports.email_report]`` block."""
     warn_over = email.get("warn_over") or []
     if isinstance(warn_over, str):
         warn_over = [warn_over]
     warn_lines = "\n".join(f'  "{item}",' for item in warn_over)
-    text = f"""# Generated by github-usage setup. Safe to edit locally; do not commit secrets here.
-
-[email_report]
+    header = f"[{prefix}email_report]" if prefix else "[email_report]"
+    return f"""{header}
 include_consumers = {_bool(email.get("include_consumers"))}
 include_artifact_storage = {_bool(email.get("include_artifact_storage"))}
 include_release_assets = {_bool(email.get("include_release_assets"))}
@@ -166,28 +269,72 @@ warn_over = [
 skip_actions = {_bool(email.get("skip_actions"))}
 skip_copilot = {_bool(email.get("skip_copilot"))}
 skip_lfs = {_bool(email.get("skip_lfs"))}
+"""
 
-[schedule]
+
+def _emit_schedule_block(schedule: dict, *, prefix: str = "") -> str:
+    """Emit a TOML schedule block."""
+    header = f"[{prefix}schedule]" if prefix else "[schedule]"
+    return f"""{header}
 weekday = {int(schedule.get("weekday", 1))}
 hour = {int(schedule.get("hour", 9))}
 minute = {int(schedule.get("minute", 0))}
+"""
 
-[github_actions]
+
+def _emit_github_actions_block(ga: dict, *, prefix: str = "") -> str:
+    """Emit a TOML github_actions block."""
+    header = f"[{prefix}github_actions]" if prefix else "[github_actions]"
+    return f"""{header}
 cron = "{ga.get("cron", DEFAULT_WORKFLOW_CONFIG["cron"])}"
 include_consumers = {_bool(ga.get("include_consumers"))}
 include_artifact_storage = {_bool(ga.get("include_artifact_storage"))}
 include_release_assets = {_bool(ga.get("include_release_assets"))}
 """
+
+
+def write_config(path: Path, config: dict) -> None:
+    """Write config.toml from a nested dict (legacy or multi-profile)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    profiles = config.get("profiles") or load_report_profiles(config)
+    multi = bool(config.get("reports")) or len(profiles) > 1
+
+    if multi:
+        parts = [
+            "# Generated by github-usage setup. Safe to edit locally; do not commit secrets here.",
+            "",
+        ]
+        for profile in profiles:
+            parts.append("[[reports]]")
+            parts.append(f'name = "{profile["name"]}"')
+            target_email = profile.get("target_email", "")
+            target_subject = profile.get("target_subject", "")
+            if target_email:
+                parts.append(f'target_email = "{target_email}"')
+            if target_subject:
+                parts.append(f'target_subject = "{target_subject}"')
+            parts.append("")
+            parts.append(_emit_email_report_block(profile["email_report"], prefix="reports."))
+            parts.append(_emit_schedule_block(profile["schedule"], prefix="reports."))
+            parts.append(_emit_github_actions_block(profile["github_actions"], prefix="reports."))
+        text = "\n".join(parts)
+    else:
+        profile = profiles[0]
+        text = (
+            "# Generated by github-usage setup. Safe to edit locally; do not commit secrets here.\n\n"
+            + _emit_email_report_block(profile["email_report"])
+            + "\n"
+            + _emit_schedule_block(profile["schedule"])
+            + "\n"
+            + _emit_github_actions_block(profile["github_actions"])
+        )
+
     path.write_text(text, encoding="utf-8")
 
 
-def _bool(value: object) -> str:
-    return "true" if bool(value) else "false"
-
-
-def email_report_args(config: dict) -> list[str]:
-    """Translate email_report config into CLI arguments."""
-    email = {**DEFAULT_EMAIL_REPORT, **config.get("email_report", {})}
+def _email_flags_from_dict(email: dict, *, include_delivery: bool = True) -> list[str]:
+    """Translate an email_report dict into CLI arguments."""
+    email = {**DEFAULT_EMAIL_REPORT, **email}
     args: list[str] = []
     if email.get("include_consumers"):
         args.append("--include-consumers")
@@ -212,6 +359,46 @@ def email_report_args(config: dict) -> list[str]:
     return args
 
 
+def email_report_args(config: dict, profile_name: str = DEFAULT_PROFILE_NAME) -> list[str]:
+    """Translate a named profile's email_report config into CLI arguments."""
+    profile = find_profile(config, profile_name)
+    args = _email_flags_from_dict(profile["email_report"])
+    target_email = (profile.get("target_email") or "").strip()
+    target_subject = (profile.get("target_subject") or "").strip()
+    if target_email:
+        args.extend(["--to", target_email])
+    if target_subject:
+        args.extend(["--subject", target_subject])
+    return args
+
+
+def profile_workflow_extra_args(
+    config: dict, profile_name: str = DEFAULT_PROFILE_NAME
+) -> list[str]:
+    """Return non-include_* CLI flags baked into a GitHub Actions workflow."""
+    profile = find_profile(config, profile_name)
+    email = {**DEFAULT_EMAIL_REPORT, **profile["email_report"]}
+    args: list[str] = []
+    max_repos = int(email.get("max_repos", 100))
+    args.extend(["--max-repos", str(max_repos)])
+    args.extend(["--email-format", str(email.get("email_format", "text"))])
+    warn_over = email.get("warn_over") or []
+    if isinstance(warn_over, str):
+        warn_over = [warn_over]
+    for threshold in warn_over:
+        args.extend(["--warn-over", str(threshold)])
+    if email.get("skip_actions"):
+        args.append("--skip-actions")
+    if email.get("skip_copilot"):
+        args.append("--skip-copilot")
+    if email.get("skip_lfs"):
+        args.append("--skip-lfs")
+    target_subject = (profile.get("target_subject") or "").strip()
+    if target_subject:
+        args.extend(["--subject", target_subject])
+    return args
+
+
 def status_lines(paths: SetupPaths) -> list[str]:
     """Return human-readable setup status without printing secret values."""
     lines = [f"Repository root: {paths.root}"]
@@ -230,28 +417,51 @@ def status_lines(paths: SetupPaths) -> list[str]:
     )
     if config_exists:
         config = load_config(paths.config_file)
-        email = config["email_report"]
-        schedule = config["schedule"]
-        ga = config.get("github_actions", {})
-        lines.append(f"  max_repos: {email.get('max_repos')}")
-        lines.append(
-            "  optional sections: "
-            f"consumers={email.get('include_consumers')}, "
-            f"artifact_storage={email.get('include_artifact_storage')}, "
-            f"release_assets={email.get('include_release_assets')}"
-        )
-        lines.append(
-            f"  schedule: weekday={schedule.get('weekday')} "
-            f"{schedule.get('hour'):02d}:{schedule.get('minute'):02d} local"
-        )
-        if ga:
+        profiles = config["profiles"]
+        if len(profiles) == 1:
+            profile = profiles[0]
+            email = profile["email_report"]
+            schedule = profile["schedule"]
+            ga = profile["github_actions"]
+            lines.append(f"  profile: {profile['name']}")
+            lines.append(f"  max_repos: {email.get('max_repos')}")
+            lines.append(
+                "  optional sections: "
+                f"consumers={email.get('include_consumers')}, "
+                f"artifact_storage={email.get('include_artifact_storage')}, "
+                f"release_assets={email.get('include_release_assets')}"
+            )
+            lines.append(
+                f"  schedule: weekday={schedule.get('weekday')} "
+                f"{schedule.get('hour'):02d}:{schedule.get('minute'):02d} local"
+            )
             cron = ga.get("cron", DEFAULT_WORKFLOW_CONFIG["cron"])
             wf_status = "present" if workflow_path(paths.root).is_file() else "missing"
             lines.append(f"  GitHub Actions cron: {cron} (workflow file: {wf_status})")
+            plist_path = paths.launchd_plist_for(profile["name"])
+            lines.append(
+                f"  LaunchAgent plist ({profile['name']}): "
+                f"{'generated' if plist_path.is_file() else 'not generated'}"
+            )
         else:
-            lines.append("  GitHub Actions: not configured")
-    plist_exists = paths.launchd_plist.is_file()
-    lines.append(f"LaunchAgent plist: {'generated' if plist_exists else 'not generated'}")
+            lines.append(f"  report profiles: {len(profiles)}")
+            for profile in profiles:
+                schedule = profile["schedule"]
+                ga = profile["github_actions"]
+                cron = ga.get("cron", DEFAULT_WORKFLOW_CONFIG["cron"])
+                wf = workflow_path(paths.root, profile["name"])
+                plist_path = paths.launchd_plist_for(profile["name"])
+                target = profile.get("target_email") or "(env REPORT_EMAIL)"
+                lines.append(
+                    f"    - {profile['name']}: to={target}, "
+                    f"schedule=weekday {schedule.get('weekday')} "
+                    f"{schedule.get('hour'):02d}:{schedule.get('minute'):02d}, "
+                    f"GA cron={cron}, workflow={'present' if wf.is_file() else 'missing'}, "
+                    f"plist={'generated' if plist_path.is_file() else 'not generated'}"
+                )
+    else:
+        plist_exists = paths.launchd_plist.is_file()
+        lines.append(f"LaunchAgent plist: {'generated' if plist_exists else 'not generated'}")
     return lines
 
 
@@ -266,20 +476,32 @@ def is_minimally_configured(paths: SetupPaths) -> bool:
 def _load_or_create_config(paths: SetupPaths) -> dict:
     if paths.config_file.is_file():
         return load_config(paths.config_file)
-    return {
-        "email_report": dict(DEFAULT_EMAIL_REPORT),
-        "schedule": dict(DEFAULT_SCHEDULE),
-        "github_actions": dict(DEFAULT_WORKFLOW_CONFIG),
-    }
+    profiles = [_default_profile()]
+    return _config_with_legacy_keys({}, profiles)
 
 
-def _configure_schedule(paths: SetupPaths) -> None:
+def _configure_schedule(paths: SetupPaths, profile_name: str | None = None) -> None:
     config = _load_or_create_config(paths)
-    schedule = config["schedule"]
+    if profile_name:
+        profile = find_profile(config, profile_name)
+        schedule = profile["schedule"]
+    else:
+        schedule = config["schedule"]
     print("\nSchedule (local timezone, used by launchd):")
     schedule["weekday"] = _prompt_int("Weekday (0/7=Sun, 1=Mon)", int(schedule["weekday"]))
     schedule["hour"] = _prompt_int("Hour (0-23)", int(schedule["hour"]))
     schedule["minute"] = _prompt_int("Minute (0-59)", int(schedule["minute"]))
-    config["schedule"] = schedule
+    if profile_name:
+        profile["schedule"] = schedule
+        if config.get("reports"):
+            for entry in config["reports"]:
+                if entry["name"] == profile_name:
+                    entry["schedule"] = dict(schedule)
+                    break
+    else:
+        config["schedule"] = schedule
+        if config.get("profiles"):
+            config["profiles"][0]["schedule"] = schedule
     write_config(paths.config_file, config)
-    print(f"Updated schedule in {paths.config_file.relative_to(paths.root)}")
+    label = f" ({profile_name})" if profile_name else ""
+    print(f"Updated schedule{label} in {paths.config_file.relative_to(paths.root)}")

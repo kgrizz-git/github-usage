@@ -9,6 +9,10 @@ PYTHONPATH=src scripts/python -m github_usage --version
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--timeout"
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--max-retries"
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--email-format"
+PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--profile"
+PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--to"
+PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--subject"
+PYTHONPATH=src scripts/python -m github_usage setup --print-args --profile default 2>/dev/null | grep -q -- "--max-repos"
 
 ./start.sh --help >/dev/null
 ./start.sh report --help >/dev/null

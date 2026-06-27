@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import difflib
 import os
+import shlex
 import tempfile
 from pathlib import Path
 
 from .setup_prompts import _prompt_yes_no
+
+DEFAULT_PROFILE_NAME = "default"
 
 DEFAULT_WORKFLOW_CONFIG = {
     "cron": "0 9 * * 1",
@@ -17,9 +20,12 @@ DEFAULT_WORKFLOW_CONFIG = {
 }
 
 
-def workflow_path(root: Path) -> Path:
-    """Return the absolute path to the email-report workflow file."""
-    return root / ".github" / "workflows" / "email-report.yml"
+def workflow_path(root: Path, profile_name: str = DEFAULT_PROFILE_NAME) -> Path:
+    """Return the absolute path to an email-report workflow file."""
+    workflows = root / ".github" / "workflows"
+    if profile_name == DEFAULT_PROFILE_NAME:
+        return workflows / "email-report.yml"
+    return workflows / f"email-report-{profile_name}.yml"
 
 
 def validate_cron(expr: str) -> str:
@@ -86,33 +92,73 @@ def _validate_cron_field(field: str, name: str, lo: int, hi: int) -> None:
             raise ValueError(f"Invalid cron {name} value {val} out of range [{lo},{hi}].")
 
 
-def render_workflow(config: dict, root: Path | None = None) -> str:
-    """Render email-report.yml from the template using values from github_actions config."""
+def _profile_suffix(profile_name: str) -> str:
+    return "" if profile_name == DEFAULT_PROFILE_NAME else f"-{profile_name}"
+
+
+def _shell_quote_args(args: list[str]) -> str:
+    """Return a bash array literal for extra profile args."""
+    if not args:
+        return ""
+    return " ".join(shlex.quote(item) for item in args)
+
+
+def render_workflow(
+    config: dict,
+    root: Path | None = None,
+    profile_name: str = DEFAULT_PROFILE_NAME,
+) -> str:
+    """Render an email-report workflow from the template for one profile."""
     actual_root = root if root is not None else Path(__file__).resolve().parents[2]
-    template_path = workflow_path(actual_root).with_suffix(".yml.template")
+    template_path = workflow_path(actual_root, DEFAULT_PROFILE_NAME).with_suffix(".yml.template")
     if not template_path.is_file():
         raise FileNotFoundError(
             f"Template not found: {template_path}. "
             "Re-clone the repository or restore the file from git."
         )
     text = template_path.read_text(encoding="utf-8")
-    ga = {**DEFAULT_WORKFLOW_CONFIG, **config.get("github_actions", {})}
+    from .setup_config import find_profile, profile_workflow_extra_args
+
+    profile = find_profile(config, profile_name)
+    ga = {**DEFAULT_WORKFLOW_CONFIG, **profile.get("github_actions", {})}
 
     def bval(v: object) -> str:
         return "true" if v else "false"
 
+    suffix = _profile_suffix(profile_name)
+    extra_args = profile_workflow_extra_args(config, profile_name)
+    target_email = (profile.get("target_email") or "").strip()
+    if target_email:
+        target_email_expr = (
+            f"${{{{ inputs.report_email || '{target_email}' || secrets.REPORT_EMAIL }}}}"
+        )
+    else:
+        target_email_expr = "${{ inputs.report_email || secrets.REPORT_EMAIL }}"
+
+    display_name = (
+        "GitHub Usage Report" if suffix == "" else f"GitHub Usage Report ({profile_name})"
+    )
+
+    text = text.replace("__WORKFLOW_NAME__", display_name)
+    text = text.replace("__PROFILE_SUFFIX__", suffix)
     text = text.replace("__CRON__", ga["cron"])
     text = text.replace("__INCLUDE_CONSUMERS_DEFAULT__", bval(ga["include_consumers"]))
     text = text.replace(
         "__INCLUDE_ARTIFACT_STORAGE_DEFAULT__", bval(ga["include_artifact_storage"])
     )
     text = text.replace("__INCLUDE_RELEASE_ASSETS_DEFAULT__", bval(ga["include_release_assets"]))
+    text = text.replace("__TARGET_EMAIL__", target_email_expr)
+    text = text.replace("__PROFILE_ARGS__", _shell_quote_args(extra_args))
     return text
 
 
-def write_workflow(root: Path, text: str) -> None:
+def write_workflow(
+    root: Path,
+    text: str,
+    profile_name: str = DEFAULT_PROFILE_NAME,
+) -> None:
     """Atomically write the rendered workflow file with standard tracked-file permissions."""
-    dest = workflow_path(root)
+    dest = workflow_path(root, profile_name)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp_path: Path | None = None
     try:
@@ -126,19 +172,20 @@ def write_workflow(root: Path, text: str) -> None:
             tmp_path = Path(tmp.name)
             tmp.write(text)
         os.replace(tmp_path, dest)
-        tmp_path = None  # replace succeeded; nothing left to clean up
+        tmp_path = None
     finally:
         if tmp_path is not None and tmp_path.exists():
             tmp_path.unlink()
     os.chmod(dest, 0o644)
 
 
-def diff_workflow(root: Path, new_text: str) -> str:
-    """Return a unified diff between new_text and the current on-disk workflow file.
-
-    Returns empty string when the file is absent or content is identical.
-    """
-    dest = workflow_path(root)
+def diff_workflow(
+    root: Path,
+    new_text: str,
+    profile_name: str = DEFAULT_PROFILE_NAME,
+) -> str:
+    """Return a unified diff between new_text and the current on-disk workflow file."""
+    dest = workflow_path(root, profile_name)
     if not dest.is_file():
         return ""
     old_text = dest.read_text(encoding="utf-8")
@@ -154,12 +201,17 @@ def diff_workflow(root: Path, new_text: str) -> str:
     )
 
 
-def _configure_github_actions(paths) -> None:
-    from .setup_config import _load_or_create_config, write_config
+def _configure_github_actions(paths, profile_name: str | None = None) -> None:
+    from .setup_config import _load_or_create_config, find_profile, write_config
 
     config = _load_or_create_config(paths)
-    ga = config.get("github_actions", dict(DEFAULT_WORKFLOW_CONFIG))
-    print("\nGitHub Actions workflow (stored in .github-usage/config.toml):")
+    if profile_name:
+        ga = find_profile(config, profile_name)["github_actions"]
+        label = f" for profile {profile_name!r}"
+    else:
+        ga = config.get("github_actions", dict(DEFAULT_WORKFLOW_CONFIG))
+        label = ""
+    print(f"\nGitHub Actions workflow{label} (stored in .github-usage/config.toml):")
     print("  Schedule always runs in UTC.")
     print("  Weekday: 0 or 7 = Sunday, 1 = Monday, ..., 6 = Saturday.")
     print("  Example cron expressions: '0 9 * * 1' (Mon 09:00), '0 14 * * 5' (Fri 14:00)")
@@ -180,27 +232,46 @@ def _configure_github_actions(paths) -> None:
     ga["include_release_assets"] = _prompt_yes_no(
         "Include release asset inventory?", ga["include_release_assets"]
     )
-    config["github_actions"] = ga
+    if profile_name:
+        profile = find_profile(config, profile_name)
+        profile["github_actions"] = ga
+        if config.get("reports"):
+            for entry in config["reports"]:
+                if entry["name"] == profile_name:
+                    entry["github_actions"] = dict(ga)
+                    break
+    else:
+        config["github_actions"] = ga
+        if config.get("profiles"):
+            config["profiles"][0]["github_actions"] = ga
     write_config(paths.config_file, config)
     print(f"Wrote {paths.config_file.relative_to(paths.root)}")
 
 
-def _render_and_offer_commit(paths) -> None:
+def _render_and_offer_commit(paths, profile_name: str | None = None) -> None:
     from .setup_config import _load_or_create_config
 
     config = _load_or_create_config(paths)
-    rendered = render_workflow(config, paths.root)
-    diff = diff_workflow(paths.root, rendered)
-    if not diff:
-        print("Workflow file already up to date.")
-        return
-    print("\nProposed changes to .github/workflows/email-report.yml:")
-    print(diff)
-    if _prompt_yes_no("Write the updated workflow file?", True):
-        write_workflow(paths.root, rendered)
-        print("Wrote .github/workflows/email-report.yml")
-        print(
-            "  To apply: git add .github/workflows/email-report.yml"
-            " && git commit -m 'chore(workflow): update email-report schedule'"
-            " && git push"
-        )
+    profile_names = (
+        [profile_name] if profile_name else [p["name"] for p in config.get("profiles") or []]
+    )
+    if not profile_names:
+        profile_names = [DEFAULT_PROFILE_NAME]
+
+    for name in profile_names:
+        rendered = render_workflow(config, paths.root, name)
+        diff = diff_workflow(paths.root, rendered, name)
+        if not diff:
+            print(f"Workflow file for profile {name!r} already up to date.")
+            continue
+        dest = workflow_path(paths.root, name)
+        print(f"\nProposed changes to {dest.relative_to(paths.root)}:")
+        print(diff)
+        if _prompt_yes_no("Write the updated workflow file?", True):
+            write_workflow(paths.root, rendered, name)
+            print(f"Wrote {dest.relative_to(paths.root)}")
+            print(
+                f"  To apply: git add {dest.relative_to(paths.root)}"
+                f" && git commit -m 'chore(workflow): update email-report schedule'"
+                f" && git push"
+            )

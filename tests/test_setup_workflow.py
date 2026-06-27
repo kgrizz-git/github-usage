@@ -115,6 +115,31 @@ class RenderWorkflowTests(unittest.TestCase):
         self.assertNotIn("__INCLUDE_CONSUMERS_DEFAULT__", rendered)
         self.assertNotIn("__INCLUDE_ARTIFACT_STORAGE_DEFAULT__", rendered)
         self.assertNotIn("__INCLUDE_RELEASE_ASSETS_DEFAULT__", rendered)
+        self.assertNotIn("__WORKFLOW_NAME__", rendered)
+        self.assertNotIn("__PROFILE_SUFFIX__", rendered)
+        self.assertNotIn("__PROFILE_ARGS__", rendered)
+        self.assertNotIn("__TARGET_EMAIL__", rendered)
+
+    def test_non_default_profile_renders_profile_suffix_and_path(self):
+        config = {
+            "profiles": [
+                {
+                    "name": "weekly",
+                    "target_email": "team@example.com",
+                    "target_subject": "",
+                    "email_report": {"max_repos": 50},
+                    "schedule": {},
+                    "github_actions": dict(DEFAULT_WORKFLOW_CONFIG),
+                }
+            ]
+        }
+        rendered = render_workflow(config, self.root, "weekly")
+        self.assertIn("group: github-usage-email-report-weekly", rendered)
+        self.assertIn("team@example.com", rendered)
+        self.assertIn("--max-repos", rendered)
+        dest = workflow_path(self.root, "weekly")
+        write_workflow(self.root, rendered, "weekly")
+        self.assertTrue(dest.is_file())
 
     def test_custom_cron_appears_in_rendered_output(self):
         rendered = render_workflow(self._config(cron="0 8 * * 5"), self.root)

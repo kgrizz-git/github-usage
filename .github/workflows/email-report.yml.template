@@ -1,4 +1,4 @@
-name: GitHub Usage Report
+name: __WORKFLOW_NAME__
 
 on:
   schedule:
@@ -35,7 +35,7 @@ on:
         type: string
 
 concurrency:
-  group: github-usage-email-report
+  group: github-usage-email-report__PROFILE_SUFFIX__
   cancel-in-progress: true
 
 permissions:
@@ -54,7 +54,7 @@ jobs:
         env:
           GH_USAGE_TOKEN: ${{ secrets.GH_USAGE_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          REPORT_EMAIL: ${{ inputs.report_email || secrets.REPORT_EMAIL }}
+          REPORT_EMAIL: __TARGET_EMAIL__
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
         run: |
           args=()
@@ -66,5 +66,9 @@ jobs:
           fi
           if [ "${{ inputs.include_release_assets || '__INCLUDE_RELEASE_ASSETS_DEFAULT__' }}" = "true" ]; then
             args+=(--include-release-assets --yes-include-release-assets)
+          fi
+          profile_args=(__PROFILE_ARGS__)
+          if [ ${#profile_args[@]} -gt 0 ]; then
+            args+=("${profile_args[@]}")
           fi
           python -m github_usage email-report "${args[@]}"

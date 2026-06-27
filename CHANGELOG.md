@@ -15,6 +15,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Added
 
+- **Multi-report profiles:** Configure named report profiles in `config.toml` (`[[reports]]`) with per-profile schedules, recipients, subjects, section toggles, and GitHub Actions cron settings. The CLI accepts `--profile`, `--to`, and `--subject`; `setup --print-args --profile NAME` expands a profile's flags; launchd installs one plist per profile; GitHub Actions renders one workflow per profile with options baked at render time (no runtime `config.toml` read in CI). Setup wizard adds **Manage report profiles** (`m`). Legacy single-profile configs round-trip unchanged.
 - **`start.sh` entrypoint script:** Root-level unified CLI for setup, one-off legacy reports, and email-report runs.
 - **`scripts/prune-backups` + pre-commit hook:** prunes tracked `backups/*.bak` files whose last commit is older than the most recent 5 commits (non-`.bak` files and untracked/new backups are preserved). Supports `PRUNE_BACKUPS_DRYRUN=1` and `PRUNE_BACKUPS_KEEP=N`.
 - **`scripts/docs-check` plan-hygiene warning:** warns (without failing) when a plan whose status banner reads `COMPLETE`/`COMPLETED` is still in the active `docs/superpowers/plans/` directory instead of `archived/`.

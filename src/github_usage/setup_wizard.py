@@ -16,13 +16,18 @@ from pathlib import Path
 from . import cli
 from .setup_ci import _configure_ci_secrets, _configure_dev_hooks
 from .setup_config import (
+    DEFAULT_PROFILE_NAME,
     SetupPaths,
     _configure_schedule,
+    _default_profile,
     email_report_args,
+    ensure_profiles,
+    find_profile,
     is_minimally_configured,
     load_config,
     repo_root,
     status_lines,
+    write_config,
 )
 from .setup_email_config import _configure_email_options
 from .setup_launchd import (
@@ -57,6 +62,11 @@ def _setup_parser() -> argparse.ArgumentParser:
         help="Print email-report CLI args derived from config.toml.",
     )
     parser.add_argument(
+        "--profile",
+        default=None,
+        help="Report profile for --print-args or --verify (default profile: default).",
+    )
+    parser.add_argument(
         "--non-interactive",
         action="store_true",
         help="Skip prompts (use with --status or --verify).",
@@ -70,13 +80,133 @@ def _setup_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _verify_setup(paths: SetupPaths) -> int:
+def _verify_setup(paths: SetupPaths, profile_name: str | None = None) -> int:
     if not paths.config_file.is_file():
         print("Error: missing .github-usage/config.toml. Run setup and configure report options.")
         return 1
     _apply_env(paths)
-    args = ["email-report", "--dry-run", *email_report_args(load_config(paths.config_file))]
-    return cli.main(args)
+    config = load_config(paths.config_file)
+    names = [profile_name] if profile_name else [p["name"] for p in config["profiles"]]
+    for name in names:
+        args = ["email-report", "--dry-run", *email_report_args(config, name)]
+        code = cli.main(args)
+        if code != 0:
+            print(f"Verify failed for profile {name!r}.")
+            return code
+    return 0
+
+
+def _regenerate_scheduled_artifacts(paths: SetupPaths) -> None:
+    """Regenerate launchd plists and offer to update workflow files for all profiles."""
+    config = load_config(paths.config_file) if paths.config_file.is_file() else None
+    profile_names = [p["name"] for p in config["profiles"]] if config else [DEFAULT_PROFILE_NAME]
+    for profile_name in profile_names:
+        plist = generate_plist(paths, profile_name)
+        print(f"Generated {plist.relative_to(paths.root)}")
+    _render_and_offer_commit(paths)
+
+
+def _manage_profiles(paths: SetupPaths) -> int:
+    config = _load_or_create_config(paths)
+    while True:
+        config = load_config(paths.config_file) if paths.config_file.is_file() else config
+        profiles = config.get("profiles") or []
+        print("\nReport profiles:")
+        if not profiles:
+            print("  (none)")
+        for profile in profiles:
+            schedule = profile["schedule"]
+            target = profile.get("target_email") or "(env REPORT_EMAIL)"
+            print(
+                f"  - {profile['name']}: to={target}, "
+                f"schedule weekday={schedule.get('weekday')} "
+                f"{schedule.get('hour'):02d}:{schedule.get('minute'):02d}"
+            )
+        print("\n  a) Add profile")
+        print("  e) Edit profile")
+        print("  d) Delete profile")
+        print("  s) Save and regenerate schedules/workflows")
+        print("  q) Back")
+        action = input("Action [q]: ").strip().lower() or "q"
+        if action in {"q", "quit", "back"}:
+            return 0
+        if action in {"a", "add"}:
+            config = ensure_profiles(config)
+            name = input("New profile name: ").strip()
+            if not name:
+                print("Profile name is required.")
+                continue
+            if any(p["name"] == name for p in config.get("profiles", [])):
+                print(f"Profile {name!r} already exists.")
+                continue
+            config["profiles"].append(_default_profile(name=name))
+            config["reports"] = [
+                {
+                    "name": p["name"],
+                    "target_email": p.get("target_email", ""),
+                    "target_subject": p.get("target_subject", ""),
+                    "email_report": dict(p["email_report"]),
+                    "schedule": dict(p["schedule"]),
+                    "github_actions": dict(p["github_actions"]),
+                }
+                for p in config["profiles"]
+            ]
+            write_config(paths.config_file, config)
+            _configure_email_options(paths, name)
+            _configure_schedule(paths, name)
+            _configure_github_actions(paths, name)
+            continue
+        if action in {"e", "edit"}:
+            name = input("Profile name to edit: ").strip()
+            if not name:
+                continue
+            try:
+                find_profile(config, name)
+            except KeyError:
+                print(f"Unknown profile: {name!r}")
+                continue
+            _configure_email_options(paths, name)
+            _configure_schedule(paths, name)
+            _configure_github_actions(paths, name)
+            continue
+        if action in {"d", "delete"}:
+            name = input("Profile name to delete: ").strip()
+            if not name:
+                continue
+            if name == DEFAULT_PROFILE_NAME and len(config.get("profiles", [])) <= 1:
+                print("Cannot delete the only profile.")
+                continue
+            config = ensure_profiles(config)
+            config["profiles"] = [p for p in config["profiles"] if p["name"] != name]
+            if not config["profiles"]:
+                print("At least one profile must remain.")
+                config["profiles"] = [_default_profile()]
+            config["reports"] = [
+                {
+                    "name": p["name"],
+                    "target_email": p.get("target_email", ""),
+                    "target_subject": p.get("target_subject", ""),
+                    "email_report": dict(p["email_report"]),
+                    "schedule": dict(p["schedule"]),
+                    "github_actions": dict(p["github_actions"]),
+                }
+                for p in config["profiles"]
+            ]
+            write_config(paths.config_file, config)
+            print(f"Deleted profile {name!r}.")
+            continue
+        if action in {"s", "save"}:
+            _regenerate_scheduled_artifacts(paths)
+            if sys.platform == "darwin" and launch_agent_status(paths) != "not installed":
+                print(_REINSTALL_REMINDER)
+            return 0
+        print("Unknown action.")
+
+
+def _load_or_create_config(paths: SetupPaths):
+    from .setup_config import _load_or_create_config as load_or_create
+
+    return load_or_create(paths)
 
 
 def _full_setup(paths: SetupPaths) -> int:
@@ -84,9 +214,7 @@ def _full_setup(paths: SetupPaths) -> int:
     _configure_email_options(paths)
     _configure_schedule(paths)
     _configure_github_actions(paths)
-    _render_and_offer_commit(paths)
-    plist = generate_plist(paths)
-    print(f"Generated {plist.relative_to(paths.root)}")
+    _regenerate_scheduled_artifacts(paths)
     code = _verify_setup(paths)
     if code != 0:
         print("Verify failed; fix auth or options before scheduling.")
@@ -141,9 +269,8 @@ _REINSTALL_REMINDER = (
 def _schedule_only(paths: SetupPaths) -> int:
     """Configure the schedule and regenerate the LaunchAgent plist."""
     _configure_schedule(paths)
-    plist = generate_plist(paths)
-    print(f"Generated {plist.relative_to(paths.root)}")
-    if sys.platform == "darwin" and launch_agent_status() == "installed":
+    _regenerate_scheduled_artifacts(paths)
+    if sys.platform == "darwin" and launch_agent_status(paths) != "not installed":
         print(_REINSTALL_REMINDER)
     return 0
 
@@ -247,6 +374,15 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
         _verify_setup,
     ),
     (
+        "m",
+        "Manage report profiles",
+        (
+            "Add, edit, or delete named report profiles with separate schedules, "
+            "recipients, and GitHub Actions settings."
+        ),
+        _manage_profiles,
+    ),
+    (
         "0",
         "Show status",
         (
@@ -271,6 +407,13 @@ def _print_menu() -> None:
     print("  q) Quit")
 
 
+def _print_status(paths: SetupPaths) -> int:
+    for line in status_lines(paths):
+        print(line)
+    print(f"LaunchAgent: {launch_agent_status(paths)}")
+    return 0
+
+
 def _interactive_menu(paths: SetupPaths) -> int:
     _print_menu()
     choice = input("\nChoose an option [1]: ").strip().lower() or "1"
@@ -281,13 +424,6 @@ def _interactive_menu(paths: SetupPaths) -> int:
             return int(handler(paths) or 0)
     print("Unknown option.")
     return 1
-
-
-def _print_status(paths: SetupPaths) -> int:
-    for line in status_lines(paths):
-        print(line)
-    print(f"LaunchAgent: {launch_agent_status()}")
-    return 0
 
 
 def run_setup(argv: Sequence[str] | None = None) -> int:
@@ -302,7 +438,8 @@ def run_setup(argv: Sequence[str] | None = None) -> int:
 
     if args.print_args:
         config = load_config(paths.config_file)
-        for item in email_report_args(config):
+        profile_name = args.profile or DEFAULT_PROFILE_NAME
+        for item in email_report_args(config, profile_name):
             print(item)
         return 0
 
@@ -311,7 +448,7 @@ def run_setup(argv: Sequence[str] | None = None) -> int:
         return 0 if is_minimally_configured(paths) else 1
 
     if args.verify:
-        return _verify_setup(paths)
+        return _verify_setup(paths, args.profile)
 
     if args.non_interactive:
         print("Error: --non-interactive requires --status or --verify.")

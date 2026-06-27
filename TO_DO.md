@@ -12,9 +12,10 @@
 
 ## Code Health
 
+- [ ] Refactor `src/github_usage/setup_config.py` (507 lines, over the 500-line limit per `scripts/check-sizes`). Extract a focused submodule — e.g. profile schema/loading (`load_report_profiles`, `find_profile`, `ensure_profiles`, `_default_profile`) and/or the TOML writer helpers (`_emit_*_block`, `write_config`) — to bring the file back under the threshold. Also watch `setup_wizard.py` (461 lines) and the `_manage_profiles()`/`_run_email_report()` functions, which are approaching their limits.
+
 ## Configuration & Setup
 
-- [ ] Add support for configuring multiple reports with different run frequencies, targets, and options. **[Plan](docs/superpowers/plans/2026-06-27-multi-report-config.md)**
 - [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules).
 - [ ] Write Windows-compatible PowerShell versions of all scripts (setup, check, smoke, docs-check, etc.).
 - [ ] Create a `start.ps1` PowerShell entrypoint script for Windows.

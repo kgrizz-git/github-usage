@@ -2,6 +2,7 @@
 
 ## Repository Expectations
 
+- **NEVER MAKE FILE EDITS the user did not explicitly ask for.** Do not preemptively fix circular imports or modify unrelated files unless explicitly requested.
 - Active package code lives in `src/github_usage/`.
 - `backups/` holds only transient pre-modification backups (`*.bak`), pruned by `scripts/prune-backups`; it is not active implementation.
 - Use `scripts/check` as the default verification command before claiming a code change is complete.

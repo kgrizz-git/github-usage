@@ -19,6 +19,7 @@ from .cli_email_report import (
 )
 from .cli_parsers import _email_parser, _legacy_parser
 from .legacy_report import main as legacy_main
+from .setup_config import SetupPaths, email_report_args, load_config, repo_root
 
 HELP = """GitHub Monthly Usage Report
 
@@ -159,10 +160,49 @@ def _validate_email_flags(args: argparse.Namespace) -> int | None:
     return None
 
 
+def _expand_profile_argv(argv: Sequence[str]) -> tuple[list[str], str | None]:
+    """Expand ``--profile NAME`` into profile CLI flags; return (argv, error)."""
+    argv_list = list(argv)
+    profile_name: str | None = None
+    stripped: list[str] = []
+    index = 0
+    while index < len(argv_list):
+        item = argv_list[index]
+        if item == "--profile":
+            if index + 1 >= len(argv_list):
+                return argv_list, "Error: --profile requires a profile name."
+            profile_name = argv_list[index + 1]
+            index += 2
+            continue
+        if item.startswith("--profile="):
+            profile_name = item.split("=", 1)[1]
+            index += 1
+            continue
+        stripped.append(item)
+        index += 1
+
+    if not profile_name:
+        return argv_list, None
+
+    config_path = SetupPaths.from_root(repo_root()).config_file
+    config = load_config(config_path)
+    try:
+        profile_flags = email_report_args(config, profile_name)
+    except KeyError:
+        return argv_list, f"Error: report profile not found: {profile_name!r}"
+
+    return [*profile_flags, *stripped], None
+
+
 def _run_email_report(argv: Sequence[str]) -> int:
+    expanded_argv, profile_error = _expand_profile_argv(argv)
+    if profile_error:
+        print(profile_error)
+        return 1
+
     parser = _email_parser()
     try:
-        args = parser.parse_args(list(argv))
+        args = parser.parse_args(list(expanded_argv))
     except SystemExit as exc:
         return _safe_exit_code(exc.code)
 
@@ -193,7 +233,12 @@ def _run_email_report(argv: Sequence[str]) -> int:
         return 1
 
     if not args.dry_run:
-        missing = _missing_env(["RESEND_API_KEY", "REPORT_EMAIL", "RESEND_FROM"])
+        recipient = (getattr(args, "to", None) or "").strip() or os.environ.get(
+            "REPORT_EMAIL", ""
+        ).strip()
+        missing = _missing_env(["RESEND_API_KEY", "RESEND_FROM"])
+        if not recipient:
+            missing.append("REPORT_EMAIL")
         if missing:
             print("Error: missing required email environment variable(s):")
             for name in missing:
@@ -227,7 +272,21 @@ def _run_email_report(argv: Sequence[str]) -> int:
         if args.dry_run:
             print(html_body if args.email_format == "html" else body, end="")
             return 0
-        _send_email(args, body, html_body, username, data.get("generated_at"))
+        recipient = (getattr(args, "to", None) or "").strip() or os.environ.get(
+            "REPORT_EMAIL", ""
+        ).strip()
+        subject = (getattr(args, "subject", None) or "").strip() or os.environ.get(
+            "REPORT_SUBJECT", ""
+        ).strip()
+        _send_email(
+            args,
+            body,
+            html_body,
+            username,
+            data.get("generated_at"),
+            subject=subject or None,
+            recipient=recipient or None,
+        )
         return 0
     except (RuntimeError, ValueError) as exc:
         print(f"Error: {exc}")

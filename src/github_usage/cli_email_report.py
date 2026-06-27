@@ -65,24 +65,30 @@ def _send_email(
     html_body: str | None,
     username: str,
     generated_at: str,
+    *,
+    subject: str | None = None,
+    recipient: str | None = None,
+    from_addr: str | None = None,
 ) -> None:
     """Build the subject and dispatch the email via email_report.send_email."""
     import os
 
-    subject = os.environ.get("REPORT_SUBJECT", "").strip() or email_report.default_subject(
-        username, generated_at
-    )
+    resolved_subject = (subject or "").strip() or os.environ.get("REPORT_SUBJECT", "").strip()
+    if not resolved_subject:
+        resolved_subject = email_report.default_subject(username, generated_at)
+    resolved_recipient = (recipient or "").strip() or os.environ.get("REPORT_EMAIL", "").strip()
+    resolved_from = (from_addr or "").strip() or os.environ.get("RESEND_FROM", "").strip()
     email_report.send_email(
         os.environ["RESEND_API_KEY"],
-        os.environ["RESEND_FROM"],
-        os.environ["REPORT_EMAIL"],
-        subject,
+        resolved_from,
+        resolved_recipient,
+        resolved_subject,
         body,
         html=html_body,
         timeout=args.timeout,
         max_retries=args.max_retries,
     )
-    print(f"Email report sent to {os.environ['REPORT_EMAIL']}.")
+    print(f"Email report sent to {resolved_recipient}.")
 
 
 def _export_report(

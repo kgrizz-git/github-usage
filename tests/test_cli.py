@@ -242,6 +242,76 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("No GitHub token found", stdout.getvalue())
 
+    def test_email_report_help_lists_profile_flags(self):
+        from github_usage import cli
+
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = cli.main(["email-report", "--help"])
+        self.assertEqual(code, 0)
+        output = stdout.getvalue()
+        self.assertIn("--profile", output)
+        self.assertIn("--to", output)
+        self.assertIn("--subject", output)
+
+    def test_email_report_to_satisfies_recipient_without_report_email_env(self):
+        from github_usage import cli
+
+        report_data = {
+            "username": "octocat",
+            "period": "current_month",
+            "generated_at": "2026-06-15T14:30:00Z",
+            "warnings": [],
+            "errors": {},
+            "actions": None,
+            "copilot": None,
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_TOKEN": "fake-token",
+                    "RESEND_API_KEY": "re_key",
+                    "RESEND_FROM": "from@example.com",
+                },
+                clear=True,
+            ),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
+            mock.patch("github_usage.report_data.build_report_data", return_value=report_data),
+            mock.patch("github_usage.cli._send_email") as send_email,
+        ):
+            api = api_cls.return_value
+            api.request.return_value = {"login": "octocat"}
+            code = cli.main(
+                [
+                    "email-report",
+                    "--to",
+                    "profile@example.com",
+                    "--skip-actions",
+                    "--yes-include-release-assets",
+                ]
+            )
+        self.assertEqual(code, 0)
+        send_email.assert_called_once()
+        self.assertEqual(send_email.call_args.kwargs.get("recipient"), "profile@example.com")
+
+    def test_email_report_unknown_profile_exits_one(self):
+        from github_usage import cli
+
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = cli.main(["email-report", "--profile", "missing", "--dry-run"])
+        self.assertEqual(code, 1)
+        self.assertIn("profile not found", stdout.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

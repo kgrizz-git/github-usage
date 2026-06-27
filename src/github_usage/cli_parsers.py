@@ -37,6 +37,13 @@ def _email_parser() -> argparse.ArgumentParser:
         prog="github-usage email-report",
         description="Send or preview a scheduled GitHub usage email report.",
     )
+    parser.add_argument(
+        "--profile",
+        default=None,
+        help="Expand options from a named report profile in config.toml",
+    )
+    parser.add_argument("--to", default=None, help="Recipient email address")
+    parser.add_argument("--subject", default=None, help="Email subject line")
     parser.add_argument("--include-consumers", action="store_true")
     parser.add_argument("--include-artifact-storage", action="store_true")
     parser.add_argument("--include-release-assets", action="store_true")

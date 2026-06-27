@@ -7,7 +7,7 @@ max repositories to scan, stored in ``.github-usage/config.toml``.
 
 from __future__ import annotations
 
-from .setup_config import SetupPaths, _load_or_create_config, write_config
+from .setup_config import SetupPaths, _load_or_create_config, find_profile, write_config
 from .setup_prompts import _prompt_int, _prompt_yes_no
 
 
@@ -21,10 +21,27 @@ def _prompt_email_format(default: str) -> str:
         print(f"  Invalid choice: {raw!r}. Enter 'text' or 'html'.")
 
 
-def _configure_email_options(paths: SetupPaths) -> None:
+def _prompt_target_fields(profile: dict) -> None:
+    """Prompt for per-profile recipient and subject."""
+    current_email = (profile.get("target_email") or "").strip()
+    raw = input(f"  Recipient email [{current_email or 'env REPORT_EMAIL'}]: ").strip()
+    profile["target_email"] = raw or current_email
+    current_subject = (profile.get("target_subject") or "").strip()
+    raw = input(f"  Email subject [{current_subject or 'auto-generated'}]: ").strip()
+    profile["target_subject"] = raw or current_subject
+
+
+def _configure_email_options(paths: SetupPaths, profile_name: str | None = None) -> None:
     config = _load_or_create_config(paths)
-    email = config["email_report"]
-    print("\nEmail report options (stored in .github-usage/config.toml):")
+    if profile_name:
+        profile = find_profile(config, profile_name)
+        email = profile["email_report"]
+        header = f"\nEmail report options for profile {profile_name!r}:"
+    else:
+        email = config["email_report"]
+        profile = config["profiles"][0] if config.get("profiles") else None
+        header = "\nEmail report options (stored in .github-usage/config.toml):"
+    print(header)
     email["include_consumers"] = _prompt_yes_no(
         "Include top repository breakdowns (consumers of Actions minutes)?",
         email["include_consumers"],
@@ -44,6 +61,23 @@ def _configure_email_options(paths: SetupPaths) -> None:
     email["skip_actions"] = _prompt_yes_no("Skip Actions section?", email["skip_actions"])
     email["skip_copilot"] = _prompt_yes_no("Skip Copilot section?", email["skip_copilot"])
     email["skip_lfs"] = _prompt_yes_no("Skip Git LFS section?", email["skip_lfs"])
-    config["email_report"] = email
+    if profile is not None and profile_name:
+        profile["email_report"] = email
+        if config.get("reports"):
+            for entry in config["reports"]:
+                if entry["name"] == profile_name:
+                    entry["email_report"] = dict(email)
+                    break
+        _prompt_target_fields(profile)
+        if config.get("reports"):
+            for entry in config["reports"]:
+                if entry["name"] == profile_name:
+                    entry["target_email"] = profile.get("target_email", "")
+                    entry["target_subject"] = profile.get("target_subject", "")
+                    break
+    elif profile is not None:
+        config["email_report"] = email
+        if config.get("profiles"):
+            config["profiles"][0]["email_report"] = email
     write_config(paths.config_file, config)
     print(f"Wrote {paths.config_file.relative_to(paths.root)}")
