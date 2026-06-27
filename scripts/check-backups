@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# check-backups — enforce the repository backup-file policy.
+#
+# `backups/` is reserved for transient pre-modification `*.bak` files. Backup
+# additions should not be committed, and non-`.bak` files should not accumulate
+# in the directory at all.
+#
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+BACKUP_DIR="backups"
+failed=0
+
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+
+staged_backups="$(git diff --cached --name-only --diff-filter=A -- "$BACKUP_DIR/*.bak" 2>/dev/null || true)"
+if [ -n "$staged_backups" ]; then
+  {
+    echo "Do not stage backups/*.bak files; they are transient pre-modification backups."
+    echo "Remove them from the index and working tree before committing:"
+    echo "$staged_backups" | sed 's/^/  /'
+  } >&2
+  failed=1
+fi
+
+if [ -d "$BACKUP_DIR" ]; then
+  non_backup_files="$(find "$BACKUP_DIR" -type f ! -name '*.bak' -print | sort)"
+  if [ -n "$non_backup_files" ]; then
+    {
+      echo "Only backups/*.bak files are allowed in backups/."
+      echo "Move or remove these non-backup files:"
+      echo "$non_backup_files" | sed 's/^/  /'
+    } >&2
+    failed=1
+  fi
+fi
+
+exit "$failed"

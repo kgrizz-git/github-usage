@@ -1,10 +1,7 @@
 import unittest
 from unittest import mock
 
-
-class FakeAPI:
-    def get_all_pages(self, path, params=None):
-        return []
+from tests._fakes import FakeAPI
 
 
 class StorageTests(unittest.TestCase):

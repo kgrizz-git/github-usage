@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Protocol
 
-from .report_helpers import fmt_price, gb_hours_to_avg_mb
+from .report_helpers import fmt_price, gb_hours_to_avg_mb, sanitize_item_amounts
 from .report_optional import (
     estimate_api_request_count,
     get_artifact_storage_details,
@@ -44,7 +44,9 @@ def _billing_summary(api: GitHubAPIClient, username: str, product: str) -> dict 
     )
     if not data:
         return None
-    items = data.get("usageItems", []) if isinstance(data, dict) else []
+    if not isinstance(data, dict):
+        return None
+    items = data.get("usageItems", [])
     summary = {
         "raw": data,
         "items": {},
@@ -54,10 +56,11 @@ def _billing_summary(api: GitHubAPIClient, username: str, product: str) -> dict 
     }
     for item in items:
         sku = item.get("sku", item.get("product", "unknown"))
-        summary["items"][sku] = item
-        summary["total_gross"] += float(item.get("grossAmount", 0.0))
-        summary["total_discount"] += float(item.get("discountAmount", 0.0))
-        summary["total_net"] += float(item.get("netAmount", 0.0))
+        sanitized = sanitize_item_amounts(item)
+        summary["items"][sku] = sanitized
+        summary["total_gross"] += float(sanitized.get("grossAmount", 0.0))
+        summary["total_discount"] += float(sanitized.get("discountAmount", 0.0))
+        summary["total_net"] += float(sanitized.get("netAmount", 0.0))
     return summary
 
 
@@ -95,16 +98,19 @@ def get_copilot_usage(api: GitHubAPIClient, username: str) -> dict:
         f"/users/{username}/settings/billing/premium_request/usage",
         {"product": "copilot"},
     )
+    if not isinstance(premium, dict):
+        premium = {}
     by_model = {}
-    for item in (premium or {}).get("usageItems", []):
+    for item in premium.get("usageItems", []):
         model = item.get("model", "Unknown")
         entry = by_model.setdefault(
             model, {"requests": 0.0, "gross": 0.0, "discount": 0.0, "net": 0.0}
         )
-        entry["requests"] += float(item.get("grossQuantity", 0.0))
-        entry["gross"] += float(item.get("grossAmount", 0.0))
-        entry["discount"] += float(item.get("discountAmount", 0.0))
-        entry["net"] += float(item.get("netAmount", 0.0))
+        sanitized = sanitize_item_amounts(item)
+        entry["requests"] += float(sanitized.get("grossQuantity", 0.0))
+        entry["gross"] += float(sanitized.get("grossAmount", 0.0))
+        entry["discount"] += float(sanitized.get("discountAmount", 0.0))
+        entry["net"] += float(sanitized.get("netAmount", 0.0))
     cost = _summary_cost(summary)
     return {
         "total_requests": sum(model["requests"] for model in by_model.values()),
@@ -210,7 +216,11 @@ def _rate_limit(api: GitHubAPIClient) -> tuple[int | None, int | None]:
         data = api.request("GET", "/rate_limit")
     except RuntimeError:
         return None, None
-    core = (data or {}).get("resources", {}).get("core", {})
+    if not isinstance(data, dict):
+        return None, None
+    core = data.get("resources", {}).get("core", {})
+    if not isinstance(core, dict):
+        core = {}
     return core.get("limit"), core.get("remaining")
 
 

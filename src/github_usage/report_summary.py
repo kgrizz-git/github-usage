@@ -29,9 +29,11 @@ def show_final_summary(
     lfs_discount = lfs_summary["total_discount"] if lfs_summary else 0
     lfs_net = lfs_summary["total_net"] if lfs_summary else 0
 
-    total_gross = actions_gross + copilot_gross + lfs_gross
-    total_discount = actions_discount + copilot_discount + lfs_discount
-    total_net = actions_net + (copilot_summary["total_net"] if copilot_summary else 0) + lfs_net
+    total_gross = (actions_gross or 0) + copilot_gross + lfs_gross
+    total_discount = (actions_discount or 0) + copilot_discount + lfs_discount
+    total_net = (
+        (actions_net or 0) + (copilot_summary["total_net"] if copilot_summary else 0) + lfs_net
+    )
 
     _print_cost_overview(total_gross, total_discount, total_net)
 
@@ -59,14 +61,14 @@ def show_final_summary(
 def _print_cost_overview(total_gross, total_discount, total_net):
     print("\n  1. COST OVERVIEW")
     print(f"  {'─' * 55}")
-    print(f"    Total Gross:     {fmt_price(total_gross):>12}")
+    print(f"    Total Gross:     {fmt_price(total_gross or 0):>12}")
 
     discount_pct = 0.0
-    if total_gross > 0:
-        discount_pct = total_discount / total_gross * 100
+    if (total_gross or 0) > 0:
+        discount_pct = (total_discount or 0) / (total_gross or 0) * 100
 
-    print(f"    Total Discount:  {fmt_price(total_discount):>12}  ({discount_pct:.1f}% off)")
-    print(f"    Total Net:       {fmt_price(total_net):>12}")
+    print(f"    Total Discount:  {fmt_price(total_discount or 0):>12}  ({discount_pct:.1f}% off)")
+    print(f"    Total Net:       {fmt_price(total_net or 0):>12}")
     print()
 
 
@@ -88,7 +90,7 @@ def _print_top_consumers(user_minutes, actions_gross, repo_data, premium_by_mode
     sorted_by_cost = sorted(repo_data, key=lambda x: x[4], reverse=True) if repo_data else []
     print("    Actions Cost (top 5 repos):")
     for full, _mins, _gb, _avg_mb, gross, _ in sorted_by_cost[:5]:
-        pct = gross / actions_gross * 100 if actions_gross > 0 else 0
+        pct = gross / actions_gross * 100 if (actions_gross or 0) > 0 else 0
         print(f"      {full:<45} {fmt_price(gross):>10}  ({pct:5.1f}%)")
     print()
 
@@ -138,17 +140,17 @@ def _print_storage_breakdown(storage_analysis):
         print(f"\n    {'REPO':<45} {'TOTAL':>10}")
         print(f"    {'-' * 45} {'-' * 10}")
         for r in sorted_by_storage[:10]:
-            print(f"      {r['name']:<45} {fmt_price(r['total_storage']):>10}")
+            print(f"      {r['name']:<45} {r['total_storage']:>10.2f} GB")
         print()
 
         top_storage = sorted_by_storage[0]
         print(
-            f"    Top storage consumer: {top_storage['name']} ({fmt_price(top_storage['total_storage'])})"
+            f"    Top storage consumer: {top_storage['name']} ({top_storage['total_storage']:.2f} GB)"
         )
         print("    Breakdown:")
         for item in top_storage.get("items", []):
             print(
-                f"      {item['type']:<20} {item['count']:>5} items  {fmt_price(item['storage'])}  ({item['size']})"
+                f"      {item['type']:<20} {item['count']:>5} items  {item['storage']:>10.2f} GB  ({item['size']})"
             )
         print()
     else:
@@ -161,11 +163,11 @@ def _print_utilization(user_minutes, user_storage_gb_hours):
 
     # Actions minutes
     free_min_limit = 2000
-    min_pct = min(100, (user_minutes / free_min_limit * 100) if user_minutes else 0)
+    min_pct = min(100, ((user_minutes or 0) / free_min_limit * 100) if (user_minutes or 0) else 0)
     bar_len = 40
     min_filled = int(min_pct / 100 * bar_len)
     print(
-        f"\n    Actions Minutes:     {user_minutes:>8.1f} / {free_min_limit} min ({min_pct:.1f}% of free tier)"
+        f"\n    Actions Minutes:     {(user_minutes or 0):>8.1f} / {free_min_limit} min ({min_pct:.1f}% of free tier)"
     )
     print(f"    {'█' * min_filled}{'░' * (bar_len - min_filled)}")
     if min_pct > 80:
@@ -228,9 +230,7 @@ def _print_impactful_findings(
         top_st = sorted_by_storage[0]
         total_gb = top_st["total_storage"]
         size_str = f"{total_gb:.2f} GB" if total_gb >= 1 else f"{total_gb * 1024:.0f} MB"
-        findings.append(
-            f"Biggest storage consumer: {top_st['name']} at {fmt_price(top_st['total_storage'])} ({size_str})"
-        )
+        findings.append(f"Biggest storage consumer: {top_st['name']} ({size_str})")
 
     if premium_by_model:
         top_model = max(premium_by_model.items(), key=lambda x: x[1]["total_requests"])
@@ -238,13 +238,13 @@ def _print_impactful_findings(
             f"Most-used Copilot model: {top_model[0]} with {top_model[1]['total_requests']:.0f} requests"
         )
 
-    if total_discount > 0 and total_gross > 0:
+    if (total_discount or 0) > 0 and (total_gross or 0) > 0:
         findings.append(
-            f"Monthly savings from discounts: {fmt_price(total_discount)} ({total_discount / total_gross * 100:.1f}% off gross)"
+            f"Monthly savings from discounts: {fmt_price(total_discount or 0)} ({(total_discount or 0) / (total_gross or 0) * 100:.1f}% off gross)"
         )
 
-    if total_net > 0 and user_minutes > 0:
-        cost_per_min = total_net / user_minutes
+    if (total_net or 0) > 0 and (user_minutes or 0) > 0:
+        cost_per_min = (total_net or 0) / (user_minutes or 0)
         findings.append(
             f"Effective cost per Actions minute: {fmt_price(cost_per_min)} (all products averaged)"
         )
@@ -262,18 +262,18 @@ def _print_recommendations(
     recs = []
 
     free_min_limit = 2000
-    min_pct = (user_minutes / free_min_limit * 100) if user_minutes else 0
+    min_pct = ((user_minutes or 0) / free_min_limit * 100) if (user_minutes or 0) else 0
     if min_pct > 80:
         recs.append(
             "Upgrade from free tier or optimize Actions workflows — you're near your minute limit."
         )
 
     sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True) if repo_data else []
-    if sorted_repos and len(sorted_repos) > 1 and user_minutes > 0:
+    if sorted_repos and len(sorted_repos) > 1 and (user_minutes or 0) > 0:
         top2_sum = sorted_repos[0][1] + sorted_repos[1][1]
-        if top2_sum / user_minutes * 100 > 70:
+        if top2_sum / (user_minutes or 0) * 100 > 70:
             recs.append(
-                f"Top 2 repos consume {top2_sum / user_minutes * 100:.0f}% of Actions — consider self-hosted runners to save."
+                f"Top 2 repos consume {top2_sum / (user_minutes or 0) * 100:.0f}% of Actions — consider self-hosted runners to save."
             )
 
     if premium_by_model:
@@ -283,7 +283,7 @@ def _print_recommendations(
                 f"Using {len(models)} Copilot models — consolidate to reduce cost complexity."
             )
 
-    if lfs_summary and lfs_summary.get("total_gross", 0) > 0:
+    if lfs_summary and (lfs_summary.get("total_gross", 0) or 0) > 0:
         recs.append("Review Git LFS usage — large binaries add up quickly at ~$1/GB.")
 
     sorted_by_storage = sorted(
@@ -297,7 +297,7 @@ def _print_recommendations(
             total_release_size = sum(a["storage"] for a in release_assets)
             if total_release_size > 0.1:  # 100MB in GB
                 recs.append(
-                    f"Release assets in {top_st['name']} use {fmt_price(total_release_size)} — consider using GitHub Pages or external storage for large binaries."
+                    f"Release assets in {top_st['name']} use {total_release_size:.2f} GB — consider using GitHub Pages or external storage for large binaries."
                 )
 
     if not recs:

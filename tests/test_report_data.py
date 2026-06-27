@@ -1,22 +1,6 @@
 import unittest
 
-
-class FakeAPI:
-    def __init__(self, responses):
-        self.responses = responses
-        self.requests = []
-
-    def request(self, method, path, params=None):
-        self.requests.append((method, path, params or {}))
-        key = (method, path, tuple(sorted((params or {}).items())))
-        value = self.responses.get(key)
-        if isinstance(value, Exception):
-            raise value
-        return value
-
-    def get_all_pages(self, path, params=None):
-        self.requests.append(("PAGES", path, params or {}))
-        return self.responses.get(("PAGES", path), [])
+from tests._fakes import FakeAPI
 
 
 class ReportDataTests(unittest.TestCase):
@@ -24,7 +8,7 @@ class ReportDataTests(unittest.TestCase):
         from github_usage.report_data import build_report_data
 
         api = FakeAPI(
-            {
+            request_responses={
                 (
                     "GET",
                     "/users/octocat/settings/billing/usage/summary",
@@ -176,3 +160,117 @@ class ReportDataTests(unittest.TestCase):
         insights = get_key_insights(report)
 
         self.assertLessEqual(len(insights), 3)
+
+    def test_get_actions_usage_handles_null_amounts(self):
+        """Source sanitization: report_data._billing_summary and get_actions_usage loop
+        both encounter null amount fields; totals stay 0.0; stored items have 0.0."""
+        from github_usage.report_data import get_actions_usage
+
+        api = FakeAPI(
+            request_responses={
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Actions"),),
+                ): {
+                    "usageItems": [
+                        {
+                            "sku": "linux",
+                            "unitType": "minutes",
+                            "grossAmount": None,
+                            "discountAmount": None,
+                            "netAmount": None,
+                            "grossQuantity": None,
+                        }
+                    ]
+                }
+            }
+        )
+
+        result = get_actions_usage(api, "octocat")
+
+        self.assertEqual(result["minutes"], 0.0)
+        self.assertEqual(result["storage_gb_hours"], 0.0)
+        # Sanitized SKU has 0.0 in the null fields
+        self.assertEqual(result["sku_breakdown"]["linux"]["grossAmount"], 0.0)
+        self.assertEqual(result["sku_breakdown"]["linux"]["grossQuantity"], 0.0)
+
+    def test_get_copilot_usage_handles_null_amounts(self):
+        """Source sanitization: both _billing_summary and inline premium loop handle nulls."""
+        from github_usage.report_data import get_copilot_usage
+
+        api = FakeAPI(
+            request_responses={
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Copilot"),),
+                ): {
+                    "usageItems": [
+                        {
+                            "sku": "copilot",
+                            "grossAmount": None,
+                            "discountAmount": None,
+                            "netAmount": None,
+                        }
+                    ]
+                },
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/premium_request/usage",
+                    (("product", "copilot"),),
+                ): {
+                    "usageItems": [
+                        {
+                            "model": "gpt-4.1",
+                            "grossQuantity": None,
+                            "grossAmount": None,
+                            "discountAmount": None,
+                            "netAmount": None,
+                        }
+                    ]
+                },
+            }
+        )
+
+        result = get_copilot_usage(api, "octocat")
+
+        # No crash; per-model totals are 0.0
+        self.assertEqual(result["by_model"]["gpt-4.1"]["requests"], 0.0)
+        self.assertEqual(result["by_model"]["gpt-4.1"]["gross"], 0.0)
+
+    def test_get_copilot_usage_handles_non_dict_premium(self):
+        """Regression: /premium_request/usage returns a list; get_copilot_usage does not raise."""
+        from github_usage.report_data import get_copilot_usage
+
+        api = FakeAPI(
+            request_responses={
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Copilot"),),
+                ): {"usageItems": []},
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/premium_request/usage",
+                    (("product", "copilot"),),
+                ): [1, 2, 3],  # list instead of dict
+            }
+        )
+
+        result = get_copilot_usage(api, "octocat")
+
+        # No crash; by_model is empty
+        self.assertEqual(result["by_model"], {})
+
+    def test_rate_limit_handles_non_dict_response(self):
+        """Regression: /rate_limit returns a list; _rate_limit returns (None, None)."""
+        from github_usage.report_data import _rate_limit
+
+        api = FakeAPI(
+            request_responses={
+                ("GET", "/rate_limit", ()): [1, 2, 3],  # list instead of dict
+            }
+        )
+
+        self.assertEqual(_rate_limit(api), (None, None))

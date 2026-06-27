@@ -7,14 +7,7 @@ from github_usage.report_optional import (
     get_release_asset_details,
     get_repo_consumers,
 )
-
-
-class _FakeAPI:
-    def __init__(self, pages):
-        self._pages = pages
-
-    def get_all_pages(self, path, params=None):
-        return self._pages.get(path, [])
+from tests._fakes import FakeAPI
 
 
 def _repo(full_name, owner_login="octocat", name="repo"):
@@ -61,8 +54,8 @@ class SafeIntSizeTests(unittest.TestCase):
 
 class GetArtifactStorageDetailsTests(unittest.TestCase):
     def test_skips_items_with_non_numeric_size(self):
-        api = _FakeAPI(
-            {
+        api = FakeAPI(
+            pages_responses={
                 "/repos/octocat/repo/actions/artifacts": [
                     {"size_in_bytes": "1024"},
                     {"size_in_bytes": "abc"},
@@ -78,8 +71,8 @@ class GetArtifactStorageDetailsTests(unittest.TestCase):
         self.assertEqual(result["top_repos"], [{"repo": "octocat/repo", "artifact_bytes": 2304}])
 
     def test_omits_repos_with_no_valid_sizes(self):
-        api = _FakeAPI(
-            {
+        api = FakeAPI(
+            pages_responses={
                 "/repos/octocat/repo/actions/artifacts": [
                     {"size_in_bytes": "abc"},
                     {"size_in_bytes": None},
@@ -90,15 +83,15 @@ class GetArtifactStorageDetailsTests(unittest.TestCase):
         self.assertEqual(result["top_repos"], [])
 
     def test_handles_empty_artifacts(self):
-        api = _FakeAPI({"/repos/octocat/repo/actions/artifacts": []})
+        api = FakeAPI(pages_responses={"/repos/octocat/repo/actions/artifacts": []})
         result = get_artifact_storage_details(api, [_repo("octocat/repo")], max_repos=10)
         self.assertEqual(result["top_repos"], [])
 
 
 class GetReleaseAssetDetailsTests(unittest.TestCase):
     def test_skips_assets_with_non_numeric_size(self):
-        api = _FakeAPI(
-            {
+        api = FakeAPI(
+            pages_responses={
                 "/repos/octocat/repo/releases": [
                     {
                         "assets": [
@@ -120,8 +113,8 @@ class GetReleaseAssetDetailsTests(unittest.TestCase):
         )
 
     def test_omits_repos_with_no_valid_asset_sizes(self):
-        api = _FakeAPI(
-            {
+        api = FakeAPI(
+            pages_responses={
                 "/repos/octocat/repo/releases": [
                     {"assets": [{"size": "bad"}, {"size": None}]},
                 ]
@@ -192,6 +185,23 @@ class GetRepoConsumersTests(unittest.TestCase):
             result = get_repo_consumers(mock.Mock(), repos, limit=2, max_repos=2)
         self.assertTrue(result["truncated"])
         self.assertEqual(result["scanned_repo_count"], 2)
+
+    def test_get_repo_consumers_handles_null_gross(self):
+        """Source sanitization: per-repo SKU with null grossAmount is sanitized upstream;
+        the sum over the clean items stays 0.0."""
+        from github_usage.report_optional import get_repo_consumers
+
+        # get_actions_per_repo already sanitizes, so by the time the items
+        # reach get_repo_consumers they have 0.0 in null fields. The test
+        # confirms the consumer works correctly when items are passed through.
+        repo = _repo("octocat/zero-gross", name="zero-gross")
+        with mock.patch(
+            "github_usage.report_optional.get_actions_per_repo",
+            return_value=(0.0, 0.0, {"sku": {"grossAmount": 0.0}}),
+        ):
+            result = get_repo_consumers(mock.Mock(), [repo], limit=5, max_repos=10)
+        self.assertEqual(result["by_minutes"][0]["gross"], 0.0)
+        self.assertEqual(result["errors"], {})
 
 
 if __name__ == "__main__":

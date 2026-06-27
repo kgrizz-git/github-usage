@@ -11,6 +11,7 @@
 # What it does NOT touch:
 #   - Non-`.bak` files in backups/ (if any are added later).
 #   - Untracked or never-committed backups (they have no history to age against).
+#   - Staged additions, which are rejected separately by scripts/check-backups.
 #
 # Inputs:  the git repository (history of backups/*.bak files).
 # Outputs: `git rm` of stale backups (staged for the current commit); a summary
@@ -51,6 +52,13 @@ while IFS= read -r f; do
   # Last commit that touched this file; empty if staged but never committed.
   last_commit="$(git log -1 --format=%H -- "$f" 2>/dev/null || true)"
   [ -n "$last_commit" ] || continue
+
+  # A same-path staged addition may still have historical commits. Leave it for
+  # check-backups to reject with a clear policy message instead of surfacing a
+  # low-level `git rm` error.
+  if git diff --cached --name-only --diff-filter=A -- "$f" | grep -qx "$f"; then
+    continue
+  fi
 
   # Keep the file if its last commit is within the recent window.
   if grep -qx "$last_commit" <<<"$recent_commits"; then

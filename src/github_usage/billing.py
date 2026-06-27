@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from .report_helpers import sanitize_item_amounts
+
 
 class BillingFetchError(RuntimeError):
     """Raised when a per-repo billing API call fails."""
+
+
+def _safe_amount(item: dict, key: str) -> float:
+    """Read a numeric amount from an item dict, treating None as 0.0."""
+    val = item.get(key)
+    return float(val) if val is not None else 0.0
 
 
 def get_billing_summary(api, username, product):
@@ -19,14 +27,17 @@ def get_billing_summary(api, username, product):
         return None
     if not billing:
         return None
+    if not isinstance(billing, dict):
+        return None
     items = billing.get("usageItems", [])
     summary = {"raw": billing, "items": {}, "total_gross": 0, "total_discount": 0, "total_net": 0}
     for item in items:
         sku = item.get("sku", item.get("product", "unknown"))
-        summary["items"][sku] = item
-        summary["total_gross"] += item.get("grossAmount", 0)
-        summary["total_discount"] += item.get("discountAmount", 0)
-        summary["total_net"] += item.get("netAmount", 0)
+        sanitized = sanitize_item_amounts(item)
+        summary["items"][sku] = sanitized
+        summary["total_gross"] += _safe_amount(sanitized, "grossAmount")
+        summary["total_discount"] += _safe_amount(sanitized, "discountAmount")
+        summary["total_net"] += _safe_amount(sanitized, "netAmount")
     return summary
 
 
@@ -45,6 +56,8 @@ def get_premium_request_usage(api, username, product="copilot", model=None):
         return None
     if not data:
         return None
+    if not isinstance(data, dict):
+        return None
     items = data.get("usageItems", [])
     by_model = {}
     for item in items:
@@ -57,11 +70,12 @@ def get_premium_request_usage(api, username, product="copilot", model=None):
                 "total_discount": 0,
                 "total_net": 0,
             }
-        by_model[m]["items"].append(item)
-        by_model[m]["total_requests"] += item.get("grossQuantity", 0)
-        by_model[m]["total_gross"] += item.get("grossAmount", 0)
-        by_model[m]["total_discount"] += item.get("discountAmount", 0)
-        by_model[m]["total_net"] += item.get("netAmount", 0)
+        sanitized = sanitize_item_amounts(item)
+        by_model[m]["items"].append(sanitized)
+        by_model[m]["total_requests"] += _safe_amount(sanitized, "grossQuantity")
+        by_model[m]["total_gross"] += _safe_amount(sanitized, "grossAmount")
+        by_model[m]["total_discount"] += _safe_amount(sanitized, "discountAmount")
+        by_model[m]["total_net"] += _safe_amount(sanitized, "netAmount")
     return by_model
 
 
@@ -72,6 +86,8 @@ def get_full_billing(api, username):
     except RuntimeError:
         return None
     if not data:
+        return None
+    if not isinstance(data, dict):
         return None
     return data.get("usageItems", [])
 
@@ -86,7 +102,7 @@ def get_user_actions_billing(api, username):
     sku_breakdown = {}
     for sku, item in summary["items"].items():
         unit = item.get("unitType", "")
-        qty = item.get("grossQuantity", 0)
+        qty = _safe_amount(item, "grossQuantity")
         if unit == "minutes":
             total_minutes += qty
         elif unit == "gigabyte-hours":
@@ -107,18 +123,21 @@ def get_actions_per_repo(api, owner, repo):
         raise BillingFetchError(f"{owner}/{repo}: {e}") from e
     if not billing:
         return 0.0, 0.0, {}
+    if not isinstance(billing, dict):
+        return 0.0, 0.0, {}
     total_minutes = 0.0
     total_storage_gb_hours = 0.0
     sku_breakdown = {}
     for item in billing.get("usageItems", []):
         sku = item.get("sku", "unknown")
-        unit = item.get("unitType", "")
-        qty = item.get("grossQuantity", 0)
+        sanitized = sanitize_item_amounts(item)
+        unit = sanitized.get("unitType", "")
+        qty = _safe_amount(sanitized, "grossQuantity")
         if unit == "minutes":
             total_minutes += qty
         elif unit == "gigabyte-hours":
             total_storage_gb_hours += qty
-        sku_breakdown[sku] = item
+        sku_breakdown[sku] = sanitized
     return total_minutes, total_storage_gb_hours, sku_breakdown
 
 
@@ -131,6 +150,8 @@ def get_actions_from_runs(api, owner, repo):
         f"/repos/{owner}/{repo}/actions/runs",
         {"created": created_range, "per_page": 100},
     )
+    if not runs:
+        runs = []
     total_minutes = 0.0
     workflow_minutes = {}
     os_millis = {"UBUNTU": 0, "WINDOWS": 0, "MACOS": 0}
@@ -138,7 +159,7 @@ def get_actions_from_runs(api, owner, repo):
         billable = run.get("billable") or {}
         run_minutes = 0.0
         for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
-            millis = billable.get(os_name, {}).get("millis", 0)
+            millis = (billable.get(os_name) or {}).get("millis", 0)
             os_millis[os_name] += millis
             run_minutes += millis / 60000
         total_minutes += run_minutes

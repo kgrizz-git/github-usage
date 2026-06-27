@@ -6,10 +6,6 @@
 
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
 
-## Test Coverage Gaps
-
-- [ ] Add unit tests for remaining uncovered code: `report_account.py` (deeper coverage), `report_summary.py` (remaining helpers), `billing.get_actions_from_runs`, and `billing.get_full_billing`. (Other previously listed modules — `report_optional.*`, `report_data.get_key_insights`, `auth.check_user_scope` — now have coverage.) **[Plan](docs/superpowers/plans/2026-06-27-unit-tests-coverage.md)**
-
 ## Code Health
 
 - [ ] Refactor `src/github_usage/setup_config.py` (507 lines, over the 500-line limit per `scripts/check-sizes`). Extract a focused submodule — e.g. profile schema/loading (`load_report_profiles`, `find_profile`, `ensure_profiles`, `_default_profile`) and/or the TOML writer helpers (`_emit_*_block`, `write_config`) — to bring the file back under the threshold. Also watch `setup_wizard.py` (461 lines) and the `_manage_profiles()`/`_run_email_report()` functions, which are approaching their limits.

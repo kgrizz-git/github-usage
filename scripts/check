@@ -25,4 +25,7 @@ grep -q "No GitHub token found" /tmp/github-usage-smoke.out
 echo "==> Size check"
 scripts/python scripts/check-sizes
 
+echo "==> Backup policy"
+scripts/check-backups
+
 echo "check passed"

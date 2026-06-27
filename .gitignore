@@ -43,3 +43,6 @@ junit/
 .idea/
 .vscode/
 tmp/
+
+# Transient pre-modification backups
+backups/*.bak

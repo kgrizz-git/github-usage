@@ -11,7 +11,11 @@ def show_rate_limits(api):
     """Print a breakdown of GitHub API rate limits for the authenticated token."""
     print_sep("API Rate Limit")
     data = api.request("GET", "/rate_limit")
+    if not isinstance(data, dict):
+        data = {}
     resources = data.get("resources", {})
+    if not isinstance(resources, dict):
+        resources = {}
 
     # Standard limits
     print()
@@ -22,8 +26,14 @@ def show_rate_limits(api):
         ("Code Scanning", "code_scanning_upload"),
     ]:
         r = resources.get(key, {})
-        rem = r.get("remaining", "?")
-        lim = r.get("limit", "?")
+        if not isinstance(r, dict):
+            r = {}
+        rem = r.get("remaining")
+        if rem is None:
+            rem = "?"
+        lim = r.get("limit")
+        if lim is None:
+            lim = "?"
         used = r.get("used", 0)
         reset_ts = r.get("reset", 0)
         reset_str = ""
@@ -37,8 +47,14 @@ def show_rate_limits(api):
     print()
     print("  Premium API tiers:")
     for name, res in resources.items():
-        limit = res.get("limit", 0)
-        used = res.get("used", 0)
+        if not isinstance(res, dict):
+            continue
+        limit = res.get("limit")
+        if limit is None:
+            limit = 0
+        used = res.get("used")
+        if used is None:
+            used = 0
         if limit > 5000:
             pct = (used / limit * 100) if limit else 0
             print(f"    {name:<35} {used:>6} / {limit:<6} ({pct:.1f}% used)")
@@ -49,9 +65,13 @@ def show_account_info(api):
     """Print account details, plan info, and collaborator seat counts."""
     print_sep("Account Info")
     user = api.request("GET", "/user")
+    if not isinstance(user, dict):
+        user = {}
     username = user.get("login", "?")
     user_type = user.get("type", "?")
     plan = user.get("plan", {})
+    if not isinstance(plan, dict):
+        plan = {}
 
     print(f"  Username:   {username}")
     print(f"  Account:    {user_type}")

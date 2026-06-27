@@ -25,6 +25,12 @@ repos:
         entry: Generated github-usage report files should not be committed.
         language: fail
         files: ^github-usage-.*\.json$
+      - id: check-backups
+        name: Check backup file policy
+        entry: scripts/check-backups
+        language: system
+        always_run: true
+        pass_filenames: false
       - id: prune-stale-backups
         name: Prune stale backups (backups/*.bak older than 5 commits)
         entry: scripts/prune-backups
