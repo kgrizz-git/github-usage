@@ -8,13 +8,13 @@
 
 ## Test Coverage Gaps
 
-- [ ] Add unit tests for remaining uncovered code: `report_account.py` (deeper coverage), `report_summary.py` (remaining helpers), `billing.get_actions_from_runs`, and `billing.get_full_billing`. (Other previously listed modules — `report_optional.*`, `report_data.get_key_insights`, `auth.check_user_scope` — now have coverage.)
+- [ ] Add unit tests for remaining uncovered code: `report_account.py` (deeper coverage), `report_summary.py` (remaining helpers), `billing.get_actions_from_runs`, and `billing.get_full_billing`. (Other previously listed modules — `report_optional.*`, `report_data.get_key_insights`, `auth.check_user_scope` — now have coverage.) **[Plan](docs/superpowers/plans/2026-06-27-unit-tests-coverage.md)**
 
 ## Code Health
 
 ## Configuration & Setup
 
-- [ ] Add support for configuring multiple reports with different run frequencies, targets, and options.
+- [ ] Add support for configuring multiple reports with different run frequencies, targets, and options. **[Plan](docs/superpowers/plans/2026-06-27-multi-report-config.md)**
 - [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules).
 - [ ] Write Windows-compatible PowerShell versions of all scripts (setup, check, smoke, docs-check, etc.).
 - [ ] Create a `start.ps1` PowerShell entrypoint script for Windows.
