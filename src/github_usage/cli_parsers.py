@@ -36,7 +36,16 @@ def _runs_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the ``runs`` subcommand."""
     parser = argparse.ArgumentParser(
         prog="github-usage runs",
-        description="View all currently configured scheduled runs (launchd and GitHub Actions).",
+        description=(
+            "View all currently configured scheduled runs (launchd and GitHub "
+            "Actions). Reflects local state: reads every config.toml profile "
+            "and any email-report*.yml files in .github/workflows/, so it "
+            "shows only what is on disk in this checkout. --api only "
+            "enriches the local rows with each workflow's latest run; it "
+            "does not enumerate workflows that exist on GitHub but not "
+            "locally. The view matches what is configured on GitHub only "
+            "when local files reflect the pushed repo."
+        ),
     )
     parser.add_argument(
         "--profile",

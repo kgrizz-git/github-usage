@@ -174,7 +174,10 @@ Release assets are optional inventory, not a billing/quota report. The CLI asks 
 
 `github-usage runs` prints a consolidated, read-only summary of every currently
 configured scheduled run — both local launchd schedules and GitHub Actions
-workflow cron expressions — without needing an interactive terminal:
+workflow cron expressions — without needing an interactive terminal. The
+listing reflects local state: it reads every `config.toml` profile plus any
+`email-report*.yml` files present in `.github/workflows/`, so it shows only
+what is on disk in this checkout:
 
 ```sh
 github-usage runs
@@ -207,6 +210,12 @@ github-usage runs \
 `--api` requires a GitHub token (resolved from `GITHUB_TOKEN`, the `gh` CLI, or
 the GitHub CLI config) and annotates each GitHub Actions row with the latest
 run's timestamp and conclusion. The offline view never makes network requests.
+With or without `--api`, the listing reflects local state only — `--api`
+enriches the local rows with each workflow's latest run but does not enumerate
+workflows that exist on GitHub but not in this checkout. The view matches what
+is configured on GitHub only when every local `email-report*.yml` and
+`config.toml` profile has been pushed and no workflows have been added through
+the GitHub UI without being checked out locally.
 
 ## Exporting Reports
 
