@@ -27,12 +27,18 @@ Usage:
   github-usage [GITHUB_TOKEN] [options]
   github-usage email-report [options]
   github-usage setup [options]
+  github-usage runs [options]
 
 Setup:
   ./start.sh setup            Guided setup for secrets, options, launchd, CI, hooks
   github-usage setup --status Show configured paths without printing secrets
   github-usage setup --verify Run email-report --dry-run using local config
   github-usage setup --print-args Print email-report CLI args from config.toml
+
+Runs:
+  github-usage runs           View all currently configured scheduled runs
+  github-usage runs --json    Output the configured runs as structured JSON
+  github-usage runs --api     Also query the GitHub API for latest workflow runs
 
 Legacy report options:
   --export FORMAT         Export format: csv | xlsx | pdf | json | text | none
@@ -383,6 +389,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             from .setup_wizard import run_setup
 
             return run_setup(args[1:])
+
+        if args and args[0] == "runs":
+            from .cli_runs import main as runs_main
+
+            return runs_main(args[1:])
 
         return _run_legacy_report(args)
     except SystemExit as exc:

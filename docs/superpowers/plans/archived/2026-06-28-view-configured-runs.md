@@ -1,6 +1,16 @@
-> **Status:** IN PROGRESS — reviewed and corrected 2026-06-28; ready for implementation.
+> **Status:** COMPLETE
 
 **Date:** 2026-06-28
+
+> **Done (2026-06-28):** Implemented all four phases. Added `cli_runs.py` (`list_local_runs`,
+> `extract_first_cron_from_workflow`, `_resolve_owner_repo`, `_enrich_with_api`, `RunsApiError`,
+> `_print_runs`, `main`), `_runs_parser()` in `cli_parsers.py`, routing + HELP in `cli.py`, and a
+> `runs)` case in `start.sh`. Added 32 tests in `tests/test_cli_runs.py`; extended `scripts/smoke`;
+> documented in `README.md`; added a CHANGELOG `Added` entry; removed the `TO_DO.md` item.
+> `scripts/check`, `scripts/smoke`, and `scripts/docs-check` all pass.
+> **Deviation:** each row carries an extra `workflow_file` field (repo-relative path) so
+> `_enrich_with_api` can match the GitHub API's workflow `path` without re-deriving paths; this keeps
+> the documented `_enrich_with_api(rows, args)` signature unchanged and is reflected in JSON output.
 
 > **Review note (2026-06-28, second pass):** Verified all referenced functions/signatures against the
 > codebase (`SetupPaths.from_root`, `load_config`, `find_profile`, `repo_root`, `launch_agent_dest`,

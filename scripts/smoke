@@ -14,10 +14,16 @@ PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--subject"
 PYTHONPATH=src scripts/python -m github_usage setup --print-args --profile default 2>/dev/null | grep -q -- "--max-repos"
 
+PYTHONPATH=src scripts/python -m github_usage runs --help | grep -q -- "--profile"
+PYTHONPATH=src scripts/python -m github_usage runs --help | grep -q -- "--api"
+PYTHONPATH=src scripts/python -m github_usage runs --json | grep -q '"source"'
+
 ./start.sh --help >/dev/null
+./start.sh --help | grep -q "runs"
 ./start.sh report --help >/dev/null
 ./start.sh email-report --help >/dev/null
 ./start.sh setup --help >/dev/null
+./start.sh runs --json >/dev/null
 ./start.sh --version | grep -q "github-usage"
 
 # Bare-token & routing smoke tests

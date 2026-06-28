@@ -32,6 +32,40 @@ def _legacy_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _runs_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for the ``runs`` subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="github-usage runs",
+        description="View all currently configured scheduled runs (launchd and GitHub Actions).",
+    )
+    parser.add_argument(
+        "--profile",
+        default=None,
+        help="Show only the named profile's runs",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output structured JSON instead of human-readable text",
+    )
+    parser.add_argument(
+        "--api",
+        action="store_true",
+        help="Also query GitHub API for active workflows and latest runs",
+    )
+    parser.add_argument(
+        "--owner",
+        default=None,
+        help="GitHub owner override for --api queries (default: parsed from local git remote)",
+    )
+    parser.add_argument(
+        "--repo",
+        default=None,
+        help="GitHub repository name override for --api queries (default: parsed from local git remote)",
+    )
+    return parser
+
+
 def _email_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="github-usage email-report",

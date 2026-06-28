@@ -170,6 +170,44 @@ github-usage email-report \
 
 Release assets are optional inventory, not a billing/quota report. The CLI asks for confirmation in interactive terminals, and CI must pass `--yes-include-release-assets`.
 
+## Viewing Configured Runs
+
+`github-usage runs` prints a consolidated, read-only summary of every currently
+configured scheduled run — both local launchd schedules and GitHub Actions
+workflow cron expressions — without needing an interactive terminal:
+
+```sh
+github-usage runs
+# or: ./start.sh runs
+```
+
+Each row shows the profile, the source (`launchd` or `github_actions`), the
+schedule (launchd times are local; GitHub Actions cron is UTC), and an
+activity state:
+
+- `active` — launchd plist installed in `~/Library/LaunchAgents/`, or the
+  workflow file present in `.github/workflows/`.
+- `inactive` — configured but the plist/workflow file is not present.
+- `unsupported` — launchd schedules on a non-macOS host.
+
+On-disk `email-report*.yml` workflows that do not match a configured profile are
+listed as `<unconfigured>` so drifted or externally added workflows are visible.
+
+Options:
+
+```sh
+github-usage runs \
+  [--profile NAME] \   # show only one profile (skips stray-workflow detection)
+  [--json] \           # structured JSON instead of human-readable text
+  [--api] \            # also query the GitHub API for each workflow's latest run
+  [--owner OWNER] \    # owner override for --api (default: parsed from git remote)
+  [--repo REPO]        # repo override for --api (default: parsed from git remote)
+```
+
+`--api` requires a GitHub token (resolved from `GITHUB_TOKEN`, the `gh` CLI, or
+the GitHub CLI config) and annotates each GitHub Actions row with the latest
+run's timestamp and conclusion. The offline view never makes network requests.
+
 ## Exporting Reports
 
 Both the legacy and email-report commands can write the report to a file in

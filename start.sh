@@ -17,6 +17,7 @@ Commands:
   setup         Configure local secrets, options, launchd, CI, and hooks.
   report        Run a legacy one-off usage report.
   email-report  Run and send an email report.
+  runs          View all currently configured scheduled runs.
 
 Global Options:
   -h, --help    Show this help message.
@@ -89,6 +90,10 @@ EOF
   email-report)
     shift
     exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage email-report "$@"
+    ;;
+  runs)
+    shift
+    exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage runs "$@"
     ;;
   *)
     echo "Error: Unknown command '$COMMAND'" >&2
