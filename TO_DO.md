@@ -12,7 +12,8 @@
 
 ## Configuration & Setup
 
-- [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules).
+- [ ] Make `start.sh` present users with an interactive options menu instead of requiring CLI flags.
+- [ ] Add support for viewing currently configured runs in the GitHub config (e.g., GitHub Actions schedules). **[Plan](docs/superpowers/plans/2026-06-28-view-configured-runs.md)**
 - [ ] Write Windows-compatible PowerShell versions of all scripts (setup, check, smoke, docs-check, etc.).
 - [ ] Create a `start.ps1` PowerShell entrypoint script for Windows.
 
