@@ -66,13 +66,17 @@ def _run_git(
 ) -> subprocess.CompletedProcess:
     """Run a git command and return the CompletedProcess.
 
-    Always uses ``check=False`` so callers handle non-zero exits via
-    ``returncode``. Raises ``FileNotFoundError`` (no git binary) or
-    ``subprocess.SubprocessError`` (timeout) which the caller is expected to
-    catch.
+    Resolves ``git`` to an absolute executable path first so subprocesses do not
+    depend on ``PATH`` lookup semantics. Always uses ``check=False`` so callers
+    handle non-zero exits via ``returncode``. Raises ``FileNotFoundError`` (no
+    git binary) or ``subprocess.SubprocessError`` (timeout) which the caller is
+    expected to catch.
     """
-    return subprocess.run(  # nosec B404
-        ["git", *args],
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        raise FileNotFoundError("git not found")
+    return subprocess.run(  # nosec B404,B603
+        [git_executable, *args],
         cwd=cwd,
         capture_output=True,
         text=True,
