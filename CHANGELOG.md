@@ -26,7 +26,33 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Added
 
-- **`github-usage runs` subcommand** ([plan](docs/superpowers/plans/archived/2026-06-28-view-configured-runs.md)): a read-only, non-interactive view of all currently configured scheduled runs — launchd schedules and GitHub Actions workflow cron expressions — across every `config.toml` profile. Reports an `active`/`inactive`/`unsupported` state per row, surfaces on-disk `email-report*.yml` workflows that don't match a configured profile as `<unconfigured>`, and supports `--profile`, `--json`, and an optional `--api` flag (with `--owner`/`--repo` overrides) that annotates each workflow with its latest GitHub Actions run timestamp and conclusion. Routed through both `cli.py` and `start.sh`. Each row also carries a `workflow_file` field (repo-relative path) in JSON output to support API matching — a minor addition beyond the original plan schema.
+- **`github-usage runs` subcommand** ([plan](docs/superpowers/plans/archived/2026-06-28-view-configured-runs.md)):
+  a read-only, non-interactive view of all currently configured scheduled runs —
+  launchd schedules and GitHub Actions workflow cron expressions — across every
+  `config.toml` profile. Reports an `active`/`inactive`/`unsupported` state per
+  row, surfaces on-disk `email-report*.yml` workflows that don't match a
+  configured profile as `<unconfigured>`, and supports `--profile`, `--json`,
+  and an optional `--api` flag (with `--owner`/`--repo` overrides) that annotates
+  each workflow with its latest GitHub Actions run timestamp and conclusion.
+  Routed through both `cli.py` and `start.sh`. Each row also carries a
+  `workflow_file` field (repo-relative path) in JSON output to support API
+  matching — a minor addition beyond the original plan schema.
+- **`github-usage runs --diff` subcommand** ([plan](docs/superpowers/plans/2026-06-28-runs-diff-flag.md)):
+  a per-file drift report comparing the local state of `.github/workflows/email-report*.yml`
+  against the configured remote's default branch. Reports one of nine categories
+  per file (`in-sync`, `uncommitted`, `staged`, `untracked`, `ahead`, `behind`,
+  `remote-only`, `diverged`, `unknown`) with a human-readable summary. Mutually
+  exclusive with `--api` (argparse-enforced) and `--owner`/`--repo` (runtime
+  check). Supports `--profile NAME` to scope to a single profile, `--no-fetch`
+  (or `GITHUB_USAGE_SKIP_FETCH=1`) to skip the `git fetch` step, and `--json` for
+  a structured output. Uses dynamic remote resolution (`git config
+  branch.<current>.remote` with `origin` fallback), default-branch resolution
+  with `main`/`master` fallback (each verified via `git rev-parse --verify`),
+  per-file blob-hash comparison via `git ls-tree`, and three-dot `git diff` for
+  direction. Runs a single batched `git status` call regardless of file count.
+  No token, no API. Implemented in a new `cli_runs_diff.py` module; routed
+  through `cli_runs.py:main()` as an early-return branch and surfaced in
+  `start.sh` as a `runs-diff` shortcut.
 - **Multi-report profiles:** Configure named report profiles in `config.toml` (`[[reports]]`) with per-profile schedules, recipients, subjects, section toggles, and GitHub Actions cron settings. The CLI accepts `--profile`, `--to`, and `--subject`; `setup --print-args --profile NAME` expands a profile's flags; launchd installs one plist per profile; GitHub Actions renders one workflow per profile with options baked at render time (no runtime `config.toml` read in CI). Setup wizard adds **Manage report profiles** (`m`). Legacy single-profile configs round-trip unchanged.
 - **`start.sh` entrypoint script:** Root-level unified CLI for setup, one-off legacy reports, and email-report runs.
 - **`scripts/prune-backups` + pre-commit hook:** prunes tracked `backups/*.bak` files whose last commit is older than the most recent 5 commits (non-`.bak` files and untracked/new backups are preserved). Supports `PRUNE_BACKUPS_DRYRUN=1` and `PRUNE_BACKUPS_KEEP=N`.

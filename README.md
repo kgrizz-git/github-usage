@@ -217,6 +217,55 @@ is configured on GitHub only when every local `email-report*.yml` and
 `config.toml` profile has been pushed and no workflows have been added through
 the GitHub UI without being checked out locally.
 
+## Checking for Drift
+
+`github-usage runs --diff` answers a different question than `--api`:
+"is what I have locally what GitHub has?" It compares each
+`.github/workflows/email-report*.yml` against the configured remote's default
+branch and reports per-file drift — no GitHub token required.
+
+```sh
+github-usage runs --diff
+# or: ./start.sh runs-diff
+```
+
+Each row reports one of nine categories with a summary:
+
+- `in-sync` — local and remote blob hashes match.
+- `uncommitted` — local has working-tree changes vs. HEAD.
+- `staged` — local has staged index changes vs. HEAD.
+- `untracked` — file on disk but not in the git index.
+- `ahead` — local has changes not on the remote (or the file was
+  added/deleted locally and not pushed).
+- `behind` — remote has changes the local working tree lacks.
+- `remote-only` — file is on the remote but wholly missing locally.
+- `diverged` — local and remote have both moved past the merge base.
+- `unknown` — a required piece of state could not be determined.
+
+The remote name is read from `git config branch.<current>.remote` (with
+`origin` as a fallback) and the default branch is resolved as
+`git symbolic-ref refs/remotes/<remote>/HEAD`, falling back to `main` then
+`master`. The view reflects local state plus what the local git refs
+report for the remote — `.github-usage/config.toml` is intentionally not
+in scope (it is created by the setup wizard and is not pushed).
+
+Options:
+
+```sh
+github-usage runs --diff \
+  [--profile NAME] \     # scope to one profile's workflow file only
+  [--json] \             # structured JSON instead of human-readable text
+  [--no-fetch] \         # skip `git fetch <remote>`; equivalent to GITHUB_USAGE_SKIP_FETCH=1
+  [--owner OWNER] \      # (rejected with --diff; only applies to --api)
+  [--repo REPO]          # (rejected with --diff; only applies to --api)
+```
+
+`--diff` and `--api` are mutually exclusive at parse time. A failed
+`git fetch` falls back to the cached `<remote>/<default-branch>` ref and
+emits a `warning: fetch of <remote> failed; falling back to cached
+refs (...)` line to stderr; rows only degrade to `unknown` when no cached
+ref is available.
+
 ## Exporting Reports
 
 Both the legacy and email-report commands can write the report to a file in

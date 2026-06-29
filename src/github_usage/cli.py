@@ -39,6 +39,8 @@ Runs:
   github-usage runs           View all currently configured scheduled runs
   github-usage runs --json    Output the configured runs as structured JSON
   github-usage runs --api     Also query the GitHub API for latest workflow runs
+  github-usage runs --diff    Check for drift between local workflows and the remote default branch
+                              (mutually exclusive with --api; --no-fetch skips the git fetch)
 
 Legacy report options:
   --export FORMAT         Export format: csv | xlsx | pdf | json | text | none

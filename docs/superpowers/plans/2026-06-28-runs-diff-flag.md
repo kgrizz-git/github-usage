@@ -157,12 +157,9 @@ adds another 150-200). Functions:
   default_branch: str | None,
   *, candidate_path: Path | None = None) -> list[dict]` — produces
   the per-file row list. Takes an optional pre-resolved
-  `candidate_path` (set by `main()` for `--profile` mode; see Phase
-  3) which restricts scope to a single path. (Named
-  `candidate_path` rather than `workflow_path` to avoid shadowing
-  the `setup_workflow.workflow_path()` function used to resolve
-  profile paths.) The function does not validate the profile —
-  that is `main()`'s job. Algorithm:
+  `candidate_path` which restricts scope to a single path. The
+  function does not validate the profile — that is `main()`'s job.
+  Algorithm:
   1. Enumerate candidate paths. If `candidate_path` is set, the
      candidate set is exactly that single path (normalized). If
      it is `None`, enumerate both local and remote:
@@ -187,24 +184,34 @@ adds another 150-200). Functions:
        on the relative case.
      - Union the two path sets, preserving order (remote-first,
        then local-only).
-  2. For each candidate path `P`:
-     a. Run `git status --porcelain=v1 -- P` (single-path mode,
-        always pinned to v1; the v2 format enabled by
-        `git config status.porcelainFormat=2` is not supported)
-        with `cwd=repo_root`. Parse the X (index) and Y
-        (working-tree) columns of the resulting line. Precedence
-        (with explicit summary strings): rename (`R*`), copy
-        (`C*`), and unmerged (`U*`) states are handled by the
-        generic rules below (Y non-space → `uncommitted`, X
-        non-space & Y space → `staged`) without special-casing:
-        - First two chars are `??` → row is `untracked`, summary
-          `untracked file`.
-        - Y is non-space (e.g. ` M`, `MM`, `AM`, `MD`, ` D`) →
-          row is `uncommitted`, summary
-          `uncommitted changes in working tree`.
-        - X is non-space and Y is space (e.g. `M `, `A `, `D `)
-          → row is `staged`, summary `staged changes in index`.
-        - Empty → continue to step 2c.
+   2. **Batched `git status` pre-pass:** before iterating candidate
+      paths, run `git status --porcelain=v1 -- .github/workflows/`
+      (always pinned to v1; the v2 format enabled by
+      `git config status.porcelainFormat=2` is not supported) once
+      with `cwd=repo_root` and the module-level env (see step 3).
+      Parse the output into a dict mapping `repo-relative path →
+      status line`. The lookup is case-sensitive and tolerates
+      missing entries (a clean tracked file does not appear in
+      `git status` output; treat as "no status change", which
+      proceeds to step 2b). Batching replaces the earlier
+      per-path-`P` approach and keeps the total subprocess call
+      count constant regardless of how many workflow files exist.
+      For each candidate path `P`:
+      a. Look up `P` in the status dict. If present, parse the X
+         (index) and Y (working-tree) columns of the line.
+         Precedence (with explicit summary strings): rename
+         (`R*`), copy (`C*`), and unmerged (`U*`) states are
+         handled by the generic rules below (Y non-space →
+         `uncommitted`, X non-space & Y space → `staged`)
+         without special-casing:
+         - First two chars are `??` → row is `untracked`, summary
+           `untracked file`.
+         - Y is non-space (e.g. ` M`, `MM`, `AM`, `MD`, ` D`) →
+           row is `uncommitted`, summary
+           `uncommitted changes in working tree`.
+         - X is non-space and Y is space (e.g. `M `, `A `, `D `)
+           → row is `staged`, summary `staged changes in index`.
+         - Empty → continue to step 2b.
      b. Compute per-file blob hashes:
         - `local_blob` = sha from
           `git ls-tree HEAD -- P` (or `None` if file absent at HEAD).
@@ -240,22 +247,29 @@ adds another 150-200). Functions:
           remote, not pulled` when `remote_blob` is `None`
           and `local_blob` is not — i.e. a remote deletion
           that has not been pulled).
-  3. Every `subprocess.run` call passes `cwd=repo_root` and
-     uses `check=False`, `capture_output=True`, `text=True`,
-     `timeout=10` (or `timeout=30` for the network-bound
-     `git fetch`). Each call is wrapped in
-     `try/except (FileNotFoundError, OSError,
-     subprocess.SubprocessError)` (covers `TimeoutExpired`
-     for timeouts and `FileNotFoundError` for missing `git`;
-     non-zero exits are handled by checking `result.returncode`
-     on the `CompletedProcess`, not by catching an exception,
-     since the calls use `check=False`); on a missing
-     `git` binary, a single stderr message is emitted
-     and affected rows degrade to `unknown`. A `git fetch`
-     timeout is treated as a fetch failure (fall back to the
-     cached ref or degrade to `unknown`). Failures on individual
-     commands (non-zero exit) degrade the row to `unknown` with
-     a descriptive note rather than aborting the whole command.
+   3. Every `subprocess.run` call passes `cwd=repo_root` and
+      uses `check=False`, `capture_output=True`, `text=True`,
+      `timeout=30` (or a higher value for the network-bound
+      `git fetch` if needed). The env is a module-level constant
+      `GIT_ENV = {**os.environ, "LC_ALL": "C"}` — `LC_ALL=C`
+      ensures stable sort order for porcelain output regardless
+      of the user's locale. Each call is wrapped in
+      `try/except (FileNotFoundError, OSError,
+      subprocess.SubprocessError)` (covers `TimeoutExpired`
+      for timeouts and `FileNotFoundError` for missing `git`;
+      non-zero exits are handled by checking `result.returncode`
+      on the `CompletedProcess`, not by catching an exception,
+      since the calls use `check=False`); on a missing
+      `git` binary, the early check in Phase 3 has already
+      failed with a clear error before this loop is reached, so
+      the `FileNotFoundError` catch is a defense-in-depth net.
+      A `git fetch` timeout is treated as a fetch failure and
+      triggers the warning
+      `warning: fetch of <remote> failed; falling back to cached refs (<remote>/<default_branch>)`
+      to stderr; classification then proceeds with the cached
+      ref. Failures on individual commands (non-zero exit)
+      degrade the row to `unknown` with a descriptive note
+      rather than aborting the whole command.
 - `DRIFT_CATEGORIES = {"in-sync", "uncommitted", "staged", "ahead",
   "behind", "remote-only", "untracked", "diverged", "unknown"}` —
   single source of truth (module-level constant in
@@ -286,6 +300,14 @@ is the right thing to diff.
   early branch** at the top of `main()`: when `args.diff` is set,
   main() runs the diff path and returns 0; it does **not** call
   `list_local_runs()`. The diff path:
+  0. **Early environment checks** (fail fast, fail clearly):
+     if `shutil.which("git") is None`, print
+     `Error: git is required for --diff but was not found on PATH.`
+     to stderr and return `1`. If `not (repo_root() / ".git").exists()`,
+     print `Error: --diff must be run from within a git repository.`
+     to stderr and return `1`. These are quick sanity checks
+     before any subprocess work, so the user gets a clear error
+     instead of a wall of `unknown` rows.
   1. **Constraint checks** (runtime — argparse cannot enforce
      "valid only with" cleanly): if `args.diff` and
      (`args.owner is not None` or `args.repo is not None`), print
@@ -300,25 +322,24 @@ is the right thing to diff.
      KeyError)` that the existing `list_local_runs()` path uses
      (see `cli_runs.py:337-342`). If `--profile` is not set, the
      diff path does not need config and skips this step.
-  3. **Resolve `--profile`:** if set, call `find_profile(config,
+   3. **Resolve `--profile`:** if set, call `find_profile(config,
      args.profile)` (from `src/github_usage/setup_config.py`); on
      a miss, print `Error: Profile '<name>' not found in
      configuration.` and return `1` — matching regular `runs`
      behavior. If the profile is valid, check whether its workflow
      **file exists** via
-     `workflow_path(repo_root, args.profile).is_file()`. (Do not
-     rely on `"github_actions" in profile`: every profile in
-     `_default_profile` (setup_config.py:149) sets
-     `github_actions` to `DEFAULT_WORKFLOW_CONFIG`, so the key
-     check is always True even for launchd-only profiles.) If the
-     file is missing, emit a stderr notice
+     `workflow_path(repo_root, args.profile).is_file()` (not
+     `"github_actions" in profile` — every profile in
+     `_default_profile` (setup_config.py:149) has that key, even
+     for launchd-only profiles). If the file is missing, emit a
+     stderr notice
      (`notice: profile '<name>' has no GitHub Actions workflow`)
      and return an empty diff (`[]`); do **not** call
      `classify_drift`. Otherwise, resolve the path via
      `workflow_path(repo_root, args.profile)` and pass it to
      `classify_drift(..., candidate_path=<resolved>)`.
-  4. **Pre-`classify_drift` setup** (the call sequence; the
-     ordering matters — see item-1 review note):
+   4. **Pre-`classify_drift` setup** (the call sequence; the
+     ordering matters):
      ```python
      remote = resolve_remote_name(repo_root)
      fetched, using_cached_ref = fetch_remote(
@@ -337,10 +358,6 @@ is the right thing to diff.
      the resolver sees fresh refs on a first run. `fetch_remote`
      no longer takes a `default_branch` parameter (it has no need
      to; the cached-ref check lives in `resolve_default_branch`).
-     The diff module is imported with a lazy import at the top of
-     the function body to match the existing `main()` style
-     (e.g. `from .cli_parsers import _runs_parser` inside the
-     function).
   5. **Output:** dispatch to `_print_drift` or
      `json.dumps(..., indent=2)` per `args.json`. Wrap the diff
      output in a top-level object:
@@ -356,8 +373,7 @@ is the right thing to diff.
   diff view) to discriminate.
 - A diff run with no other flags does **not** also emit the regular
   `runs` rows; the two views are alternatives. The mutually exclusive
-  group in Phase 1 makes `--api + --diff` a parse-time error, so the
-  "warn to stderr and ignore" path from the prior draft is gone.
+  group in Phase 1 makes `--api + --diff` a parse-time error.
 
 ### Phase 4 — Start.sh shortcut
 
@@ -403,8 +419,9 @@ is the right thing to diff.
     and the configured remote's default branch for the tracked
     workflow YAMLs. Runs `git fetch <remote>` by default; pass
     --no-fetch (or set GITHUB_USAGE_SKIP_FETCH=1) to skip the fetch.
-    Cannot be combined with --api. With --profile NAME, scopes the
-    diff to that profile's workflow file only."
+    Cannot be combined with --api, --owner, or --repo. With
+    --profile NAME, scopes the diff to that profile's workflow
+    file only. Requires git on PATH and a git working tree."
   - `--no-fetch`: "Skip `git fetch <remote>` when using --diff. Use
     the local <remote>/<branch> ref as-is. Equivalent to setting
     `GITHUB_USAGE_SKIP_FETCH=1`."
@@ -442,8 +459,10 @@ Test categories (one test or parametrized set each):
 - **Default-branch verification:** `refs/remotes/origin/HEAD`
   missing; resolver tries `main` (missing) then `master` (verified
   via `git rev-parse --verify`) → returns `master`.
-- **Missing `git` binary:** `FileNotFoundError` on every call →
-  caught, stderr message, all rows `unknown`, exit 0.
+- **Missing `git` binary:** the early check in `main()` catches
+  this before any subprocess work, exiting 1 with a clear error.
+  The per-subprocess `try/except (FileNotFoundError, ...)` is
+  defense-in-depth.
 - **Dynamic remote resolution:** `git config
   branch.<current>.remote` returns `upstream`; `fetch_remote` runs
   `git fetch upstream`; resolver reads `refs/remotes/upstream/HEAD`.
@@ -465,6 +484,30 @@ Test categories (one test or parametrized set each):
 - **JSON shape:** top-level object with `kind`, `default_branch`,
   `remote`, `fetched`, `using_cached_ref`, `skipped_fetch`, `rows`;
   each row has `path`, `drift`, `summary`.
+- **First-run scenario (fetch-before-resolve ordering):** on a
+  fresh clone with no `refs/remotes/<remote>/main` or
+  `refs/remotes/<remote>/master`, `git fetch <remote>` is called
+  first and populates the refs; `resolve_default_branch` then
+  returns `main` (or `master`) from the fresh refs. No rows
+  degrade to `unknown` due to ordering.
+- **`--no-fetch` without `--diff` rejected:** `runs --no-fetch`
+  (no `--diff`) exits 1 with `Error: --no-fetch only applies to
+  --diff.`
+- **Config error handling:** a malformed `config.toml` produces
+  the existing user-friendly error (not a stack trace) when
+  `--diff --profile NAME` is passed. The `try/except` for
+  `tomllib.TOMLDecodeError`/`ValueError`/`KeyError` from the
+  existing path is replicated in the diff path.
+- **Missing `git` binary:** `shutil.which("git") is None` →
+  exit 1 with `Error: git is required for --diff but was not
+  found on PATH.` (no row-processing loop runs).
+- **Not a git repo:** `(repo_root / ".git").exists()` is False →
+  exit 1 with `Error: --diff must be run from within a git
+  repository.`
+- **Batched `git status`:** `git status --porcelain=v1
+  -- .github/workflows/` is called exactly once per
+  `classify_drift` invocation, regardless of the number of
+  candidate paths. Assert via `FakeGit` call log.
 - **Profile validation:** `runs --diff --profile bogus` prints
   `Error: Profile 'bogus' not found in configuration.` and exits
   1, matching regular `runs` behavior. The runner never calls
@@ -503,8 +546,8 @@ non-zero.
 
 ## Out of Scope
 
-- Interactive prompts in `start.sh` (rejected previously; the new
-  shortcut is a non-interactive alias).
+- Interactive prompts in `start.sh` (the new shortcut is a
+  non-interactive alias).
 - Comparing local workflow YAML contents to a copy fetched from the
   GitHub API. The `git diff` already catches any divergence that
   matters.
@@ -530,11 +573,10 @@ non-zero.
   cached ref. The stderr warning is the only signal — if
   `2>/dev/null` swallows it, the user won't know. Call this out in
   the README and help text.
-- **Missing `git` binary.** `subprocess.run` raises
-  `FileNotFoundError` if `git` isn't on `PATH`. The plan wraps every
-  call in `try/except (FileNotFoundError, OSError)` and degrades to
-  `unknown` with a stderr message; the README should note `git` as
-  a hard dependency for `--diff`.
+- **Missing `git` binary.** The early `shutil.which("git")` check
+  in `main()` catches this and exits 1 with a clear error before
+  any subprocess work. The per-subprocess `try/except` is
+  defense-in-depth only.
 - **Path-normalization edge cases.** Symlinks, case-insensitive
   filesystems, and trailing slashes could cause duplicate or missed
   paths in the union. The plan normalizes via
@@ -572,5 +614,3 @@ non-zero.
 - A pre-commit hook that runs `runs --diff --no-fetch` and fails the
   commit if drift is detected (i.e. forces the user to commit the
   local changes before committing).
-- Extending the path list via a `--diff-path PATH` repeatable flag,
-  for users who keep their schedule config in a non-default location.

@@ -331,7 +331,21 @@ def main(argv: Sequence[str]) -> int:
     except SystemExit as exc:
         return int(exc.code or 0)
 
-    paths = SetupPaths.from_root(repo_root())
+    # --no-fetch is only meaningful with --diff; reject it as a user error
+    # if --diff isn't set. Must run before the diff/regular split because
+    # the regular path doesn't use --no-fetch.
+    if args.no_fetch and not args.diff:
+        from . import cli_runs_diff
+
+        print(cli_runs_diff.ERR_NO_FETCH_WITHOUT_DIFF, file=__import__("sys").stderr)
+        return 1
+
+    root = repo_root()
+
+    if args.diff:
+        return _run_diff(args, root)
+
+    paths = SetupPaths.from_root(root)
     no_config = not paths.config_file.is_file()
     try:
         config = load_config(paths.config_file)
@@ -368,3 +382,121 @@ def main(argv: Sequence[str]) -> int:
     else:
         _print_runs(rows)
     return 0
+
+
+def _run_diff(args, root: Path) -> int:
+    """Run the ``--diff`` path: a per-file drift report vs. the remote default branch.
+
+    Replaces the ``list_local_runs()`` path entirely when ``--diff`` is set.
+    The output is always either a JSON object (``--json``) or a compact
+    text table; the regular ``runs`` row shape is never emitted in this
+    mode.
+    """
+    import os
+    import sys
+
+    from . import cli_runs_diff
+
+    # 0. Early environment checks: fail fast, fail clearly.
+    prereq_err = cli_runs_diff.check_prerequisites(root)
+    if prereq_err is not None:
+        print(prereq_err, file=sys.stderr)
+        return 1
+
+    # 1. Constraint checks (argparse can't enforce "valid only with").
+    if args.owner is not None or args.repo is not None:
+        print(cli_runs_diff.ERR_OWNER_REPO_WITH_DIFF, file=sys.stderr)
+        return 1
+
+    skip_fetch = args.no_fetch or os.environ.get("GITHUB_USAGE_SKIP_FETCH") == "1"
+    candidate_path, early_exit = _resolve_diff_profile(args, root, skip_fetch)
+    if early_exit is not None:
+        return early_exit
+
+    # 2. Pre-classify_drift setup. Ordering matters: fetch first so the
+    #    default-branch resolver sees fresh refs on a first run.
+    remote = cli_runs_diff.resolve_remote_name(root)
+    fetched, _using_cached_ref_from_fetch = cli_runs_diff.fetch_remote(
+        root, remote, skip_fetch=skip_fetch, env=cli_runs_diff.GIT_ENV
+    )
+    default_branch = cli_runs_diff.resolve_default_branch(root, remote)
+    using_cached_ref = (not fetched) and (default_branch is not None)
+
+    rows = cli_runs_diff.classify_drift(
+        root,
+        remote,
+        default_branch,
+        candidate_path=candidate_path,
+    )
+
+    if (not fetched) and default_branch and not skip_fetch:
+        print(
+            cli_runs_diff.FETCH_FALLBACK_WARNING_TEMPLATE.format(
+                remote=remote, default_branch=default_branch
+            ),
+            file=sys.stderr,
+        )
+
+    print(
+        cli_runs_diff.render_drift(
+            rows,
+            remote=remote,
+            default_branch=default_branch,
+            fetched=fetched,
+            using_cached_ref=using_cached_ref,
+            skipped_fetch=skip_fetch,
+            as_json=args.json,
+        )
+    )
+    return 0
+
+
+def _resolve_diff_profile(args, root: Path, skip_fetch: bool) -> tuple[Path | None, int | None]:
+    """Resolve ``--profile`` for the diff path.
+
+    Returns ``(candidate_path, None)`` for a normal profile (or no
+    profile at all). Returns ``(None, exit_code)`` for early-exit
+    conditions (unknown profile, malformed config, profile with no
+    GitHub Actions workflow file).
+    """
+    from . import cli_runs_diff
+
+    if not args.profile:
+        return None, None
+
+    paths = SetupPaths.from_root(root)
+    try:
+        config = load_config(paths.config_file)
+    except tomllib.TOMLDecodeError as exc:
+        print(f"Error: Failed to parse config.toml: {exc}")
+        return None, 1
+    except (ValueError, KeyError) as exc:
+        print(f"Error: Invalid config.toml: {exc}")
+        return None, 1
+
+    try:
+        find_profile(config, args.profile)
+    except KeyError:
+        print(cli_runs_diff.ERR_PROFILE_NOT_FOUND_TEMPLATE.format(name=args.profile))
+        return None, 1
+
+    wf = workflow_path(root, args.profile)
+    if not wf.is_file():
+        print(
+            cli_runs_diff.NO_GA_WORKFLOW_NOTICE_TEMPLATE.format(name=args.profile),
+            file=__import__("sys").stderr,
+        )
+        # Render an empty diff so the output shape is consistent.
+        print(
+            cli_runs_diff.render_drift(
+                [],
+                remote="",
+                default_branch=None,
+                fetched=False,
+                using_cached_ref=False,
+                skipped_fetch=skip_fetch,
+                as_json=args.json,
+            )
+        )
+        return None, 0
+    return wf, None

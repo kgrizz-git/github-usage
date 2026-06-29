@@ -43,8 +43,13 @@ def _runs_parser() -> argparse.ArgumentParser:
             "shows only what is on disk in this checkout. --api only "
             "enriches the local rows with each workflow's latest run; it "
             "does not enumerate workflows that exist on GitHub but not "
-            "locally. The view matches what is configured on GitHub only "
-            "when local files reflect the pushed repo."
+            "locally. --diff reports per-file drift between the local "
+            "working tree and the configured remote's default branch for "
+            "the tracked workflow YAMLs (mutually exclusive with --api, "
+            "and respecting --profile if given); --no-fetch (or "
+            "GITHUB_USAGE_SKIP_FETCH=1) skips the git fetch step. The "
+            "view matches what is configured on GitHub only when local "
+            "files reflect the pushed repo."
         ),
     )
     parser.add_argument(
@@ -57,10 +62,35 @@ def _runs_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Output structured JSON instead of human-readable text",
     )
-    parser.add_argument(
+    # --api and --diff are alternative views; enforce at parse time.
+    exclusive = parser.add_mutually_exclusive_group()
+    exclusive.add_argument(
         "--api",
         action="store_true",
         help="Also query GitHub API for active workflows and latest runs",
+    )
+    exclusive.add_argument(
+        "--diff",
+        action="store_true",
+        help=(
+            "Report per-file drift between the local working tree and "
+            "the configured remote's default branch for the tracked "
+            "workflow YAMLs. Runs `git fetch <remote>` by default; pass "
+            "--no-fetch (or set GITHUB_USAGE_SKIP_FETCH=1) to skip the "
+            "fetch. Cannot be combined with --api, --owner, or --repo. "
+            "With --profile NAME, scopes the diff to that profile's "
+            "workflow file only. Requires git on PATH and a git "
+            "working tree."
+        ),
+    )
+    parser.add_argument(
+        "--no-fetch",
+        action="store_true",
+        help=(
+            "Skip `git fetch <remote>` when using --diff. Use the local "
+            "<remote>/<branch> ref as-is. Equivalent to setting "
+            "GITHUB_USAGE_SKIP_FETCH=1."
+        ),
     )
     parser.add_argument(
         "--owner",
