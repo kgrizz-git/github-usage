@@ -1,6 +1,18 @@
-> **Status:** IN PROGRESS — **NEEDS REVIEW**
->
-> **DO NOT MERGE** until review is complete. This plan is submitted for discussion.
+> **Status:** COMPLETE (merged in c34a025)
+
+> **Done (2026-06-28):** All six phases implemented. New module
+> `src/github_usage/cli_runs_diff.py` (576 lines, file-size warning
+> is advisory), `cli_parsers.py` `--diff` / `--no-fetch` flags in a
+> mutually exclusive group with `--api`, `cli_runs.py` early-return
+> diff path with constraint / prereq / profile / setup checks, and
+> `start.sh runs-diff` shortcut. 42 new tests in
+> `tests/test_cli_runs_diff.py` and a `FakeGit` helper in
+> `tests/_fakes.py` (response keys are argv lists without the
+> leading `"git"` because the mocked layer is the `_run_git`
+> wrapper, which is what prepends `"git"`). README "Checking for
+> drift" subsection and CHANGELOG entry added. `scripts/check`,
+> `scripts/smoke`, and `scripts/docs-check` all pass; full test
+> suite (436 tests) is green.
 
 **Date:** 2026-06-28
 
