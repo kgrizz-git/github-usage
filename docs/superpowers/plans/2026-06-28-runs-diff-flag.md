@@ -137,30 +137,33 @@ adds another 150-200). Functions:
   none of the candidates exist locally. Always invoked with
   `cwd=repo_root`.
 - `fetch_remote(repo_root: Path, remote: str,
-  default_branch: str | None,
   *, skip_fetch: bool, env: Mapping[str, str]) -> tuple[bool, bool]`
-  — runs `git fetch <remote>` unless `skip_fetch` is True (set when
-  `--no-fetch` is passed or `GITHUB_USAGE_SKIP_FETCH=1` is in `env`).
-  If `default_branch` is `None`, skips the fetch and the cached-ref
-  check and returns `(fetched=False, using_cached_ref=False)`
-  immediately. Otherwise returns `(fetched, using_cached_ref)`:
+  — runs `git fetch <remote>` (no branch argument; this fetches
+  all branches and tags) unless `skip_fetch` is True (set when
+  `--no-fetch` is passed or `GITHUB_USAGE_SKIP_FETCH=1` is in
+  `env`). Returns `(fetched, using_cached_ref)`:
   - `fetched=True, using_cached_ref=False` — fresh fetch succeeded.
-  - `fetched=False, using_cached_ref=True` — fetch failed but a
-    cached `<remote>/<default_branch>` ref exists locally; emit a
-    stderr warning and proceed with the cached ref.
-  - `fetched=False, using_cached_ref=False` — fetch failed and no
-    cached ref; rows that need a remote check degrade to `unknown`.
-  - `skip_fetch=True, fetched=False, using_cached_ref=False` — fetch
-    was not attempted; rely entirely on the local refs.
-  Never raises. Always invoked with `cwd=repo_root`.
+  - `fetched=False, using_cached_ref=False` — fetch failed (network
+    error, auth failure, etc.) or was skipped; the subsequent
+    `resolve_default_branch` call will then fall back to whatever
+    cached refs exist locally (or return `None` if none).
+  The cached-ref check lives in `resolve_default_branch` (via
+  `git rev-parse --verify refs/remotes/<remote>/<branch>`); this
+  function does not need to know about it. The fetch must run
+  **before** `resolve_default_branch` is called, so that the
+  default-branch resolver sees fresh refs on first run. Never
+  raises. Always invoked with `cwd=repo_root`.
 - `classify_drift(repo_root: Path, remote: str,
   default_branch: str | None,
-  *, workflow_path: Path | None = None) -> list[dict]` — produces
+  *, candidate_path: Path | None = None) -> list[dict]` — produces
   the per-file row list. Takes an optional pre-resolved
-  `workflow_path` (set by `main()` for `--profile` mode; see Phase
-  3) which restricts scope to a single path. The function does not
-  validate the profile — that is `main()`'s job. Algorithm:
-  1. Enumerate candidate paths. If `workflow_path` is set, the
+  `candidate_path` (set by `main()` for `--profile` mode; see Phase
+  3) which restricts scope to a single path. (Named
+  `candidate_path` rather than `workflow_path` to avoid shadowing
+  the `setup_workflow.workflow_path()` function used to resolve
+  profile paths.) The function does not validate the profile —
+  that is `main()`'s job. Algorithm:
+  1. Enumerate candidate paths. If `candidate_path` is set, the
      candidate set is exactly that single path (normalized). If
      it is `None`, enumerate both local and remote:
      - Local: `git ls-tree -r HEAD -- .github/workflows/` filtered
@@ -185,10 +188,15 @@ adds another 150-200). Functions:
      - Union the two path sets, preserving order (remote-first,
        then local-only).
   2. For each candidate path `P`:
-     a. Run `git status --porcelain -- P` (single-path mode) with
-        `cwd=repo_root`. Parse the X (index) and Y (working-tree)
-        columns of the resulting line. Precedence (with explicit
-        summary strings):
+     a. Run `git status --porcelain=v1 -- P` (single-path mode,
+        always pinned to v1; the v2 format enabled by
+        `git config status.porcelainFormat=2` is not supported)
+        with `cwd=repo_root`. Parse the X (index) and Y
+        (working-tree) columns of the resulting line. Precedence
+        (with explicit summary strings): rename (`R*`), copy
+        (`C*`), and unmerged (`U*`) states are handled by the
+        generic rules below (Y non-space → `uncommitted`, X
+        non-space & Y space → `staged`) without special-casing:
         - First two chars are `??` → row is `untracked`, summary
           `untracked file`.
         - Y is non-space (e.g. ` M`, `MM`, `AM`, `MD`, ` D`) →
@@ -237,9 +245,11 @@ adds another 150-200). Functions:
      `timeout=10` (or `timeout=30` for the network-bound
      `git fetch`). Each call is wrapped in
      `try/except (FileNotFoundError, OSError,
-     subprocess.SubprocessError)` (covers `CalledProcessError`
-     for non-zero exits, `TimeoutExpired` for timeouts, and
-     `FileNotFoundError` for missing `git`); on a missing
+     subprocess.SubprocessError)` (covers `TimeoutExpired`
+     for timeouts and `FileNotFoundError` for missing `git`;
+     non-zero exits are handled by checking `result.returncode`
+     on the `CompletedProcess`, not by catching an exception,
+     since the calls use `check=False`); on a missing
      `git` binary, a single stderr message is emitted
      and affected rows degrade to `unknown`. A `git fetch`
      timeout is treated as a fetch failure (fall back to the
@@ -262,8 +272,13 @@ is the right thing to diff.
 
 - Add `_print_drift(rows: list[dict], remote: str, default_branch: str) -> None`
   to `cli_runs_diff.py` that prints a compact table similar to
-  `_print_runs`: one line per row showing the path, the drift category,
-  and a short summary (e.g. `"ahead of origin/main: 1 commit"`).
+  `_print_runs`: one line per row in the format
+  `<path> · <drift> · <summary>` (e.g.
+  `.github/workflows/email-report.yml · ahead · added locally, not pushed`).
+  When `rows` is `[]` (all workflows in-sync, or a launchd-only
+  profile short-circuited), print `"No drift detected."` to stdout.
+  The JSON path wraps the empty array in the metadata object as
+  already specified.
 - In `main()` (in `cli_runs.py`, calling into the diff module), the
   diff path **replaces** the existing `list_local_runs()` path. The
   current `main()` is `parse args → load config → list_local_runs()
@@ -271,13 +286,21 @@ is the right thing to diff.
   early branch** at the top of `main()`: when `args.diff` is set,
   main() runs the diff path and returns 0; it does **not** call
   `list_local_runs()`. The diff path:
-  1. **Constraint check** (runtime — argparse cannot enforce
+  1. **Constraint checks** (runtime — argparse cannot enforce
      "valid only with" cleanly): if `args.diff` and
      (`args.owner is not None` or `args.repo is not None`), print
      `Error: --owner and --repo only apply to --api.` to stderr and
+     return `1`. If `args.no_fetch` and not `args.diff`, print
+     `Error: --no-fetch only applies to --diff.` to stderr and
      return `1`. (The mutual exclusion of `--api` and `--diff` is
      handled by `add_mutually_exclusive_group` in Phase 1.)
-  2. **Resolve `--profile`:** if set, call `find_profile(config,
+  2. **Config loading** (only when needed): if `args.profile` is
+     set, load config via `load_config(paths.config_file)` wrapped
+     in the same `try/except (tomllib.TOMLDecodeError, ValueError,
+     KeyError)` that the existing `list_local_runs()` path uses
+     (see `cli_runs.py:337-342`). If `--profile` is not set, the
+     diff path does not need config and skips this step.
+  3. **Resolve `--profile`:** if set, call `find_profile(config,
      args.profile)` (from `src/github_usage/setup_config.py`); on
      a miss, print `Error: Profile '<name>' not found in
      configuration.` and return `1` — matching regular `runs`
@@ -293,14 +316,38 @@ is the right thing to diff.
      and return an empty diff (`[]`); do **not** call
      `classify_drift`. Otherwise, resolve the path via
      `workflow_path(repo_root, args.profile)` and pass it to
-     `classify_drift(..., workflow_path=<resolved>)`.
-  3. Call `classify_drift(...)` and dispatch to `_print_drift` or
+     `classify_drift(..., candidate_path=<resolved>)`.
+  4. **Pre-`classify_drift` setup** (the call sequence; the
+     ordering matters — see item-1 review note):
+     ```python
+     remote = resolve_remote_name(repo_root)
+     fetched, using_cached_ref = fetch_remote(
+         repo_root, remote,
+         skip_fetch=(args.no_fetch or
+                     os.environ.get("GITHUB_USAGE_SKIP_FETCH") == "1"),
+         env=os.environ,
+     )
+     default_branch = resolve_default_branch(repo_root, remote)
+     rows = classify_drift(
+         repo_root, remote, default_branch,
+         candidate_path=candidate_path,
+     )
+     ```
+     The fetch must run **before** `resolve_default_branch` so that
+     the resolver sees fresh refs on a first run. `fetch_remote`
+     no longer takes a `default_branch` parameter (it has no need
+     to; the cached-ref check lives in `resolve_default_branch`).
+     The diff module is imported with a lazy import at the top of
+     the function body to match the existing `main()` style
+     (e.g. `from .cli_parsers import _runs_parser` inside the
+     function).
+  5. **Output:** dispatch to `_print_drift` or
      `json.dumps(..., indent=2)` per `args.json`. Wrap the diff
      output in a top-level object:
      `{"kind": "diff", "default_branch": "main", "remote": "origin",
      "rows": [...], "fetched": true|false, "using_cached_ref":
      true|false, "skipped_fetch": true|false}`.
-  4. Return `0`.
+  6. Return `0`.
 
   Note: regular `runs --json` outputs a bare JSON array
   (`json.dumps(rows, indent=2)`); `--diff --json` outputs the
@@ -377,29 +424,26 @@ Test categories (one test or parametrized set each):
 
 - **Per-file classification:** in-sync, uncommitted, staged, ahead
   (modification), behind (modification), diverged.
-- **Deletion regressions** (first-pass Claim 1): local committed
-  deletion → `ahead` `deleted locally, not pushed`; remote deletion
-  → `behind` `deleted on remote, not pulled`.
+- **Deletion regressions:** local committed deletion → `ahead`
+  `deleted locally, not pushed`; remote deletion → `behind`
+  `deleted on remote, not pulled`.
 - **Remote-only:** `git ls-tree -r` enumerates a file not present
   locally → `remote-only`. Untracked local workflow → `untracked`.
   Assert `config.toml` is **never** present in the output (scope
   decision).
-- **Combined `git status` states** (second-pass Claim 8): `MM`,
-  `AM`, `MD` all classify as `uncommitted` (Y column wins over X
-  column).
-- **`--profile` + `--diff`** (second-pass Claim 2): restricts to
-  one file via `workflow_path`; launchd-only profile returns `[]`
-  with a stderr notice.
-- **Fetch failure** (second-pass Claim 3): with cached ref →
-  `using_cached_ref=True`, stderr warning, normal classification;
-  without cached ref → rows degrade to `unknown`, exit 0.
-- **Default-branch verification** (second-pass Claim 4):
-  `refs/remotes/origin/HEAD` missing; resolver tries `main`
-  (missing) then `master` (verified via `git rev-parse --verify`)
-  → returns `master`.
-- **Missing `git` binary** (second-pass Claim 7): `FileNotFoundError`
-  on every call → caught, stderr message, all rows `unknown`,
-  exit 0.
+- **Combined `git status` states:** `MM`, `AM`, `MD` all classify
+  as `uncommitted` (Y column wins over X column).
+- **`--profile` + `--diff`:** restricts to one file via
+  `workflow_path`; launchd-only profile returns `[]` with a
+  stderr notice.
+- **Fetch failure:** with cached ref → `using_cached_ref=True`,
+  stderr warning, normal classification; without cached ref →
+  rows degrade to `unknown`, exit 0.
+- **Default-branch verification:** `refs/remotes/origin/HEAD`
+  missing; resolver tries `main` (missing) then `master` (verified
+  via `git rev-parse --verify`) → returns `master`.
+- **Missing `git` binary:** `FileNotFoundError` on every call →
+  caught, stderr message, all rows `unknown`, exit 0.
 - **Dynamic remote resolution:** `git config
   branch.<current>.remote` returns `upstream`; `fetch_remote` runs
   `git fetch upstream`; resolver reads `refs/remotes/upstream/HEAD`.
@@ -421,34 +465,35 @@ Test categories (one test or parametrized set each):
 - **JSON shape:** top-level object with `kind`, `default_branch`,
   `remote`, `fetched`, `using_cached_ref`, `skipped_fetch`, `rows`;
   each row has `path`, `drift`, `summary`.
-- **Profile validation** (third-pass Claim 5): `runs --diff --profile
-  bogus` prints `Error: Profile 'bogus' not found in configuration.`
-  and exits 1, matching regular `runs` behavior. The runner never
-  calls `classify_drift`.
-- **`default_branch is None` graceful degradation** (third-pass Claim
-  2): `resolve_default_branch` returns `None`; `fetch_remote` returns
+- **Profile validation:** `runs --diff --profile bogus` prints
+  `Error: Profile 'bogus' not found in configuration.` and exits
+  1, matching regular `runs` behavior. The runner never calls
+  `classify_drift`.
+- **`default_branch is None` graceful degradation:**
+  `resolve_default_branch` returns `None`; `fetch_remote` returns
   `(False, False)` without calling git; `classify_drift` skips the
-  remote enumeration; any candidate path that would have required a
-  remote check degrades to `unknown` with summary
+  remote enumeration; any candidate path that would have required
+  a remote check degrades to `unknown` with summary
   `no remote default branch ref available`; command exits 0.
-- **Path normalization** (third-pass Claim 1): `git ls-tree` returns
+- **Path normalization:** `git ls-tree` returns
   `.github/workflows/email-report.yml` (repo-relative) and
   `Path.glob` returns an absolute path; the union treats them as
   the same path. Assert no `ValueError` is raised.
-- **`TimeoutExpired` handling** (third-pass Claim 3): `subprocess.run`
-  raises `subprocess.TimeoutExpired` on the `git fetch` call; tool
-  catches it, falls back to the cached ref (or degrades to `unknown`
-  if no cached ref), emits a stderr message, and exits 0.
-- **Staged deletion discovery** (third-pass Claim 4): a workflow file
-  is committed in HEAD but staged for deletion (`git rm`); neither
-  `git ls-files` nor `Path.glob` returns it. With
-  `git ls-tree -r HEAD` in the local enumeration, the path is
-  discovered; `git status` returns `D `; row is `staged` with
-  summary `staged changes in index`.
-- **Summary strings** (third-pass Claim 6): assert that
-  `uncommitted`, `staged`, `untracked`, `remote-only`, `in-sync`,
-  `ahead` (three variants), `behind` (two variants), `diverged`,
-  and `unknown` all carry the summary strings defined in Phase 2.
+- **`TimeoutExpired` handling:** `subprocess.run` raises
+  `subprocess.TimeoutExpired` on the `git fetch` call; tool
+  catches it, falls back to the cached ref (or degrades to
+  `unknown` if no cached ref), emits a stderr message, and exits
+  0.
+- **Staged deletion discovery:** a workflow file is committed in
+  HEAD but staged for deletion (`git rm`); neither `git ls-files`
+  nor `Path.glob` returns it. With `git ls-tree -r HEAD` in the
+  local enumeration, the path is discovered; `git status`
+  returns `D `; row is `staged` with summary
+  `staged changes in index`.
+- **Summary strings:** assert that `uncommitted`, `staged`,
+  `untracked`, `remote-only`, `in-sync`, `ahead` (three variants),
+  `behind` (two variants), `diverged`, and `unknown` all carry
+  the summary strings defined in Phase 2.
 
 Extend `scripts/smoke` with: `--help` greps for `--diff` and
 `--no-fetch`; `GITHUB_USAGE_SKIP_FETCH=1 ./start.sh runs-diff
@@ -495,6 +540,14 @@ non-zero.
   paths in the union. The plan normalizes via
   `Path(p).relative_to(repo_root).as_posix()`, which handles the
   common cases; pathological setups are out of scope.
+- **Three-dot diff with unrelated histories.** When the local
+  branch and the remote default branch have no common ancestor
+  (e.g. `git remote add` pointing to a different repo), the
+  three-dot form `git diff A...B` falls back to two-dot semantics
+  on newer git versions, which can produce confusing `diverged`
+  results. The plan does not special-case this; the mitigation is
+  the cached-ref / `--no-fetch` path, where the resolver sees
+  the same refs regardless of how `git diff` interprets them.
 - **File size growth.** Phase 2 adds 200-300 lines to a new
   `cli_runs_diff.py` module. `cli_runs.py` (370 lines) stays under
   the 500-line soft limit; the new module is created from the start.
