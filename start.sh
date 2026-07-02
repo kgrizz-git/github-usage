@@ -4,13 +4,8 @@ set -euo pipefail
 # Resolve the repository root directory
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-COMMAND="${1:-}"
-case "$COMMAND" in
-  -v|--version)
-    exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage --version
-    ;;
-  -h|--help|"")
-    cat << 'EOF'
+show_help() {
+  cat << 'EOF'
 Usage: ./start.sh <command> [options]
 
 Commands:
@@ -27,7 +22,68 @@ Global Options:
 For help on a specific command, run:
   ./start.sh <command> --help
 EOF
+}
+
+show_menu() {
+  while true; do
+    echo ""
+    echo "github-usage"
+    echo ""
+    echo "  1) Run Guided Setup (setup)"
+    echo "  2) Run Legacy Usage Report (report)"
+    echo "  3) Run and Send Email Report (email-report)"
+    echo "  4) View Scheduled Runs (profiles, launchd + GitHub cron)"
+    echo "  5) Check Scheduled Runs Drift (runs-diff)"
+    echo "  6) Show Standard Help (--help)"
+    echo "  7) Exit (q)"
+    echo ""
+    read -r choice || exit 0
+    case "$choice" in
+      1)
+        exec "$ROOT_DIR/start.sh" setup
+        ;;
+      2)
+        exec "$ROOT_DIR/start.sh" report
+        ;;
+      3)
+        exec "$ROOT_DIR/start.sh" email-report
+        ;;
+      4)
+        exec "$ROOT_DIR/start.sh" runs
+        ;;
+      5)
+        exec "$ROOT_DIR/start.sh" runs-diff
+        ;;
+      6)
+        show_help
+        exit 0
+        ;;
+      7|q|Q)
+        exit 0
+        ;;
+      *)
+        echo "Invalid choice. Enter 1-7 or q."
+        ;;
+    esac
+  done
+}
+
+COMMAND="${1:-}"
+case "$COMMAND" in
+  -v|--version)
+    exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage --version
+    ;;
+  -h|--help)
+    show_help
     exit 0
+    ;;
+  "")
+    if [ -t 0 ] || [ "${FORCE_INTERACTIVE:-}" = "1" ]; then
+      show_menu
+    else
+      show_help
+      exit 0
+    fi
     ;;
   setup)
     shift

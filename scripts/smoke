@@ -77,3 +77,19 @@ env -u GITHUB_TOKEN HOME="$SMOKE_HOME" ./start.sh report >/tmp/start-sh-smoke.ou
   exit 1
 }
 grep -q "No GitHub token found" /tmp/start-sh-smoke.out
+
+# Verify start.sh interactive menu prints menu and exits cleanly on choice 7
+MENU_OUT="$(mktemp)"
+FORCE_INTERACTIVE=1 ./start.sh <<EOF >"$MENU_OUT" 2>&1
+7
+EOF
+grep -q "Run Guided Setup" "$MENU_OUT" || {
+  echo "Expected interactive menu text in FORCE_INTERACTIVE output"
+  cat "$MENU_OUT"
+  rm -f "$MENU_OUT"
+  exit 1
+}
+rm -f "$MENU_OUT"
+
+# Verify non-interactive fallback when stdin is redirected without FORCE_INTERACTIVE
+./start.sh </dev/null | grep -q "Usage: ./start.sh"

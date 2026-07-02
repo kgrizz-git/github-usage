@@ -12,7 +12,7 @@
 
 ## Configuration & Setup
 
-- [ ] Make `start.sh` present users with an interactive options menu instead of requiring CLI flags.
+- [ ] Build GUI interface alternative for `start` and its related CLI menus. **[Plan](docs/superpowers/plans/2026-07-02-gui-interface.md)**
 - [ ] Write Windows-compatible PowerShell versions of all scripts (setup, check, smoke, docs-check, etc.).
 - [ ] Create a `start.ps1` PowerShell entrypoint script for Windows.
 

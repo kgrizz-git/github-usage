@@ -60,6 +60,23 @@ python3 -m pip install -e '.[dev]'
 ./start.sh setup
 ```
 
+In an interactive terminal, `./start.sh` with no arguments opens a top-level menu; choose **1** (Run Guided Setup) to enter the wizard, or run `./start.sh setup` directly.
+
+### Interactive menus
+
+Two numbered menus exist. Do not mix their option numbers.
+
+| Layer | Invocation | Options |
+|-------|------------|---------|
+| **Top-level** `start.sh` menu | `./start.sh` (TTY) | **1** setup · **2** report · **3** email-report · **4** runs · **5** runs-diff · **6** help · **7** exit |
+| **Setup wizard** menu | `./start.sh setup` or top-level **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify |
+
+**Convention:** wherever this README refers to a setup-wizard choice, use:
+
+> Run `./start.sh`, choose **1** (Run Guided Setup), then choose **N** (*wizard label*) — or run `./start.sh setup` and choose **N**.
+
+For top-level commands, either run `./start.sh` and choose the matching number, or use `./start.sh <command>` directly.
+
 The guided wizard can:
 
 - Write `.env.email-report` (mode `600`) for `GITHUB_TOKEN`, Resend, and recipient settings
@@ -82,8 +99,8 @@ Example templates (safe to commit): [`.env.email-report.example`](.env.email-rep
 
 ### GitHub Actions workflow
 
-`./start.sh` option **5** (GitHub Actions workflow) configures the scheduled
-GitHub Actions report and renders `.github/workflows/email-report.yml` from a
+Run `./start.sh`, choose **1** (Run Guided Setup), then choose **5** (GitHub Actions workflow) — or run `./start.sh setup` and choose **5** — to configure the scheduled
+GitHub Actions report and render `.github/workflows/email-report.yml` from a
 checked-in template:
 
 - **Cron schedule** — always UTC. Example: `0 9 * * 1` = every Monday at 09:00 UTC.
@@ -95,13 +112,13 @@ checked-in template:
 - **Commit required** — the wizard writes the file locally and prints a
   `git add … && git commit … && git push` line. Nothing is committed automatically.
 
-The local launchd schedule (option **4**) is independent of the GitHub Actions
-cron — they are stored in separate sections (`[schedule]` vs `[github_actions]`)
+The local launchd schedule (setup wizard option **4**, *Report schedule only*) is independent of the GitHub Actions
+cron (setup wizard option **5**, *GitHub Actions workflow*) and the LaunchAgent install/remove flow (setup wizard option **6**, *macOS launchd schedule*). These options are stored in separate sections (`[schedule]`, `[github_actions]`, and launchd plist generation)
 of `.github-usage/config.toml` and drive separate scheduling systems.
 
 The four `gh` secrets (`GH_USAGE_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`,
-`RESEND_FROM`) are not touched by the workflow renderer; use option **7**
-(GitHub Actions secrets) to push them.
+`RESEND_FROM`) are not touched by the workflow renderer; use setup wizard option **7**
+(*GitHub Actions secrets*) to push them.
 
 ## Authentication
 
@@ -129,7 +146,7 @@ Passing a token as a command-line argument is supported, but it can expose the t
 
 ## Scheduled Email Reports
 
-Run `./start.sh` for guided configuration, or configure manually.
+Run `./start.sh` and choose **1** (Run Guided Setup), or run `./start.sh setup`, or configure manually.
 
 `github-usage email-report` collects the current-month billing data, renders a plain-text email body, and sends it with Resend. Use `--dry-run` first to preview the message without requiring email settings:
 
@@ -182,11 +199,16 @@ what is on disk in this checkout:
 ```sh
 github-usage runs
 # or: ./start.sh runs
+# or: ./start.sh and choose 4 (View Scheduled Runs)
 ```
 
-Each row shows the profile, the source (`launchd` or `github_actions`), the
-schedule (launchd times are local; GitHub Actions cron is UTC), and an
-activity state:
+Each row shows the profile (a report configuration name from `config.toml`),
+the source (`launchd` or `github_actions`), and the schedule. The profile name
+`default` is the primary report configuration (workflow file
+`.github/workflows/email-report.yml`); additional names come from `[[reports]]`
+entries. GitHub Actions cron lines are shown in plain language plus the raw
+expression — for example `0 9 * * 1` means Mondays at 09:00 UTC. launchd
+times use your Mac's local timezone.
 
 - `active` — launchd plist installed in `~/Library/LaunchAgents/`, or the
   workflow file present in `.github/workflows/`.
@@ -227,6 +249,7 @@ branch and reports per-file drift — no GitHub token required.
 ```sh
 github-usage runs --diff
 # or: ./start.sh runs-diff
+# or: ./start.sh and choose 5 (Check Scheduled Runs Drift)
 ```
 
 Each row reports one of nine categories with a summary:
@@ -327,7 +350,7 @@ queries are not feasible with the current GitHub API.
 
 ### GitHub Actions Setup
 
-This repo includes [`.github/workflows/email-report.yml`](.github/workflows/email-report.yml) as a workflow template. Run `./start.sh` and choose **GitHub Actions secrets** to set these with `gh secret set`:
+This repo includes [`.github/workflows/email-report.yml`](.github/workflows/email-report.yml) as a workflow template. Run `./start.sh`, choose **1** (Run Guided Setup), then choose **7** (GitHub Actions secrets) — or run `./start.sh setup` and choose **7** — to set these with `gh secret set`:
 
 - `GH_USAGE_TOKEN`: a personal access token that can read your personal repos
   and your user-level billing data
@@ -351,9 +374,9 @@ After secrets are set, test with `gh workflow run email-report.yml`.
 
 ### macOS launchd Setup
 
-Run `./start.sh` and choose **macOS launchd schedule** (or the recommended full setup). The wizard writes `.github-usage/config.toml`, generates a LaunchAgent plist, and can install it for Monday 9:00 in your local timezone.
+Run `./start.sh`, choose **1** (Run Guided Setup), then choose **6** (macOS launchd schedule) — or run `./start.sh setup` and choose **6** (or **1** for recommended full setup). The wizard writes `.github-usage/config.toml`, generates a LaunchAgent plist, and can install it for Monday 9:00 in your local timezone.
 
-To change only the report schedule after initial setup, choose **Report schedule only** from the main menu. It updates `[schedule]` in `config.toml` and regenerates the LaunchAgent plist. If a LaunchAgent is already installed, the wizard reminds you to rerun the macOS launchd option and choose install to apply the new schedule.
+To change only the report schedule after initial setup, run `./start.sh setup` and choose **4** (*Report schedule only*). It updates `[schedule]` in `config.toml` and regenerates the LaunchAgent plist. If a LaunchAgent is already installed, the wizard reminds you to rerun setup wizard option **6** (*macOS launchd schedule*) and choose install to apply the new schedule.
 
 Scheduled runs invoke [`scripts/send-email-report.sh`](scripts/send-email-report.sh), which loads `.env.email-report`, applies config options, and logs to `reports/`. Override the env file with `GITHUB_USAGE_ENV_FILE` or the log directory with `GITHUB_USAGE_LOG_DIR` if needed.
 
@@ -402,7 +425,7 @@ pre-commit install
 pre-commit install --hook-type pre-push
 ```
 
-Or run `./start.sh` and choose **Developer security hooks** to install commit and push hooks (including Gitleaks).
+Or run `./start.sh`, choose **1** (Run Guided Setup), then choose **8** (Developer security hooks) — or run `./start.sh setup` and choose **8** — to install commit and push hooks (including Gitleaks).
 
 Run local security checks:
 

@@ -28,8 +28,9 @@ A change is done when relevant tests pass, the CLI still starts, docs are update
 - Create new plans in `docs/superpowers/plans/` with a timestamped filename: `YYYY-MM-DD-<slug>.md`.
 - Group related work (e.g., fixes from a bug report) into logical phases within a plan.
 - As you implement, mark each task `- [x]` and prepend a `**Done:**` note with the date, a one-line summary, and any deviations from the plan.
-- When a plan is complete, set its status banner to the **canonical form** `> **Status:** COMPLETE` — the colon goes *outside* the bold so tooling (`scripts/docs-check`) can detect it — and note the merge commit.
-- Move completed, superseded, or archived plans to `docs/superpowers/plans/archived/` so the active plans directory stays uncluttered.
+- When implementation is complete and verification passes, set the status banner to the **canonical form** `> **Status:** COMPLETE` — the colon goes *outside* the bold so tooling (`scripts/docs-check`) can detect it — and **move the plan to `docs/superpowers/plans/archived/` in the same change set, before commit/merge**. Do not wait for merge to archive; the active plans directory should contain only in-progress work. `scripts/docs-check` warns when a COMPLETE plan is still in the active directory.
+- After merge, optionally append the merge commit SHA to the archived plan's status banner (e.g. `> **Status:** COMPLETE (merged in <sha>)`).
+- Move superseded or abandoned plans to `docs/superpowers/plans/archived/` as well so the active plans directory stays uncluttered.
 
 ### CHANGELOG.md
 

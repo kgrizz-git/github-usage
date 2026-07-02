@@ -210,6 +210,64 @@ class CronExtractionTests(unittest.TestCase):
         self.assertIsNone(cli_runs.extract_first_cron_from_workflow(wf))
 
 
+class DescribeCronHumanTests(unittest.TestCase):
+    """Human-readable cron translation for common GitHub Actions schedules."""
+
+    def test_weekly_monday_morning(self):
+        self.assertEqual(
+            cli_runs.describe_cron_human("0 9 * * 1"),
+            "Mondays at 09:00 UTC",
+        )
+
+    def test_weekly_friday(self):
+        self.assertEqual(
+            cli_runs.describe_cron_human("0 8 * * 5"),
+            "Fridays at 08:00 UTC",
+        )
+
+    def test_daily(self):
+        self.assertEqual(
+            cli_runs.describe_cron_human("30 14 * * *"),
+            "Daily at 14:30 UTC",
+        )
+
+    def test_monthly_day(self):
+        self.assertEqual(
+            cli_runs.describe_cron_human("0 9 15 * *"),
+            "Day 15 of each month at 09:00 UTC",
+        )
+
+    def test_complex_returns_none(self):
+        self.assertIsNone(cli_runs.describe_cron_human("*/15 9 * * 1-5"))
+
+
+class FormatScheduleTests(unittest.TestCase):
+    """``_format_schedule`` and profile description helpers."""
+
+    def test_launchd_schedule_uses_weekday_name(self):
+        row = {
+            "source": "launchd",
+            "schedule": {"weekday": 1, "hour": 9, "minute": 0},
+        }
+        self.assertEqual(
+            cli_runs._format_schedule(row),
+            "Monday 09:00 local time",
+        )
+
+    def test_github_actions_includes_human_and_cron(self):
+        row = {"source": "github_actions", "schedule": "0 9 * * 1"}
+        self.assertEqual(
+            cli_runs._format_schedule(row),
+            "Mondays at 09:00 UTC (cron: 0 9 * * 1)",
+        )
+
+    def test_default_profile_description(self):
+        self.assertIn("primary report profile", cli_runs._describe_profile("default"))
+
+    def test_named_profile_description(self):
+        self.assertIn("email-report-weekly.yml", cli_runs._describe_profile("weekly"))
+
+
 class ResolveOwnerRepoTests(unittest.TestCase):
     """``_resolve_owner_repo`` URL parsing and override behavior."""
 
@@ -391,7 +449,9 @@ class MainEntryPointTests(unittest.TestCase):
     def test_text_output_default(self):
         code, out = self._run([])
         self.assertEqual(code, 0)
-        self.assertIn("Configured runs:", out)
+        self.assertIn("Configured runs (local config.toml", out)
+        self.assertIn("primary report profile", out)
+        self.assertIn("Mondays at 09:00 UTC", out)
         self.assertIn("Warning: No config.toml found", out)
 
     def test_json_active_is_always_string(self):

@@ -8,6 +8,15 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ## [Unreleased]
 
+### Added
+
+- **Interactive `start.sh` menu:** Running `./start.sh` with no arguments in an interactive terminal presents a numbered top-level menu (setup, report, email-report, runs, runs-diff, help, exit). Non-interactive contexts (redirected stdin, CI) still receive the standard help banner.
+
+### Changed
+
+- **Plan archival timing:** Completed plans are archived in the same change set as the implementation, before commit/merge; merge commit SHA is noted in the banner afterward (optional). Documented in `AGENTS.md` and `docs/repo-harness-guidance.md`.
+- **`github-usage runs` readability:** Text output now explains profile names (including what `default` means), translates common GitHub Actions cron expressions into plain language (e.g. `0 9 * * 1` → Mondays at 09:00 UTC), and labels launchd schedules with weekday names in local time.
+
 ### Fixed
 
 - **Backup-file harness:** `backups/*.bak` is now gitignored, `scripts/check-backups` rejects staged backup additions with a clear policy message, and `scripts/check`/pre-commit enforce that `backups/` contains no non-`.bak` files. `scripts/prune-backups` now skips staged additions so stale-backup pruning does not surface a low-level `git rm` failure.

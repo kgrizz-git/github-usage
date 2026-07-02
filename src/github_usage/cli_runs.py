@@ -41,7 +41,29 @@ from pathlib import Path
 
 from .setup_config import SetupPaths, find_profile, load_config, repo_root
 from .setup_launchd import launch_agent_dest, legacy_launch_agent_dest
-from .setup_workflow import workflow_path
+from .setup_workflow import DEFAULT_PROFILE_NAME, workflow_path
+
+# launchd weekday: 0/7 = Sunday, 1 = Monday, …, 6 = Saturday (matches setup wizard).
+_WEEKDAY_NAMES: dict[int, str] = {
+    0: "Sunday",
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday",
+    7: "Sunday",
+}
+_WEEKDAY_PLURAL: dict[int, str] = {
+    0: "Sundays",
+    1: "Mondays",
+    2: "Tuesdays",
+    3: "Wednesdays",
+    4: "Thursdays",
+    5: "Fridays",
+    6: "Saturdays",
+    7: "Sundays",
+}
 
 # Regex extracting the owner/repo pair from common GitHub remote URL forms:
 #   https://github.com/owner/repo.git
@@ -289,20 +311,89 @@ def _enrich_with_api(rows: list[dict], args) -> list[dict]:
     return rows
 
 
+def _weekday_name(weekday: int) -> str:
+    """Return the English weekday name for a launchd ``weekday`` value."""
+    return _WEEKDAY_NAMES.get(weekday, f"weekday {weekday}")
+
+
+def _describe_dow_field(field: str) -> str | None:
+    """Return a human phrase for a cron day-of-week field, or ``None`` if unsupported."""
+    if field.isdigit():
+        return _WEEKDAY_PLURAL.get(int(field))
+    if "," in field:
+        names = [_WEEKDAY_PLURAL.get(int(part)) for part in field.split(",") if part.isdigit()]
+        if names and all(names):
+            if len(names) == 1:
+                return names[0]
+            return ", ".join(names[:-1]) + f", and {names[-1]}"
+    if "-" in field and not field.startswith("*/"):
+        start, end = field.split("-", 1)
+        if start.isdigit() and end.isdigit():
+            start_name = _WEEKDAY_NAMES.get(int(start), start)
+            end_name = _WEEKDAY_NAMES.get(int(end), end)
+            return f"{start_name} through {end_name}"
+    return None
+
+
+def describe_cron_human(expr: str) -> str | None:
+    """Return a short human description for common 5-field GitHub Actions cron expressions.
+
+    GitHub Actions evaluates cron in UTC. Only simple fixed minute/hour patterns with
+    ``*`` wildcards for month (and usually day-of-month) are translated; complex
+    expressions return ``None`` so callers can show the raw cron only.
+    """
+    parts = expr.split()
+    if len(parts) != 5:
+        return None
+    minute_s, hour_s, dom_s, month_s, dow_s = parts
+    if month_s != "*" or not minute_s.isdigit() or not hour_s.isdigit():
+        return None
+
+    minute, hour = int(minute_s), int(hour_s)
+    time_str = f"{hour:02d}:{minute:02d}"
+
+    if dom_s == "*" and dow_s == "*":
+        return f"Daily at {time_str} UTC"
+
+    if dom_s == "*" and dow_s != "*":
+        dow_desc = _describe_dow_field(dow_s)
+        if dow_desc:
+            return f"{dow_desc} at {time_str} UTC"
+
+    if dom_s.isdigit() and dow_s == "*":
+        return f"Day {int(dom_s)} of each month at {time_str} UTC"
+
+    return None
+
+
+def _describe_profile(name: str) -> str:
+    """Return a short parenthetical explaining a profile label."""
+    if name == DEFAULT_PROFILE_NAME:
+        return "primary report profile → .github/workflows/email-report.yml"
+    if name == "(legacy)":
+        return "pre-multi-profile macOS LaunchAgent"
+    if name == UNCONFIGURED:
+        return "workflow on disk with no matching config.toml profile"
+    return f"named report profile → .github/workflows/email-report-{name}.yml"
+
+
 def _format_schedule(row: dict) -> str:
     """Return a human-readable schedule string for a run row."""
     schedule = row.get("schedule")
     if row.get("source") == "launchd":
         if isinstance(schedule, dict) and schedule:
-            return (
-                f"weekday {schedule.get('weekday')} "
-                f"{int(schedule.get('hour', 0)):02d}:{int(schedule.get('minute', 0)):02d} local"
-            )
+            weekday = int(schedule.get("weekday", 1))
+            hour = int(schedule.get("hour", 0))
+            minute = int(schedule.get("minute", 0))
+            return f"{_weekday_name(weekday)} {hour:02d}:{minute:02d} local time"
         return "(unknown)"
     # github_actions schedules are cron expressions, always evaluated in UTC.
     if schedule:
-        return f"{schedule} UTC"
-    return "(no cron)"
+        human = describe_cron_human(str(schedule))
+        if human:
+            return f"{human} (cron: {schedule})"
+        return f"cron {schedule} UTC (minute hour day-of-month month day-of-week)"
+    return "(no cron in workflow)"
 
 
 def _print_runs(rows: list[dict]) -> None:
@@ -310,9 +401,21 @@ def _print_runs(rows: list[dict]) -> None:
     if not rows:
         print("No configured runs found.")
         return
-    print("Configured runs:")
+    print("Configured runs (local config.toml profiles + .github/workflows/email-report*.yml):")
+    print(
+        "  Each profile can schedule email reports twice: launchd (macOS, local time) "
+        "and github_actions (GitHub cron, UTC)."
+    )
+    print(
+        f'  Profile name "{DEFAULT_PROFILE_NAME}" is the primary report configuration; '
+        "additional names come from [[reports]] in config.toml."
+    )
     for row in rows:
-        print(f"  [{row['active']}] {row['profile']} · {row['source']} · {_format_schedule(row)}")
+        profile = row["profile"]
+        print(
+            f"  [{row['active']}] {profile} ({_describe_profile(profile)}) · "
+            f"{row['source']} · {_format_schedule(row)}"
+        )
         if row.get("notes"):
             print(f"      note: {row['notes']}")
         if row.get("api_last_run") or row.get("api_status"):
