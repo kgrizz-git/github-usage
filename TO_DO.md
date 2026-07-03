@@ -5,6 +5,7 @@
 ## Email Report Follow-Ups
 
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
+- [ ] Add a 'forecast' for legacy and email reports that estimates total minutes, artifact storage, and premium requests (or AI credits) expected for the month based on the trajectory of the month so far and/or an estimate of when actions minutes, storage, and premium requests (or AI credits) will run out (based on the same).
 
 ## Code Health
 
