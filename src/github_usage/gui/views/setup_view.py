@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from textual import work
+from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll
 from textual.widgets import Button, RichLog, Select, TabbedContent, TabPane
@@ -22,6 +22,7 @@ from ..async_ops import AsyncViewMixin
 from ..errors import format_error
 from ..layout import ViewSection
 from ..log_utils import write_log
+from ..wizard import SetupWizardScreen
 from .setup_profiles_panel import SetupProfilesPanel
 from .setup_secrets_panel import SetupSecretsPanel
 from .setup_verify_panel import SetupVerifyPanel
@@ -65,6 +66,7 @@ class SetupView(VerticalScroll, AsyncViewMixin):
             "guide for what applies to Usage Report vs email). Ctrl+S saves. "
             "(3) Verify Email Setup — dry-run for the active profile.",
         )
+        yield Button("Start guided setup", id="start-guided-setup", variant="success")
         with TabbedContent(initial="secrets", id="setup-tabs"):
             with TabPane("Secrets", id="secrets"):
                 yield SetupSecretsPanel(self, id="secrets-panel")
@@ -117,6 +119,15 @@ class SetupView(VerticalScroll, AsyncViewMixin):
 
     def has_unsaved_changes(self) -> bool:
         return self._dirty
+
+    @on(Button.Pressed, "#start-guided-setup")
+    def _start_guided_setup(self) -> None:
+        self.app.push_screen(SetupWizardScreen(first_run=False), self._wizard_closed)
+
+    def _wizard_closed(self, completed: bool | None) -> None:
+        if completed:
+            self.reload_form()
+            write_log(self.verify_log, "Guided setup finished", level="success")
 
     def mark_dirty(self) -> None:
         self._dirty = True

@@ -20,9 +20,10 @@ from ...gui_backend import (
 )
 from ..async_ops import AsyncViewMixin
 from ..errors import format_error
-from ..layout import FormGrid, ViewActions, ViewOutput, ViewSection
+from ..layout import ViewActions, ViewOutput, ViewSection
 from ..log_utils import write_log
 from ..modals import ConfirmScreen
+from ..widgets.schedule_picker import SchedulePicker
 
 
 class SchedulesView(VerticalScroll, AsyncViewMixin):
@@ -59,8 +60,9 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
     def compose(self) -> ComposeResult:
         yield ViewSection(
             "Schedules",
-            "Per-profile timing for local launchd (macOS) and GitHub Actions (UTC). "
-            "Ctrl+S saves. GA option checkboxes control scheduled workflow defaults "
+            "Per-profile timing for local launchd (macOS) and GitHub Actions (cloud). "
+            "Pick day and time — no cron knowledge required. Ctrl+S saves. "
+            "GA option checkboxes control scheduled workflow defaults "
             "(regenerate workflow after changing).",
         )
         with Horizontal(classes="profile-row"):
@@ -68,18 +70,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             yield Select([], id="profile-select")
             yield Static("", id="profile-active-label")
             yield Static("", id="dirty-indicator")
-        yield Static("Local schedule (launchd, local timezone)", classes="SectionTitle")
-        with FormGrid():
-            yield Label("Weekday (0=Sun, 1=Mon):")
-            yield Input(value="1", id="weekday")
-            yield Label("Hour:")
-            yield Input(value="9", id="hour")
-            yield Label("Minute:")
-            yield Input(value="0", id="minute")
-        yield Static("GitHub Actions cron (UTC)", classes="SectionTitle")
-        with FormGrid():
-            yield Label("Cron:")
-            yield Input(value="0 9 * * 1", id="cron")
+        yield SchedulePicker(id="schedule-picker", show_local=True, show_ga=True, ga_first=True)
         with Collapsible(title="GitHub Actions report options", collapsed=False):
             yield Static(
                 "Defaults for cron runs and workflow_dispatch. "
@@ -182,10 +173,17 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             profile = next(p for p in config["profiles"] if p["name"] == target)
             sched = profile["schedule"]
             ga = profile["github_actions"]
-            self.query_one("#weekday", Input).value = str(sched.get("weekday", 1))
-            self.query_one("#hour", Input).value = str(sched.get("hour", 9))
-            self.query_one("#minute", Input).value = str(sched.get("minute", 0))
-            self.query_one("#cron", Input).value = str(ga.get("cron", "0 9 * * 1"))
+            picker = self.query_one("#schedule-picker", SchedulePicker)
+            picker.set_loading(True)
+            try:
+                picker.set_local_schedule(
+                    int(sched.get("weekday", 1)),
+                    int(sched.get("hour", 9)),
+                    int(sched.get("minute", 0)),
+                )
+                picker.set_ga_cron(str(ga.get("cron", "0 9 * * 1")))
+            finally:
+                picker.set_loading(False)
             self.query_one("#ga-consumers", Checkbox).value = bool(ga.get("include_consumers"))
             self.query_one("#ga-artifact", Checkbox).value = bool(
                 ga.get("include_artifact_storage")
@@ -244,6 +242,15 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         self.app.app_state.set_current_profile(new_name)
         self._reload_form()
 
+    @on(SchedulePicker.Changed)
+    def _on_schedule_picker_changed(self, event: SchedulePicker.Changed) -> None:
+        if self._loading:
+            return
+        picker = self.query_one("#schedule-picker", SchedulePicker)
+        if getattr(event, "picker", None) is not picker:
+            return
+        self._mark_dirty()
+
     @on(Input.Changed)
     @on(Checkbox.Changed)
     def _on_field_changed(self) -> None:
@@ -252,21 +259,10 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         self._mark_dirty()
 
     def _validate_schedule_fields(self, log: RichLog) -> bool:
-        try:
-            weekday = int(self.query_one("#weekday", Input).value)
-            hour = int(self.query_one("#hour", Input).value)
-            minute = int(self.query_one("#minute", Input).value)
-        except ValueError:
-            write_log(log, "Weekday, hour, and minute must be integers", level="error")
-            return False
-        if not 0 <= weekday <= 6:
-            write_log(log, "Weekday must be 0 (Sun) through 6 (Sat)", level="error")
-            return False
-        if not 0 <= hour <= 23:
-            write_log(log, "Hour must be 0 through 23", level="error")
-            return False
-        if not 0 <= minute <= 59:
-            write_log(log, "Minute must be 0 through 59", level="error")
+        picker = self.query_one("#schedule-picker", SchedulePicker)
+        error = picker.validate()
+        if error:
+            write_log(log, error, level="error")
             return False
         return True
 
@@ -279,18 +275,24 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         if not self._validate_schedule_fields(log):
             return
         paths = self.app.app_state.paths
+        picker = self.query_one("#schedule-picker", SchedulePicker)
+        local = picker.get_local_schedule()
+        cron = picker.get_ga_cron()
+        if local is None or cron is None:
+            write_log(log, "Fix schedule fields before saving", level="error")
+            return
         try:
             configure_schedule_fields(
                 paths,
                 self._profile_name(),
-                weekday=int(self.query_one("#weekday", Input).value),
-                hour=int(self.query_one("#hour", Input).value),
-                minute=int(self.query_one("#minute", Input).value),
+                weekday=local.weekday,
+                hour=local.hour,
+                minute=local.minute,
             )
             configure_github_actions_fields(
                 paths,
                 self._profile_name(),
-                cron=self.query_one("#cron", Input).value,
+                cron=cron,
                 include_consumers=self.query_one("#ga-consumers", Checkbox).value,
                 include_artifact_storage=self.query_one("#ga-artifact", Checkbox).value,
                 include_release_assets=self.query_one("#ga-release", Checkbox).value,

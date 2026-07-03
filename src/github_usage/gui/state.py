@@ -102,3 +102,15 @@ class AppState:
         self.prefs.report_timeout = timeout
         self.prefs.report_max_retries = max_retries
         save_gui_prefs(self.paths, self.prefs)
+
+    def set_wizard_completed(self, completed: bool = True) -> None:
+        """Record that the guided setup wizard finished successfully."""
+        self.prefs.wizard_completed = completed
+        if completed:
+            self.prefs.dismissed_setup_wizard = False
+        save_gui_prefs(self.paths, self.prefs)
+
+    def dismiss_setup_wizard(self) -> None:
+        """Remember that the user skipped the first-run wizard prompt."""
+        self.prefs.dismissed_setup_wizard = True
+        save_gui_prefs(self.paths, self.prefs)

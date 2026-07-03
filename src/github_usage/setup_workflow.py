@@ -215,11 +215,16 @@ def _configure_github_actions(paths, profile_name: str | None = None) -> None:
     print("  Schedule always runs in UTC.")
     print("  Weekday: 0 or 7 = Sunday, 1 = Monday, ..., 6 = Saturday.")
     print("  Example cron expressions: '0 9 * * 1' (Mon 09:00), '0 14 * * 5' (Fri 14:00)")
+    from .schedule_helpers import describe_cron_human
+
     while True:
         raw = input(f"  Cron expression [{ga['cron']}]: ").strip()
         expr = raw or ga["cron"]
         try:
             ga["cron"] = validate_cron(expr)
+            human = describe_cron_human(ga["cron"])
+            if human:
+                print(f"  → {human}")
             break
         except ValueError as exc:
             print(f"  {exc}")

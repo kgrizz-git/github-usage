@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from github_usage.gui_backend import load_setup_paths, write_secrets
+from github_usage.gui_backend import load_profiles, load_setup_paths, save_profiles, write_secrets
 
 
 def _temp_paths() -> tuple[tempfile.TemporaryDirectory[str], object]:
@@ -23,6 +23,7 @@ def _temp_paths() -> tuple[tempfile.TemporaryDirectory[str], object]:
             "RESEND_FROM": "from@example.com",
         },
     )
+    save_profiles(paths, load_profiles(paths))
     return tmp, paths
 
 
@@ -63,6 +64,23 @@ class GitHubUsageAppIntegrationTests(unittest.IsolatedAsyncioTestCase):
 
             await pilot.click("#--content-tab-email")
             self.assertEqual(tabs.active, "email")
+
+    async def test_guided_setup_button_opens_wizard(self) -> None:
+        from github_usage.gui.app import GitHubUsageApp
+        from github_usage.gui.wizard import SetupWizardScreen
+
+        tmp, paths = _temp_paths()
+        self.addCleanup(tmp.cleanup)
+        with mock.patch("github_usage.gui.state.load_setup_paths", return_value=paths):
+            app = GitHubUsageApp()
+
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause(0.05)
+            await pilot.click("#start-guided-setup")
+            await pilot.pause(0.05)
+            wizard = pilot.app.screen
+            self.assertIsInstance(wizard, SetupWizardScreen)
+            await pilot.click("#wizard-cancel")
 
     async def test_setup_secrets_show_hide_toggle(self) -> None:
         from textual.widgets import Checkbox, Input

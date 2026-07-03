@@ -39,31 +39,10 @@ import tomllib
 from collections.abc import Sequence
 from pathlib import Path
 
+from .schedule_helpers import WEEKDAY_NAMES, describe_cron_human
 from .setup_config import SetupPaths, find_profile, load_config, repo_root
 from .setup_launchd import launch_agent_dest, legacy_launch_agent_dest
 from .setup_workflow import DEFAULT_PROFILE_NAME, workflow_path
-
-# launchd weekday: 0/7 = Sunday, 1 = Monday, …, 6 = Saturday (matches setup wizard).
-_WEEKDAY_NAMES: dict[int, str] = {
-    0: "Sunday",
-    1: "Monday",
-    2: "Tuesday",
-    3: "Wednesday",
-    4: "Thursday",
-    5: "Friday",
-    6: "Saturday",
-    7: "Sunday",
-}
-_WEEKDAY_PLURAL: dict[int, str] = {
-    0: "Sundays",
-    1: "Mondays",
-    2: "Tuesdays",
-    3: "Wednesdays",
-    4: "Thursdays",
-    5: "Fridays",
-    6: "Saturdays",
-    7: "Sundays",
-}
 
 # Regex extracting the owner/repo pair from common GitHub remote URL forms:
 #   https://github.com/owner/repo.git
@@ -313,57 +292,7 @@ def _enrich_with_api(rows: list[dict], args) -> list[dict]:
 
 def _weekday_name(weekday: int) -> str:
     """Return the English weekday name for a launchd ``weekday`` value."""
-    return _WEEKDAY_NAMES.get(weekday, f"weekday {weekday}")
-
-
-def _describe_dow_field(field: str) -> str | None:
-    """Return a human phrase for a cron day-of-week field, or ``None`` if unsupported."""
-    if field.isdigit():
-        return _WEEKDAY_PLURAL.get(int(field))
-    if "," in field:
-        names = [_WEEKDAY_PLURAL.get(int(part)) for part in field.split(",") if part.isdigit()]
-        if names and all(names):
-            if len(names) == 1:
-                return names[0]
-            return ", ".join(names[:-1]) + f", and {names[-1]}"
-    if "-" in field and not field.startswith("*/"):
-        start, end = field.split("-", 1)
-        if start.isdigit() and end.isdigit():
-            start_name = _WEEKDAY_NAMES.get(int(start), start)
-            end_name = _WEEKDAY_NAMES.get(int(end), end)
-            return f"{start_name} through {end_name}"
-    return None
-
-
-def describe_cron_human(expr: str) -> str | None:
-    """Return a short human description for common 5-field GitHub Actions cron expressions.
-
-    GitHub Actions evaluates cron in UTC. Only simple fixed minute/hour patterns with
-    ``*`` wildcards for month (and usually day-of-month) are translated; complex
-    expressions return ``None`` so callers can show the raw cron only.
-    """
-    parts = expr.split()
-    if len(parts) != 5:
-        return None
-    minute_s, hour_s, dom_s, month_s, dow_s = parts
-    if month_s != "*" or not minute_s.isdigit() or not hour_s.isdigit():
-        return None
-
-    minute, hour = int(minute_s), int(hour_s)
-    time_str = f"{hour:02d}:{minute:02d}"
-
-    if dom_s == "*" and dow_s == "*":
-        return f"Daily at {time_str} UTC"
-
-    if dom_s == "*" and dow_s != "*":
-        dow_desc = _describe_dow_field(dow_s)
-        if dow_desc:
-            return f"{dow_desc} at {time_str} UTC"
-
-    if dom_s.isdigit() and dow_s == "*":
-        return f"Day {int(dom_s)} of each month at {time_str} UTC"
-
-    return None
+    return WEEKDAY_NAMES.get(weekday, f"weekday {weekday}")
 
 
 def _describe_profile(name: str) -> str:

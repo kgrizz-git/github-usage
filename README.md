@@ -69,7 +69,7 @@ Two interfaces exist. Do not mix their option numbers.
 
 | Interface | Invocation | Purpose |
 |-----------|------------|---------|
-| **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Top tabs (not sidebar) for main navigation: Setup, Usage Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs: Secrets / Profiles & Options / Verify Email Setup. Header shows title/subtitle; Footer shows keyboard shortcuts. Keys: **1**–**5** switch views, **Ctrl+S** save (Setup/Schedules), **Ctrl+R** run/refresh, **Escape** cancel, **q** quit |
+| **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Top tabs for Setup, Usage Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs plus **Start guided setup**. Schedules use day/time pickers. Keys: **1**–**5** switch views, **j**/**k** line scroll, **PgUp**/**PgDn** page scroll, **Ctrl+Home**/**Ctrl+End** top/bottom, **Ctrl+S** save, **Ctrl+R** run/refresh, **Escape** cancel, **q** quit |
 | **CLI bash menu** | `./start.sh --cli` | **1** setup · **2** report · **3** email-report · **4** runs · **5** runs-diff · **6** help · **7** exit |
 | **Setup wizard** | `./start.sh setup` or bash menu **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify |
 

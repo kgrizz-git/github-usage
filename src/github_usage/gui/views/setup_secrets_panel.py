@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .setup_view import SetupView
 
 # (widget id, env key, description, hidden by default)
-_SECRET_FIELDS: tuple[tuple[str, str, str, bool], ...] = (
+SECRET_FIELDS: tuple[tuple[str, str, str, bool], ...] = (
     (
         "github-token",
         "GITHUB_TOKEN",
@@ -42,7 +42,7 @@ _SECRET_FIELDS: tuple[tuple[str, str, str, bool], ...] = (
     ),
 )
 
-_HIDDEN_INPUT_IDS = tuple(field_id for field_id, _, _, hidden in _SECRET_FIELDS if hidden)
+_HIDDEN_INPUT_IDS = tuple(field_id for field_id, _, _, hidden in SECRET_FIELDS if hidden)
 
 
 class SetupSecretsPanel(VerticalScroll):
@@ -60,7 +60,7 @@ class SetupSecretsPanel(VerticalScroll):
             classes="HelpText",
         )
         yield Checkbox("Show hidden values", id="show-secrets")
-        for field_id, env_key, description, hidden in _SECRET_FIELDS:
+        for field_id, env_key, description, hidden in SECRET_FIELDS:
             with FormGrid():
                 yield Label(env_key, classes="field-key")
                 yield Static(description, classes="field-help")

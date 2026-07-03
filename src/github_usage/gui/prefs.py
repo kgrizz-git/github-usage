@@ -23,6 +23,8 @@ class GuiPreferences:
     report_max_retries: int = _DEFAULT_MAX_RETRIES
     report_cache_max_age_seconds: int | None = None
     high_contrast: bool = False
+    wizard_completed: bool = False
+    dismissed_setup_wizard: bool = False
 
     def to_dict(self) -> dict:
         """Serialize preferences for TOML storage."""
@@ -32,6 +34,8 @@ class GuiPreferences:
             "report_timeout": self.report_timeout,
             "report_max_retries": self.report_max_retries,
             "high_contrast": self.high_contrast,
+            "wizard_completed": self.wizard_completed,
+            "dismissed_setup_wizard": self.dismissed_setup_wizard,
         }
         if self.report_cache_max_age_seconds is not None:
             payload["report_cache_max_age_seconds"] = self.report_cache_max_age_seconds
@@ -59,6 +63,8 @@ def load_gui_prefs(paths: SetupPaths) -> GuiPreferences:
         report_max_retries=int(gui.get("report_max_retries", _DEFAULT_MAX_RETRIES)),
         report_cache_max_age_seconds=cache_seconds,
         high_contrast=bool(gui.get("high_contrast", False)),
+        wizard_completed=bool(gui.get("wizard_completed", False)),
+        dismissed_setup_wizard=bool(gui.get("dismissed_setup_wizard", False)),
     )
 
 
@@ -82,6 +88,8 @@ def save_gui_prefs(paths: SetupPaths, prefs: GuiPreferences) -> None:
     lines.extend(
         [
             f"high_contrast = {'true' if p['high_contrast'] else 'false'}",
+            f"wizard_completed = {'true' if p.get('wizard_completed') else 'false'}",
+            f"dismissed_setup_wizard = {'true' if p.get('dismissed_setup_wizard') else 'false'}",
             "",
         ]
     )
