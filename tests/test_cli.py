@@ -201,6 +201,7 @@ class CliTests(unittest.TestCase):
     def test_export_does_not_call_user_when_session_returns_data(self):
         # Export reuses data from run_legacy_report_session (no second fetch).
         from github_usage import cli
+        from github_usage.report_cache import CacheHit
 
         data = {
             "username": "octocat",
@@ -222,7 +223,7 @@ class CliTests(unittest.TestCase):
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
             mock.patch(
                 "github_usage.legacy_report.run_legacy_report_session",
-                return_value=(0, data, "octocat"),
+                return_value=(0, data, "octocat", CacheHit()),
             ),
             mock.patch("github_usage.api.GitHubAPI") as api_cls,
         ):

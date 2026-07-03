@@ -8,6 +8,7 @@ import os
 import unittest
 from unittest import mock
 
+from github_usage.report_cache import CacheHit
 from tests.test_export_cli import _report_data
 
 
@@ -18,7 +19,7 @@ class LegacySingleFetchTests(unittest.TestCase):
         sample = _report_data()
 
         def _session(**_kwargs):
-            return 0, sample, "octocat"
+            return 0, sample, "octocat", CacheHit()
 
         with (
             mock.patch.dict(

@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from github_usage.report_cache import CacheHit
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -17,7 +19,7 @@ def _report_data():
 def _legacy_session_patch(data):
     return mock.patch(
         "github_usage.legacy_report.run_legacy_report_session",
-        return_value=(0, data, "octocat"),
+        return_value=(0, data, "octocat", CacheHit()),
     )
 
 
@@ -135,7 +137,7 @@ class LegacyExportCliTests(unittest.TestCase):
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
             mock.patch(
                 "github_usage.legacy_report.run_legacy_report_session",
-                return_value=(0, _report_data(), "octocat"),
+                return_value=(0, _report_data(), "octocat", CacheHit()),
             ),
         ):
             stdout = io.StringIO()
@@ -159,7 +161,7 @@ class LegacyExportCliTests(unittest.TestCase):
             mock.patch("github_usage.cli.resolve_token", side_effect=capture_token),
             mock.patch(
                 "github_usage.legacy_report.run_legacy_report_session",
-                return_value=(0, None, "octocat"),
+                return_value=(0, None, "octocat", CacheHit()),
             ) as session,
         ):
             code = cli.main(["ghp_fake", "--no-interactive"])
@@ -178,7 +180,7 @@ class LegacyExportCliTests(unittest.TestCase):
             mock.patch("github_usage.cli.resolve_token", return_value="ghp_fake"),
             mock.patch(
                 "github_usage.legacy_report.run_legacy_report_session",
-                return_value=(0, None, "octocat"),
+                return_value=(0, None, "octocat", CacheHit()),
             ) as session,
         ):
             code = cli.main(["ghp_fake"])

@@ -78,9 +78,14 @@ class SetupViewPilotTests(unittest.IsolatedAsyncioTestCase):
     async def test_setup_view_mounts(self) -> None:
         from textual.app import App, ComposeResult
 
+        from github_usage.gui.state import AppState
         from github_usage.gui.views.setup_view import SetupView
 
         class PilotApp(App):
+            def __init__(self) -> None:
+                super().__init__()
+                self.app_state = AppState()
+
             def compose(self) -> ComposeResult:
                 yield SetupView()
 

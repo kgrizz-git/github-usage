@@ -7,31 +7,69 @@ import sys
 from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
-from textual.widgets import Button, Checkbox, Input, Label, RichLog, Select, Static
+from textual.widgets import Button, Checkbox, Collapsible, Input, Label, RichLog, Select, Static
 
 from ...gui_backend import (
-    DEFAULT_PROFILE_NAME,
     configure_github_actions_fields,
     configure_schedule_fields,
     get_launch_agent_status,
     install_launch_agent_for_paths,
     load_profiles,
-    load_setup_paths,
     regenerate_launchd_plist,
     regenerate_workflow_file,
 )
+from ..async_ops import AsyncViewMixin
+from ..errors import format_error
+from ..layout import FormGrid, ViewActions, ViewOutput, ViewSection
+from ..log_utils import write_log
+from ..modals import ConfirmScreen
 
 
-class SchedulesView(VerticalScroll):
+class SchedulesView(VerticalScroll, AsyncViewMixin):
     """Local launchd and GitHub Actions schedule forms."""
 
+    DEFAULT_CSS = """
+    SchedulesView {
+        height: auto;
+    }
+    SchedulesView .profile-row {
+        height: auto;
+        margin-bottom: 1;
+    }
+    SchedulesView #profile-active-label {
+        color: $text-muted;
+        margin-left: 1;
+    }
+    SchedulesView ViewOutput {
+        height: auto;
+        min-height: 0;
+        margin-top: 1;
+    }
+    SchedulesView ViewOutput RichLog {
+        height: 12;
+        min-height: 8;
+    }
+    """
+
+    BINDINGS = [
+        ("ctrl+s", "save_schedules", "Save"),
+        ("escape", "cancel_async", "Cancel"),
+    ]
+
     def compose(self) -> ComposeResult:
-        yield Static("Schedules", classes="SectionTitle")
-        with Horizontal(classes="FormRow"):
+        yield ViewSection(
+            "Schedules",
+            "Per-profile timing for local launchd (macOS) and GitHub Actions (UTC). "
+            "Ctrl+S saves. GA option checkboxes control scheduled workflow defaults "
+            "(regenerate workflow after changing).",
+        )
+        with Horizontal(classes="profile-row"):
             yield Label("Profile:")
             yield Select([], id="profile-select")
+            yield Static("", id="profile-active-label")
+            yield Static("", id="dirty-indicator")
         yield Static("Local schedule (launchd, local timezone)", classes="SectionTitle")
-        with Horizontal(classes="FormRow"):
+        with FormGrid():
             yield Label("Weekday (0=Sun, 1=Mon):")
             yield Input(value="1", id="weekday")
             yield Label("Hour:")
@@ -39,101 +77,303 @@ class SchedulesView(VerticalScroll):
             yield Label("Minute:")
             yield Input(value="0", id="minute")
         yield Static("GitHub Actions cron (UTC)", classes="SectionTitle")
-        yield Input(value="0 9 * * 1", id="cron")
-        yield Checkbox("GA: include consumers", id="ga-consumers")
-        yield Checkbox("GA: include artifact storage", id="ga-artifact")
-        yield Checkbox("GA: include release assets", id="ga-release")
-        with Horizontal():
+        with FormGrid():
+            yield Label("Cron:")
+            yield Input(value="0 9 * * 1", id="cron")
+        with Collapsible(title="GitHub Actions report options", collapsed=False):
+            yield Static(
+                "Defaults for cron runs and workflow_dispatch. "
+                "Match Setup → Include top consumers / artifact / release for parity with local email.",
+                classes="HelpText",
+            )
+            yield Checkbox("GA: include top repos (consumers)", id="ga-consumers")
+            yield Checkbox("GA: include artifact storage", id="ga-artifact")
+            yield Checkbox("GA: include release assets", id="ga-release")
+        with ViewActions():
             yield Button("Save schedules", id="save-sched", variant="primary")
             yield Button("Regenerate plist", id="regen-plist")
             yield Button("Regenerate workflow", id="regen-workflow")
-        if sys.platform == "darwin":
-            with Horizontal():
+            if sys.platform == "darwin":
                 yield Button("Install LaunchAgent", id="install-la", variant="success")
-        else:
+        if sys.platform != "darwin":
             yield Static(
                 "Local launchd scheduling is macOS-only. "
                 "Use GitHub Actions for cross-platform cloud schedules.",
                 id="macos-note",
+                classes="HelpText",
             )
-        yield RichLog(id="sched-log", highlight=True)
+        with ViewOutput():
+            yield RichLog(id="sched-log", highlight=True, markup=True)
 
     def on_mount(self) -> None:
-        self._paths = load_setup_paths()
+        self._is_running = False
+        self._cancel_requested = False
+        self._dirty = False
+        self._loading = True
+        self._applying_selection = False
+        self._previous_profile: str | None = None
+        state = self.app.app_state
+        state.add_listener(self._on_state_changed)
+        try:
+            self._on_state_changed()
+        except FileNotFoundError:
+            write_log(
+                self.query_one("#sched-log", RichLog),
+                "Config file not found. Run setup first.",
+                level="error",
+            )
+        except PermissionError:
+            write_log(
+                self.query_one("#sched-log", RichLog),
+                "Permission denied reading config.",
+                level="error",
+            )
+        except Exception as exc:
+            write_log(
+                self.query_one("#sched-log", RichLog),
+                format_error(exc, context="Failed to load schedules"),
+                level="error",
+            )
+
+    def on_unmount(self) -> None:
+        self.app.app_state.remove_listener(self._on_state_changed)
+
+    def has_unsaved_changes(self) -> bool:
+        return self._dirty
+
+    def _on_state_changed(self) -> None:
         self._reload_form()
+
+    def _mark_dirty(self) -> None:
+        self._dirty = True
+        self.query_one("#dirty-indicator", Static).update("[yellow]* unsaved[/yellow]")
+
+    def _clear_dirty(self) -> None:
+        self._dirty = False
+        self.query_one("#dirty-indicator", Static).update("")
 
     def _profile_name(self) -> str:
         value = self.query_one("#profile-select", Select).value
         if value == Select.BLANK or str(value) == "Select.NULL" or value is None:
-            return DEFAULT_PROFILE_NAME
+            return self.app.app_state.current_profile
         return str(value)
 
     def _reload_form(self) -> None:
-        config = load_profiles(self._paths)
-        names = [p["name"] for p in config.get("profiles", [])]
-        select = self.query_one("#profile-select", Select)
-        select.set_options([(n, n) for n in names])
-        if names:
-            select.value = names[0]
-        profile = next(p for p in config["profiles"] if p["name"] == self._profile_name())
-        sched = profile["schedule"]
-        ga = profile["github_actions"]
-        self.query_one("#weekday", Input).value = str(sched.get("weekday", 1))
-        self.query_one("#hour", Input).value = str(sched.get("hour", 9))
-        self.query_one("#minute", Input).value = str(sched.get("minute", 0))
-        self.query_one("#cron", Input).value = str(ga.get("cron", "0 9 * * 1"))
-        self.query_one("#ga-consumers", Checkbox).value = bool(ga.get("include_consumers"))
-        self.query_one("#ga-artifact", Checkbox).value = bool(ga.get("include_artifact_storage"))
-        self.query_one("#ga-release", Checkbox).value = bool(ga.get("include_release_assets"))
+        self._loading = True
+        try:
+            state = self.app.app_state
+            paths = state.paths
+            names = list(state.profile_names)
+            select = self.query_one("#profile-select", Select)
+            label = self.query_one("#profile-active-label", Static)
+            if not names:
+                select.set_options([])
+                select.disabled = True
+                label.update("")
+                self._loading = False
+                return
+
+            select.disabled = False
+            select.set_options([(name, name) for name in names])
+            current = state.current_profile
+            target = current if current in names else names[0]
+
+            config = load_profiles(paths)
+            profile = next(p for p in config["profiles"] if p["name"] == target)
+            sched = profile["schedule"]
+            ga = profile["github_actions"]
+            self.query_one("#weekday", Input).value = str(sched.get("weekday", 1))
+            self.query_one("#hour", Input).value = str(sched.get("hour", 9))
+            self.query_one("#minute", Input).value = str(sched.get("minute", 0))
+            self.query_one("#cron", Input).value = str(ga.get("cron", "0 9 * * 1"))
+            self.query_one("#ga-consumers", Checkbox).value = bool(ga.get("include_consumers"))
+            self.query_one("#ga-artifact", Checkbox).value = bool(
+                ga.get("include_artifact_storage")
+            )
+            self.query_one("#ga-release", Checkbox).value = bool(ga.get("include_release_assets"))
+            self._previous_profile = target
+
+            def _apply_selection() -> None:
+                self._applying_selection = True
+                try:
+                    select.value = target
+                    label.update(f"Active: [b]{target}[/b]")
+                    if self.app.app_state.current_profile != target:
+                        self.app.app_state.set_current_profile(target, persist=False, notify=False)
+                finally:
+                    self._applying_selection = False
+                    self._loading = False
+                    self._clear_dirty()
+
+            self.call_after_refresh(_apply_selection)
+        except FileNotFoundError:
+            self._loading = False
+            raise
+        except Exception:
+            self._loading = False
+            raise
 
     @on(Select.Changed, "#profile-select")
     def _profile_changed(self) -> None:
+        if self._loading or self._applying_selection:
+            return
+        self._confirm_profile_switch()
+
+    @work
+    async def _confirm_profile_switch(self) -> None:
+        new_name = self._profile_name()
+        label = self.query_one("#profile-active-label", Static)
+        if new_name:
+            label.update(f"Active: [b]{new_name}[/b]")
+        if self._dirty and self._previous_profile and new_name != self._previous_profile:
+            confirmed = await self.app.push_screen_wait(
+                ConfirmScreen(
+                    f"Switch to profile '{new_name}'? Unsaved schedule changes will be lost.",
+                    title="Unsaved changes",
+                )
+            )
+            if not confirmed:
+                select = self.query_one("#profile-select", Select)
+                if self._previous_profile:
+                    self._applying_selection = True
+                    try:
+                        select.value = self._previous_profile
+                    finally:
+                        self._applying_selection = False
+                return
+        self.app.app_state.set_current_profile(new_name)
         self._reload_form()
+
+    @on(Input.Changed)
+    @on(Checkbox.Changed)
+    def _on_field_changed(self) -> None:
+        if self._loading:
+            return
+        self._mark_dirty()
+
+    def _validate_schedule_fields(self, log: RichLog) -> bool:
+        try:
+            weekday = int(self.query_one("#weekday", Input).value)
+            hour = int(self.query_one("#hour", Input).value)
+            minute = int(self.query_one("#minute", Input).value)
+        except ValueError:
+            write_log(log, "Weekday, hour, and minute must be integers", level="error")
+            return False
+        if not 0 <= weekday <= 6:
+            write_log(log, "Weekday must be 0 (Sun) through 6 (Sat)", level="error")
+            return False
+        if not 0 <= hour <= 23:
+            write_log(log, "Hour must be 0 through 23", level="error")
+            return False
+        if not 0 <= minute <= 59:
+            write_log(log, "Minute must be 0 through 59", level="error")
+            return False
+        return True
 
     @on(Button.Pressed, "#save-sched")
     def _save_schedules(self) -> None:
+        self.action_save_schedules()
+
+    def action_save_schedules(self) -> None:
         log = self.query_one("#sched-log", RichLog)
+        if not self._validate_schedule_fields(log):
+            return
+        paths = self.app.app_state.paths
         try:
             configure_schedule_fields(
-                self._paths,
+                paths,
                 self._profile_name(),
                 weekday=int(self.query_one("#weekday", Input).value),
                 hour=int(self.query_one("#hour", Input).value),
                 minute=int(self.query_one("#minute", Input).value),
             )
             configure_github_actions_fields(
-                self._paths,
+                paths,
                 self._profile_name(),
                 cron=self.query_one("#cron", Input).value,
                 include_consumers=self.query_one("#ga-consumers", Checkbox).value,
                 include_artifact_storage=self.query_one("#ga-artifact", Checkbox).value,
                 include_release_assets=self.query_one("#ga-release", Checkbox).value,
             )
-            log.write("[green]Schedules saved.[/green]")
-        except (ValueError, KeyError) as exc:
-            log.write(f"[red]{exc}[/red]")
+            self._clear_dirty()
+            self.app.app_state.reload()
+            write_log(log, "Schedules saved", level="success")
+        except (ValueError, KeyError, PermissionError, OSError) as exc:
+            write_log(log, format_error(exc), level="error")
 
     @on(Button.Pressed, "#regen-plist")
     def _regen_plist(self) -> None:
         if sys.platform != "darwin":
             return
-        path = regenerate_launchd_plist(self._paths, self._profile_name())
-        self.query_one("#sched-log", RichLog).write(f"Generated {path}")
+        log = self.query_one("#sched-log", RichLog)
+        try:
+            path = regenerate_launchd_plist(self.app.app_state.paths, self._profile_name())
+            write_log(log, f"Generated {path}", level="success")
+        except (ValueError, FileNotFoundError, KeyError, OSError) as exc:
+            write_log(log, format_error(exc), level="error")
 
     @on(Button.Pressed, "#regen-workflow")
-    def _regen_workflow(self) -> None:
+    def _regen_workflow_pressed(self) -> None:
+        self._confirm_regen_workflow()
+
+    @work
+    async def _confirm_regen_workflow(self) -> None:
+        log = self.query_one("#sched-log", RichLog)
+        confirmed = await self.app.push_screen_wait(
+            ConfirmScreen(
+                "Regenerate workflow file? This overwrites the existing workflow on disk.",
+                title="Regenerate workflow",
+            )
+        )
+        if not confirmed:
+            return
         try:
-            path = regenerate_workflow_file(self._paths, self._profile_name())
-            self.query_one("#sched-log", RichLog).write(f"Wrote workflow {path}")
-        except (ValueError, FileNotFoundError, KeyError) as exc:
-            self.query_one("#sched-log", RichLog).write(f"[red]{exc}[/red]")
+            path = regenerate_workflow_file(self.app.app_state.paths, self._profile_name())
+            write_log(log, f"Wrote workflow {path}", level="success")
+        except (ValueError, FileNotFoundError, KeyError, OSError) as exc:
+            write_log(log, format_error(exc), level="error")
 
     @on(Button.Pressed, "#install-la")
+    def _install_la_pressed(self) -> None:
+        if self._is_running:
+            return
+        self._confirm_install_la()
+
+    @work
+    async def _confirm_install_la(self) -> None:
+        confirmed = await self.app.push_screen_wait(
+            ConfirmScreen(
+                "Install or update the LaunchAgent plist for this profile?",
+                title="Install LaunchAgent",
+            )
+        )
+        if confirmed:
+            self._install_la()
+
     @work(thread=True)
     def _install_la(self) -> None:
-        code, message = install_launch_agent_for_paths(self._paths)
-        status = get_launch_agent_status(self._paths)
+        button = self.query_one("#install-la", Button)
         log = self.query_one("#sched-log", RichLog)
-        self.call_from_thread(log.write, message or f"LaunchAgent status: {status}")
-        if code != 0:
-            self.call_from_thread(log.write, f"[red]Install exit code {code}[/red]")
+        self._call_ui(
+            self._begin_async,
+            button,
+            log,
+            running_label="Installing...",
+            start_message="Installing LaunchAgent...",
+        )
+        try:
+            if self._is_cancelled():
+                self._call_ui(write_log, log, "Install cancelled", level="warning")
+                return
+            paths = self.app.app_state.paths
+            code, message = install_launch_agent_for_paths(paths)
+            status = get_launch_agent_status(paths)
+            self._call_ui(write_log, log, message or f"LaunchAgent status: {status}", level="info")
+            if code != 0:
+                self._call_ui(write_log, log, f"Install exit code {code}", level="error")
+            else:
+                self._call_ui(write_log, log, "LaunchAgent installed", level="success")
+        except Exception as exc:
+            self._call_ui(write_log, log, format_error(exc), level="error")
+        finally:
+            self._call_ui(self._end_async, button, "Install LaunchAgent")

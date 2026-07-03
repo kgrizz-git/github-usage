@@ -3,6 +3,11 @@
 #
 # This file contains no secrets. Generated local config lives in .github-usage/ (gitignored).
 
+[cache]
+# Reuse recent billing API snapshots for legacy and email reports (seconds).
+# Set to 0 to disable caching. Default when omitted: 3600 (1 hour).
+max_age_seconds = 3600
+
 [email_report]
 include_consumers = false
 include_artifact_storage = false

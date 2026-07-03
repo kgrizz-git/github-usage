@@ -17,6 +17,13 @@ from . import cli, export_report
 from .auth import resolve_token
 from .cli_email_report import _init_github_api
 from .cli_runs import list_local_runs
+from .report_cache import (
+    CacheHit,
+    legacy_cache_params,
+    load_cached_report,
+    resolve_cache_max_age,
+    store_cached_report,
+)
 from .setup_config import (
     SetupPaths,
     _default_profile,
@@ -319,14 +326,36 @@ def run_legacy_report_data(
     token: str | None = None,
     timeout: float = 30.0,
     max_retries: int = 3,
-) -> tuple[int, dict | None, str | None]:
-    """Fetch legacy report data; return ``(exit_code, data, username)``."""
+    refresh: bool = False,
+    paths: SetupPaths | None = None,
+    cache_max_age_seconds: int | None = None,
+    gui_cache_max_age_seconds: int | None = None,
+) -> tuple[int, dict | None, str | None, CacheHit]:
+    """Fetch legacy report data; return ``(exit_code, data, username, cache)``."""
     resolved = token or resolve_token(argv=[])
     if not resolved:
-        return 1, None, None
+        return 1, None, None, CacheHit()
+    resolved_paths = paths or SetupPaths.from_root()
+    max_age = resolve_cache_max_age(
+        resolved_paths,
+        override_seconds=cache_max_age_seconds,
+        gui_override_seconds=gui_cache_max_age_seconds,
+    )
+    params = legacy_cache_params(max_repos=100, warn_over=None, include_release_assets=False)
+    cached_data, cached_username, cache_hit = load_cached_report(
+        resolved_paths,
+        kind="legacy",
+        token=resolved,
+        params=params,
+        max_age_seconds=max_age,
+        refresh=refresh,
+    )
+    if cache_hit.from_cache and cached_data is not None and cached_username:
+        return 0, cached_data, cached_username, cache_hit
+
     api_result = _init_github_api(resolved, timeout, max_retries)
     if isinstance(api_result, int):
-        return api_result, None, None
+        return api_result, None, None, CacheHit()
     api, username = api_result
     try:
         from .legacy_report_data import build_legacy_report_data
@@ -338,9 +367,18 @@ def run_legacy_report_data(
             warn_over=None,
             include_release_assets=False,
         )
-        return 0, data, username
+        if max_age > 0:
+            store_cached_report(
+                resolved_paths,
+                kind="legacy",
+                token=resolved,
+                params=params,
+                username=username,
+                data=data,
+            )
+        return 0, data, username, CacheHit(max_age_seconds=max_age)
     except (RuntimeError, ValueError) as exc:
-        return 1, None, str(exc)
+        return 1, None, str(exc), CacheHit()
 
 
 def export_legacy_report(
@@ -370,12 +408,15 @@ def run_email_dry_run(
     *,
     timeout: float = 30.0,
     max_retries: int = 3,
+    refresh: bool = False,
 ) -> tuple[int, str]:
     """Build email report body without sending; return ``(exit_code, body)``."""
     buffer = io.StringIO()
     _apply_env(paths)
     config = load_profiles(paths)
     args = ["email-report", "--dry-run", *email_report_args(config, profile_name)]
+    if refresh:
+        args.append("--refresh")
     with redirect_stdout(buffer), redirect_stderr(buffer):
         code = cli.main([*args, "--timeout", str(timeout), "--max-retries", str(max_retries)])
     return code, buffer.getvalue()
@@ -387,12 +428,15 @@ def send_email_report(
     *,
     timeout: float = 30.0,
     max_retries: int = 3,
+    refresh: bool = False,
 ) -> tuple[int, str]:
     """Send email report for one profile; return ``(exit_code, message)``."""
     buffer = io.StringIO()
     _apply_env(paths)
     config = load_profiles(paths)
     args = ["email-report", *email_report_args(config, profile_name)]
+    if refresh:
+        args.append("--refresh")
     with redirect_stdout(buffer), redirect_stderr(buffer):
         code = cli.main([*args, "--timeout", str(timeout), "--max-retries", str(max_retries)])
     return code, buffer.getvalue() if code != 0 else "Email report sent."

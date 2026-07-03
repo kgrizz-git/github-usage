@@ -8,7 +8,7 @@ on:
       include_consumers:
         description: Include top repository breakdowns and key insights
         required: false
-        default: 'false'
+        default: 'true'
         type: choice
         options:
           - 'false'
@@ -16,7 +16,7 @@ on:
       include_artifact_storage:
         description: Include Actions artifact storage details
         required: false
-        default: 'false'
+        default: 'true'
         type: choice
         options:
           - 'false'
@@ -58,16 +58,16 @@ jobs:
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
         run: |
           args=()
-          if [ "${{ inputs.include_consumers || 'false' }}" = "true" ]; then
+          if [ "${{ inputs.include_consumers || 'true' }}" = "true" ]; then
             args+=(--include-consumers)
           fi
-          if [ "${{ inputs.include_artifact_storage || 'false' }}" = "true" ]; then
+          if [ "${{ inputs.include_artifact_storage || 'true' }}" = "true" ]; then
             args+=(--include-artifact-storage)
           fi
           if [ "${{ inputs.include_release_assets || 'false' }}" = "true" ]; then
             args+=(--include-release-assets --yes-include-release-assets)
           fi
-          profile_args=(--max-repos 100 --email-format text --warn-over 25 --warn-over 80%)
+          profile_args=(--max-repos 50 --email-format text --warn-over 25 --warn-over 80%)
           if [ ${#profile_args[@]} -gt 0 ]; then
             args+=("${profile_args[@]}")
           fi

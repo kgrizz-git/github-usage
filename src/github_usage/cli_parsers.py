@@ -29,6 +29,11 @@ def _legacy_parser() -> argparse.ArgumentParser:
         default=3,
         help="Maximum number of retry attempts for transient errors",
     )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Bypass the local report cache and fetch fresh billing data",
+    )
     return parser
 
 
@@ -138,5 +143,10 @@ def _email_parser() -> argparse.ArgumentParser:
         type=int,
         default=3,
         help="Maximum number of retry attempts for transient errors",
+    )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Bypass the local report cache and fetch fresh billing data",
     )
     return parser

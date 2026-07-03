@@ -13,9 +13,10 @@ class LegacyReportBackendTests(unittest.TestCase):
 
     def test_run_legacy_report_no_token(self) -> None:
         with mock.patch("github_usage.gui_backend.resolve_token", return_value=None):
-            code, data, err = run_legacy_report_data()
+            code, data, err, cache = run_legacy_report_data()
         self.assertEqual(code, 1)
         self.assertIsNone(data)
+        self.assertFalse(cache.from_cache)
 
     def test_export_requires_data(self) -> None:
         sample = {"account": {"total_spend": 0}, "actions": {}, "storage": {}}

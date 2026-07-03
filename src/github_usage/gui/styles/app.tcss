@@ -2,6 +2,18 @@ Screen {
     layout: vertical;
 }
 
+MainWindow {
+    height: 1fr;
+}
+
+#main-tabs {
+    height: 1fr;
+}
+
+TabPane {
+    padding: 1;
+}
+
 #sidebar {
     width: 28;
     height: 100%;
@@ -30,14 +42,43 @@ SidebarButton.-active {
     background: $primary 20%;
 }
 
+SidebarButton:focus {
+    border: heavy $accent;
+}
+
 SectionTitle {
     text-style: bold;
     margin: 1 0 1 0;
 }
 
+HelpText {
+    color: $text-muted;
+    margin-bottom: 1;
+}
+
+.field-key {
+    text-style: bold;
+}
+
+.field-help {
+    color: $text-muted;
+}
+
 FormRow {
     height: auto;
     margin-bottom: 1;
+}
+
+Input:focus {
+    border: heavy $accent;
+}
+
+Button:focus {
+    border: heavy $accent;
+}
+
+Select:focus {
+    border: heavy $accent;
 }
 
 RichLog {
@@ -46,9 +87,25 @@ RichLog {
     margin-top: 1;
 }
 
+ViewOutput RichLog {
+    border: none;
+    margin-top: 0;
+    height: 1fr;
+    min-height: 6;
+}
+
+ViewOutput DataTable {
+    min-height: 6;
+    height: auto;
+}
+
 DataTable {
     height: 1fr;
     min-height: 10;
+}
+
+DataTable:focus {
+    border: heavy $accent;
 }
 
 StatusPanel {
@@ -56,4 +113,18 @@ StatusPanel {
     border: solid $primary;
     padding: 1;
     margin-bottom: 1;
+}
+
+.-high-contrast Screen {
+    background: black;
+    color: white;
+}
+
+.-high-contrast Button:focus {
+    border: heavy white;
+    background: $primary;
+}
+
+.-high-contrast Input:focus {
+    border: heavy white;
 }

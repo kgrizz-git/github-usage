@@ -17,6 +17,13 @@ from .cli_email_report import (
     _validate_report_sections,
 )
 from .cli_parsers import _email_parser, _legacy_parser
+from .report_cache import (
+    email_cache_params,
+    format_cache_hit_message,
+    load_cached_report,
+    resolve_cache_max_age,
+    store_cached_report,
+)
 from .setup_config import SetupPaths, email_report_args, load_config, repo_root
 
 HELP = """GitHub Monthly Usage Report
@@ -57,6 +64,12 @@ Legacy report options:
   --dry-run               No-op for the legacy flow
   --timeout SECONDS       Seconds to wait before failing a request
   --max-retries N         Maximum number of retry attempts for transient errors
+  --refresh               Bypass local report cache and fetch fresh billing data
+
+Cache:
+  Recent report snapshots are stored under .github-usage/cache/ (gitignored).
+  Configure TTL in .github-usage/config.toml: [cache] max_age_seconds = 3600
+  Set max_age_seconds = 0 to disable caching.
 
 Email-report options:
   --export FORMAT         Export the report to a file in the given format
@@ -65,7 +78,7 @@ Email-report options:
   --include-consumers, --include-artifact-storage, --include-release-assets,
   --yes-include-release-assets, --max-repos N, --warn-over VALUE,
   --skip-actions, --skip-copilot, --skip-lfs, --dry-run,
-  --timeout SECONDS, --max-retries N
+  --timeout SECONDS, --max-retries N, --refresh
 
 TUI optional dependency:
   pip install 'github-usage[gui]'
@@ -266,24 +279,63 @@ def _run_email_report(argv: Sequence[str]) -> int:
     if not _confirm_release_assets(args):
         return 1
 
-    api_result = _init_github_api(token, args.timeout, args.max_retries)
-    if isinstance(api_result, int):
-        return api_result
-    api, username = api_result
+    paths = SetupPaths.from_root(repo_root())
+    max_age = resolve_cache_max_age(paths)
+    cache_params = email_cache_params(
+        include_actions=include_actions,
+        include_copilot=include_copilot,
+        include_lfs=include_lfs,
+        include_consumers=args.include_consumers,
+        include_artifact_storage=args.include_artifact_storage,
+        include_release_assets=args.include_release_assets,
+        max_repos=args.max_repos,
+        warn_over=args.warn_over,
+    )
+    cached_data, cached_username, cache_hit = load_cached_report(
+        paths,
+        kind="email",
+        token=token,
+        params=cache_params,
+        max_age_seconds=max_age,
+        refresh=getattr(args, "refresh", False),
+    )
+    if cache_hit.from_cache and cached_data is not None:
+        data = cached_data
+        username = cached_username or "unknown"
+        if cache_hit.age_seconds is not None and cache_hit.max_age_seconds is not None:
+            print(format_cache_hit_message(cache_hit.age_seconds, cache_hit.max_age_seconds))
+    else:
+        api_result = _init_github_api(token, args.timeout, args.max_retries)
+        if isinstance(api_result, int):
+            return api_result
+        api, username = api_result
+        try:
+            data = report_data.build_report_data(
+                api,
+                username,
+                include_actions=include_actions,
+                include_copilot=include_copilot,
+                include_lfs=include_lfs,
+                include_consumers=args.include_consumers,
+                include_artifact_storage=args.include_artifact_storage,
+                include_release_assets=args.include_release_assets,
+                max_repos=args.max_repos,
+                warn_over=args.warn_over,
+            )
+            if max_age > 0:
+                store_cached_report(
+                    paths,
+                    kind="email",
+                    token=token,
+                    params=cache_params,
+                    username=username,
+                    data=data,
+                )
+        except (RuntimeError, ValueError) as exc:
+            print(f"Error: {exc}")
+            return 1
 
     try:
-        data = report_data.build_report_data(
-            api,
-            username,
-            include_actions=include_actions,
-            include_copilot=include_copilot,
-            include_lfs=include_lfs,
-            include_consumers=args.include_consumers,
-            include_artifact_storage=args.include_artifact_storage,
-            include_release_assets=args.include_release_assets,
-            max_repos=args.max_repos,
-            warn_over=args.warn_over,
-        )
         body = email_report.format_report_email(data)
         html_body = email_report.format_html_report(data) if args.email_format == "html" else None
         _export_report(args, export_format, body, data, username)
@@ -344,9 +396,10 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
 
     from .legacy_report import run_legacy_report_session
 
-    code, data, username = run_legacy_report_session(
+    code, data, username, _cache = run_legacy_report_session(
         timeout=getattr(args, "timeout", None),
         max_retries=getattr(args, "max_retries", None),
+        refresh=getattr(args, "refresh", False),
     )
     if code != 0:
         return code
