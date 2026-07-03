@@ -15,6 +15,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Legacy report single-fetch:** The legacy CLI (`github-usage --cli` with optional `--export`) now fetches billing data once via `build_legacy_report_data`, renders the terminal report from that dict, and reuses the same data for file export — eliminating duplicate API calls when exporting. The TUI legacy report screen uses the same superset schema.
 - **Plan archival timing:** Completed plans are archived in the same change set as the implementation, before commit/merge; merge commit SHA is noted in the banner afterward (optional). Documented in `AGENTS.md` and `docs/repo-harness-guidance.md`.
 - **`github-usage runs` readability:** Text output now explains profile names (including what `default` means), translates common GitHub Actions cron expressions into plain language (e.g. `0 9 * * 1` → Mondays at 09:00 UTC), and labels launchd schedules with weekday names in local time.
 

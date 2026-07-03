@@ -17,7 +17,6 @@
 
 ## Deferred
 
-- [ ] Refactor to eliminate double API calls on legacy export (Fix #2, deferred from the 2026-06-21 bug fixes — the most architecturally invasive change; needs a dedicated refactor plan). **[Plan](docs/superpowers/plans/archived/2026-06-21-bug-fixes.md)**
 - [ ] Add clearly labeled end-of-month spend projections based on elapsed days in the billing period.
 - [ ] Add optional CC/BCC delivery fields for team and finance distribution.
 - [ ] Evaluate report retention destinations such as GitHub Releases, S3, or shared drives after export/output support exists.

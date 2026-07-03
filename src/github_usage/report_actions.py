@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .billing import get_actions_from_runs, get_actions_per_repo
+from .billing import BillingFetchError, get_actions_from_runs, get_actions_per_repo
 from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .terminal import print_section, print_sep
 
@@ -137,6 +137,174 @@ def show_limits_summary(username, user_minutes, user_storage_gb_hours):
     print()
 
     # Copilot limits note
+    print("  Copilot Pro:")
+    print("    Includes: Copilot Chat, Copilot Agent, Code Review, etc.")
+    print("    Premium requests are billed at $0.04/request after included allowance.")
+    print("    (Check your plan details for exact premium request limits)")
+    print()
+
+
+def fetch_repo_actions_table(api, repos: list[dict]) -> tuple[list[dict], dict[str, str]]:
+    """Fetch per-repo Actions billing for every repository (no printing)."""
+    rows: list[dict] = []
+    errors: dict[str, str] = {}
+    for repo in repos:
+        owner = (repo.get("owner") or {}).get("login", "")
+        name = repo.get("name", "")
+        if not owner or not name:
+            continue
+        full = f"{owner}/{name}"
+        try:
+            minutes, storage_gb_hours, sku = get_actions_per_repo(api, owner, name)
+        except BillingFetchError as exc:
+            errors[full] = str(exc)
+            continue
+        avg_mb = gb_hours_to_avg_mb(storage_gb_hours)
+        gross = sum(float(i.get("grossAmount", 0)) for i in sku.values())
+        rows.append(
+            {
+                "repo": full,
+                "minutes": float(minutes),
+                "storage_gb_hours": float(storage_gb_hours),
+                "avg_mb": float(avg_mb),
+                "gross": gross,
+                "sku": sku,
+            }
+        )
+    return rows, errors
+
+
+def fetch_actions_os_breakdown(api, repos: list[dict], *, limit: int = 10) -> dict:
+    """Fetch OS breakdown from workflow runs for up to ``limit`` repos."""
+    repo_rows = []
+    total_os = {"UBUNTU": 0, "WINDOWS": 0, "MACOS": 0}
+    found = False
+    for repo in repos[:limit]:
+        owner = (repo.get("owner") or {}).get("login", "")
+        name = repo.get("name", "")
+        if not owner or not name:
+            continue
+        minutes, os_millis, _ = get_actions_from_runs(api, owner, name)
+        if minutes > 0:
+            found = True
+            os_minutes = {
+                os_name: os_millis[os_name] / 60000 for os_name in ["UBUNTU", "WINDOWS", "MACOS"]
+            }
+            repo_rows.append({"name": f"{owner}/{name}", "os_minutes": os_minutes})
+            for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
+                total_os[os_name] += os_millis[os_name]
+    return {"repos": repo_rows, "totals": total_os, "found": found}
+
+
+def render_actions_summary(actions: dict | None) -> None:
+    """Print Actions summary from a pre-fetched ``actions`` section dict."""
+    if not actions:
+        print_section("GitHub Actions Usage")
+        print("  (Actions data unavailable.)")
+        print()
+        return
+    user_minutes = actions.get("minutes", 0)
+    storage_gb_hours = actions.get("storage_gb_hours", 0)
+    sku_breakdown = actions.get("sku_breakdown") or {}
+    print_section("GitHub Actions Usage")
+    print("  Summary:")
+    print(f"    Compute Minutes:    {user_minutes:>10.1f} min")
+    print(f"    Storage (GB-hrs):   {storage_gb_hours:>10.4f} GB-hrs")
+    print(f"    Avg Storage (MB):   {gb_hours_to_avg_mb(storage_gb_hours):>10.1f} MB")
+    print()
+    print("  Per-SKU Breakdown:")
+    print(f"    {'SKU':<30} {'QTY':>10} {'UNIT':<18} {'GROSS':>10} {'DISCOUNT':>10} {'NET':>10}")
+    print(f"    {'-' * 30} {'-' * 10} {'-' * 18} {'-' * 10} {'-' * 10} {'-' * 10}")
+    for sku, item in sku_breakdown.items():
+        qty = item.get("grossQuantity", 0)
+        unit = item.get("unitType", "")
+        gross = item.get("grossAmount", 0)
+        discount = item.get("discountAmount", 0)
+        net = item.get("netAmount", 0)
+        print(
+            f"    {sku:<30} {qty:>10.4f} {unit:<18} {fmt_price(gross):>10} "
+            f"{fmt_price(discount):>10} {fmt_price(net):>10}"
+        )
+    print()
+
+
+def render_repo_actions_table(repo_actions: list[dict]) -> None:
+    """Print the full per-repository Actions table."""
+    print_section("Per-Repository Actions Breakdown")
+    print(f"  {'REPO':<45} {'MINUTES':>10} {'GB-HRS':>10} {'AVG MB':>10} {'GROSS':>10}")
+    print(f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
+    for row in repo_actions:
+        print(
+            f"  {row['repo']:<45} {row['minutes']:>10.1f} "
+            f"{row['storage_gb_hours']:>10.4f} {row['avg_mb']:>10.1f} "
+            f"{fmt_price(row['gross']):>10}"
+        )
+    total_mins = sum(r["minutes"] for r in repo_actions)
+    total_gb = sum(r["storage_gb_hours"] for r in repo_actions)
+    total_mb = gb_hours_to_avg_mb(total_gb)
+    total_gross = sum(r["gross"] for r in repo_actions)
+    print(f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
+    print(
+        f"  {'TOTAL':<45} {total_mins:>10.1f} {total_gb:>10.4f} "
+        f"{total_mb:>10.1f} {fmt_price(total_gross):>10}"
+    )
+    print()
+
+
+def render_actions_top_consumers(repo_actions: list[dict]) -> None:
+    """Print top 10 repositories by Actions minutes."""
+    print_sep("Top 10 Repos by Actions Minutes")
+    print()
+    sorted_repos = sorted(repo_actions, key=lambda row: row["minutes"], reverse=True)
+    for row in sorted_repos[:10]:
+        print(f"    {row['minutes']:>8.1f} min | {row['avg_mb']:>8.1f} MB | {row['repo']}")
+    print()
+
+
+def render_actions_os_breakdown(breakdown: dict | None) -> None:
+    """Print OS breakdown from a pre-fetched breakdown dict."""
+    print_sep("Actions Compute by OS (from workflow runs)")
+    print()
+    if not breakdown or not breakdown.get("found"):
+        print("  No detailed OS breakdown available from workflow runs API.")
+        print("  (Use the Actions Summary above for total minutes by OS type)")
+        print()
+        return
+    total_os = breakdown.get("totals") or {}
+    for row in breakdown.get("repos", []):
+        print(f"  {row['name']}:")
+        for os_name, mins in row.get("os_minutes", {}).items():
+            if mins > 0:
+                print(f"    {os_name:<10} {mins:>8.1f} min")
+        print()
+    print("  TOTAL:")
+    for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
+        mins = total_os.get(os_name, 0) / 60000
+        if mins > 0:
+            print(f"    {os_name:<10} {mins:>8.1f} min")
+    print()
+
+
+def render_limits_summary(actions: dict | None) -> None:
+    """Print free-tier limits from a pre-fetched ``actions`` section dict."""
+    user_minutes = (actions or {}).get("minutes", 0) or 0
+    storage_gb_hours = (actions or {}).get("storage_gb_hours", 0) or 0
+    print_section("Limits Summary")
+    min_limit = 2000
+    min_remaining = max(0, min_limit - user_minutes) if user_minutes else min_limit
+    min_pct = (user_minutes / min_limit * 100) if user_minutes and min_limit else 0
+    avg_storage_mb = gb_hours_to_avg_mb(storage_gb_hours) if storage_gb_hours else 0
+    storage_limit = 500
+    storage_remaining = max(0, storage_limit - avg_storage_mb)
+    storage_pct = (avg_storage_mb / storage_limit * 100) if storage_limit else 0
+    print("  Actions Minutes:")
+    print(f"    Used:         {user_minutes:>8.1f} / {min_limit} min")
+    print(f"    Remaining:    {min_remaining:>8.1f} min ({min_pct:.1f}% used)")
+    print()
+    print("  Actions Storage (avg):")
+    print(f"    Used:         {avg_storage_mb:>8.1f} / {storage_limit} MB")
+    print(f"    Remaining:    {storage_remaining:>8.1f} MB ({storage_pct:.1f}% used)")
+    print()
     print("  Copilot Pro:")
     print("    Includes: Copilot Chat, Copilot Agent, Code Review, etc.")
     print("    Premium requests are billed at $0.04/request after included allowance.")

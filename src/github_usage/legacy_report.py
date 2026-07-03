@@ -6,86 +6,55 @@ import sys
 
 from .api import GitHubAPI
 from .auth import check_user_scope, resolve_token
-from .billing import get_billing_summary, get_user_actions_billing
-from .report_account import show_account_info, show_rate_limits, show_what_else
-from .report_actions import (
-    show_actions_os_breakdown,
-    show_actions_per_repo,
-    show_actions_summary,
-    show_actions_top_consumers,
-    show_limits_summary,
-)
-from .report_products import (
-    show_base_costs,
-    show_copilot_summary,
-    show_full_billing_history,
-    show_gitlfs_summary,
-    show_monthly_costs,
-)
-from .report_summary import show_final_summary
-from .storage import get_storage_analysis
+from .legacy_report_data import LEGACY_DEFAULT_MAX_REPOS, build_legacy_report_data
+from .legacy_terminal import render_legacy_report
+from .report_account import fetch_account_info, fetch_rate_limits
 from .terminal import print_header
 
 
-def _run_report_body(api: GitHubAPI, username: str) -> None:
-    """Drive the report sections in display order: Actions → repos → Copilot → LFS → costs → limits → final summary → what-else."""
-    # Actions
-    user_minutes, user_storage_gb, actions_sku = get_user_actions_billing(api, username)
-    actions_gross_total = sum(i.get("grossAmount", 0) for i in (actions_sku or {}).values())
-    actions_discount_total = sum(i.get("discountAmount", 0) for i in (actions_sku or {}).values())
-    actions_net_total = sum(i.get("netAmount", 0) for i in (actions_sku or {}).values())
-    if user_minutes is not None:
-        show_actions_summary(api, username, user_minutes, user_storage_gb, actions_sku)
+def run_legacy_report_session(
+    *,
+    timeout: float | None = None,
+    max_retries: int | None = None,
+    warn_over: list[str] | str | None = None,
+    max_repos: int = LEGACY_DEFAULT_MAX_REPOS,
+) -> tuple[int, dict | None, str | None]:
+    """Fetch once, render terminal report; return ``(exit_code, data, username)``."""
+    token = resolve_token()
+    if not token:
+        from .auth import print_missing_token_error
 
-    # Repos
-    repos = api.get_all_pages("/user/repos", {"type": "all"}, limit=100)
-    repo_data = show_actions_per_repo(api, repos)
-    show_actions_top_consumers(repo_data)
-    show_actions_os_breakdown(api, repos)
+        print_missing_token_error()
+        return 1, None, None
 
-    # Copilot
-    show_copilot_summary(api, username)
+    try:
+        api = GitHubAPI(token, timeout=timeout, max_retries=max_retries)
+        if not check_user_scope(api):
+            print("Error: Your GitHub token is not valid for this operation.")
+            return 1, None, None
 
-    # Git LFS
-    show_gitlfs_summary(api, username)
+        print_header()
+        account = fetch_account_info(api)
+        username = str(account.get("login") or "?")
+        rate_limits = fetch_rate_limits(api)
+        data = build_legacy_report_data(
+            api,
+            username,
+            max_repos=max_repos,
+            warn_over=warn_over,
+            include_release_assets=False,
+            account=account,
+            rate_limits=rate_limits,
+        )
+        render_legacy_report(data)
+        return 0, data, username
 
-    # Cost estimate
-    show_monthly_costs(repo_data, username, api)
-
-    # Full billing history
-    show_full_billing_history(api, username)
-
-    # Limits
-    show_limits_summary(username, user_minutes or 0, user_storage_gb or 0)
-
-    # Base costs (v3 addition — standalone section)
-    copilot_summary = get_billing_summary(api, username, "Copilot")
-    lfs_summary = get_billing_summary(api, username, "git_lfs")
-    if repos:
-        show_base_costs(api, username, actions_sku, copilot_summary, lfs_summary)
-
-    # Final summary (v3 addition)
-    storage_analysis = get_storage_analysis(api, repos) if repos else {"repos": []}
-    show_final_summary(
-        username,
-        user_minutes,
-        user_storage_gb,
-        actions_gross_total,
-        actions_discount_total,
-        actions_net_total,
-        repo_data,
-        copilot_summary,
-        lfs_summary,
-        storage_analysis,
-        api,
-    )
-
-    # What else is available
-    show_what_else(api, username)
-
-    print("=" * 70)
-    print("  End of Report v3")
-    print("=" * 70)
+    except RuntimeError as exc:
+        print(f"Error: {exc}")
+        return 1, None, None
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+        return 130, None, None
 
 
 def main(
@@ -100,38 +69,11 @@ def main(
 ) -> str | None:
     """Run the legacy interactive report. Return the resolved username, or None on failure.
 
-    The ``export``/``output``/``month``/``dry_run`` parameters are accepted here
-    so the CLI can pass parsed arguments through, but the actual export
-    orchestration is performed by the CLI (see :mod:`github_usage.cli`). This
-    keeps the data-collection path single-purpose and avoids duplicating API
-    calls between the terminal ``show_*`` flow and :func:`build_report_data`.
+    Export orchestration is performed by :mod:`github_usage.cli` using the data
+    returned from :func:`run_legacy_report_session`.
     """
-    token = resolve_token()
-    if not token:
-        from .auth import print_missing_token_error
-
-        print_missing_token_error()
-        sys.exit(1)
-
-    try:
-        api = GitHubAPI(token, timeout=timeout, max_retries=max_retries)
-
-        if not check_user_scope(api):
-            print("Error: Your GitHub token is not valid for this operation.")
-            sys.exit(1)
-
-        # Account & rate limits
-        print_header()
-        username, _user_type = show_account_info(api)
-        show_rate_limits(api)
-
-        _run_report_body(api, username)
-
-        return username
-
-    except RuntimeError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        print("\nInterrupted.")
-        sys.exit(1)
+    del export, output, no_interactive, month, dry_run  # CLI-owned kwargs
+    code, _data, username = run_legacy_report_session(timeout=timeout, max_retries=max_retries)
+    if code != 0:
+        sys.exit(code if code != 130 else 1)
+    return username

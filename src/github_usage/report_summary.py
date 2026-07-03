@@ -58,6 +58,74 @@ def show_final_summary(
     _print_recommendations(user_minutes, repo_data, premium_by_model, lfs_summary, storage_analysis)
 
 
+def render_final_summary_from_data(data: dict) -> None:
+    """Print final summary from a legacy report superset dict (no API)."""
+    actions = data.get("actions") or {}
+    monthly = data.get("monthly_costs") or {}
+    actions_costs = monthly.get("actions") or {}
+    user_minutes = actions.get("minutes", 0)
+    user_storage_gb_hours = actions.get("storage_gb_hours", 0)
+    actions_gross = actions_costs.get("gross", 0)
+    actions_discount = actions_costs.get("discount", 0)
+    actions_net = actions_costs.get("net", 0)
+    repo_data = [
+        (
+            row["repo"],
+            row["minutes"],
+            row["storage_gb_hours"],
+            row["avg_mb"],
+            row["gross"],
+            row.get("sku", {}),
+        )
+        for row in data.get("repo_actions") or []
+    ]
+    copilot_summary = data.get("copilot_billing")
+    lfs_summary = data.get("lfs_billing")
+    storage_analysis = data.get("storage_analysis") or {"repos": []}
+    premium_by_model = data.get("copilot_premium")
+    if premium_by_model is None:
+        copilot = data.get("copilot")
+        by_model = (copilot or {}).get("by_model") or {}
+        if by_model:
+            premium_by_model = {
+                model: {
+                    "total_requests": values.get("requests", 0),
+                    "total_gross": values.get("gross", 0),
+                    "total_discount": values.get("discount", 0),
+                    "total_net": values.get("net", 0),
+                    "items": [],
+                }
+                for model, values in by_model.items()
+            }
+
+    print_section("FINAL SUMMARY — Key Insights & Biggest Consumers")
+    copilot_gross = copilot_summary["total_gross"] if copilot_summary else 0
+    copilot_discount = copilot_summary["total_discount"] if copilot_summary else 0
+    lfs_gross = lfs_summary["total_gross"] if lfs_summary else 0
+    lfs_discount = lfs_summary["total_discount"] if lfs_summary else 0
+    lfs_net = lfs_summary["total_net"] if lfs_summary else 0
+    total_gross = (actions_gross or 0) + copilot_gross + lfs_gross
+    total_discount = (actions_discount or 0) + copilot_discount + lfs_discount
+    total_net = (
+        (actions_net or 0) + (copilot_summary["total_net"] if copilot_summary else 0) + lfs_net
+    )
+    _print_cost_overview(total_gross, total_discount, total_net)
+    _print_top_consumers(user_minutes, actions_gross, repo_data, premium_by_model, lfs_summary)
+    _print_storage_breakdown(storage_analysis)
+    _print_utilization(user_minutes, user_storage_gb_hours)
+    _print_impactful_findings(
+        user_minutes,
+        actions_gross,
+        total_gross,
+        total_discount,
+        total_net,
+        repo_data,
+        premium_by_model,
+        storage_analysis,
+    )
+    _print_recommendations(user_minutes, repo_data, premium_by_model, lfs_summary, storage_analysis)
+
+
 def _print_cost_overview(total_gross, total_discount, total_net):
     print("\n  1. COST OVERVIEW")
     print(f"  {'─' * 55}")

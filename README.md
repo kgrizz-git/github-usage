@@ -296,7 +296,9 @@ ref is available.
 ## Exporting Reports
 
 Both the legacy and email-report commands can write the report to a file in
-CSV, XLSX, PDF, JSON, or plain text format. Exported files go through a
+CSV, XLSX, PDF, JSON, or plain text format. The legacy path fetches data once
+and uses it for both terminal output and export (lower GitHub API usage when
+exporting). Exported files go through a
 redaction layer that masks usernames, repository names, email addresses, and
 dollar amounts before writing; interactive terminal output and the email body
 are not redacted.

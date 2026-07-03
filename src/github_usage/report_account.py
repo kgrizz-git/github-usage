@@ -7,12 +7,15 @@ from datetime import UTC, datetime
 from .terminal import print_section, print_sep
 
 
-def show_rate_limits(api):
-    """Print a breakdown of GitHub API rate limits for the authenticated token."""
-    print_sep("API Rate Limit")
+def fetch_rate_limits(api) -> dict:
+    """Return the full ``GET /rate_limit`` payload."""
     data = api.request("GET", "/rate_limit")
-    if not isinstance(data, dict):
-        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+def render_rate_limits(data: dict) -> None:
+    """Print rate limits from a pre-fetched ``/rate_limit`` response."""
+    print_sep("API Rate Limit")
     resources = data.get("resources", {})
     if not isinstance(resources, dict):
         resources = {}
@@ -61,17 +64,27 @@ def show_rate_limits(api):
     print()
 
 
-def show_account_info(api):
-    """Print account details, plan info, and collaborator seat counts."""
-    print_sep("Account Info")
+def fetch_account_info(api) -> dict:
+    """Return account metadata from ``GET /user``."""
     user = api.request("GET", "/user")
     if not isinstance(user, dict):
         user = {}
-    username = user.get("login", "?")
-    user_type = user.get("type", "?")
     plan = user.get("plan", {})
     if not isinstance(plan, dict):
         plan = {}
+    return {
+        "login": user.get("login", "?"),
+        "type": user.get("type", "?"),
+        "plan": plan,
+    }
+
+
+def render_account_info(account: dict) -> None:
+    """Print account details from a pre-fetched account dict."""
+    print_sep("Account Info")
+    username = account.get("login", "?")
+    user_type = account.get("type", "?")
+    plan = account.get("plan") or {}
 
     print(f"  Username:   {username}")
     print(f"  Account:    {user_type}")
@@ -92,11 +105,22 @@ def show_account_info(api):
         if private_repos:
             print(f"  Private repos: {private_repos} allowed")
     print()
-    return username, user_type
 
 
-def show_what_else(api, username):
-    """Show info about other available data points."""
+def show_rate_limits(api):
+    """Print a breakdown of GitHub API rate limits for the authenticated token."""
+    render_rate_limits(fetch_rate_limits(api))
+
+
+def show_account_info(api):
+    """Print account details, plan info, and collaborator seat counts."""
+    account = fetch_account_info(api)
+    render_account_info(account)
+    return account["login"], account["type"]
+
+
+def render_what_else(username: str) -> None:
+    """Print static pointers to other available billing endpoints."""
     print_section("Other Available Data Points")
     print("  Products available via billing API:")
     print("    - actions        : GitHub Actions compute & storage")
@@ -122,3 +146,9 @@ def show_what_else(api, username):
     print("    - Audit Log:      1750/hour")
     print("    - Dependency:     100/hour (snapshots + SBOM)")
     print()
+
+
+def show_what_else(api, username):
+    """Show info about other available data points."""
+    del api  # static section; kept for backward-compatible signature
+    render_what_else(username)

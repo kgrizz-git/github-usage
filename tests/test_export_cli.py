@@ -14,6 +14,13 @@ def _report_data():
     return json.loads((FIXTURES / "export_report_data.json").read_text())
 
 
+def _legacy_session_patch(data):
+    return mock.patch(
+        "github_usage.legacy_report.run_legacy_report_session",
+        return_value=(0, data, "octocat"),
+    )
+
+
 class LegacyExportCliTests(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -30,9 +37,7 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
-            mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
-            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
+            _legacy_session_patch(data),
         ):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -56,9 +61,7 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
-            mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
-            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
+            _legacy_session_patch(data),
         ):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -78,9 +81,7 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
-            mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
-            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
+            _legacy_session_patch(data),
         ):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -132,7 +133,10 @@ class LegacyExportCliTests(unittest.TestCase):
         with (
             mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
+            mock.patch(
+                "github_usage.legacy_report.run_legacy_report_session",
+                return_value=(0, _report_data(), "octocat"),
+            ),
         ):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -153,12 +157,15 @@ class LegacyExportCliTests(unittest.TestCase):
 
         with (
             mock.patch("github_usage.cli.resolve_token", side_effect=capture_token),
-            mock.patch("github_usage.cli.legacy_main", return_value="octocat") as legacy_main,
+            mock.patch(
+                "github_usage.legacy_report.run_legacy_report_session",
+                return_value=(0, None, "octocat"),
+            ) as session,
         ):
             code = cli.main(["ghp_fake", "--no-interactive"])
 
         self.assertEqual(code, 0)
-        legacy_main.assert_called_once()
+        session.assert_called_once()
         self.assertTrue(seen_argv)
         # Fix #1: the pre-check now passes only the peeled token so resolve_token
         # reads "ghp_fake" as the token, not the "github-usage" program name.
@@ -169,12 +176,15 @@ class LegacyExportCliTests(unittest.TestCase):
 
         with (
             mock.patch("github_usage.cli.resolve_token", return_value="ghp_fake"),
-            mock.patch("github_usage.cli.legacy_main", return_value="octocat") as legacy_main,
+            mock.patch(
+                "github_usage.legacy_report.run_legacy_report_session",
+                return_value=(0, None, "octocat"),
+            ) as session,
         ):
             code = cli.main(["ghp_fake"])
 
         self.assertEqual(code, 0)
-        legacy_main.assert_called_once()
+        session.assert_called_once()
 
 
 class EmailReportExportCliTests(unittest.TestCase):

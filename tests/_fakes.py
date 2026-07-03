@@ -51,7 +51,8 @@ class FakeAPI:
             raise value
         return value
 
-    def get_all_pages(self, path, params=None):
+    def get_all_pages(self, path, params=None, limit=None):
+        del limit  # tests return preconfigured pages regardless of limit
         self.requests.append(("PAGES", path, params or {}))
         return self._pages_responses.get(path, [])
 

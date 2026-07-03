@@ -198,10 +198,8 @@ class CliTests(unittest.TestCase):
         self.assertIn("github-usage", stdout.getvalue())
         resolve_token.assert_not_called()
 
-    def test_export_does_not_call_user_when_legacy_main_returns_username(self):
-        # A3: when legacy_main returns a username, _run_legacy_report must
-        # not make a redundant /user call (legacy_main already called it
-        # twice). See bug-report-20260620-235700.md#A3.
+    def test_export_does_not_call_user_when_session_returns_data(self):
+        # Export reuses data from run_legacy_report_session (no second fetch).
         from github_usage import cli
 
         data = {
@@ -222,15 +220,15 @@ class CliTests(unittest.TestCase):
         }
         with (
             mock.patch("github_usage.cli.resolve_token", return_value="fake-token"),
-            mock.patch("github_usage.cli.legacy_main", return_value="octocat"),
-            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
-            mock.patch("github_usage.cli_email_report.check_user_scope", return_value=True),
-            mock.patch("github_usage.cli.report_data.build_report_data", return_value=data),
+            mock.patch(
+                "github_usage.legacy_report.run_legacy_report_session",
+                return_value=(0, data, "octocat"),
+            ),
+            mock.patch("github_usage.api.GitHubAPI") as api_cls,
         ):
-            api = api_cls.return_value
             code = cli.main(["--export", "json", "--no-interactive"])
         self.assertEqual(code, 0)
-        api.request.assert_not_called()
+        api_cls.assert_not_called()
 
     def test_token_precheck_fails_when_resolve_token_returns_none(self):
         # Fix #1: the pre-check now calls resolve_token(argv=([token] if token else []))

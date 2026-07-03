@@ -9,7 +9,6 @@ from collections.abc import Sequence
 from typing import Any
 
 from . import __version__, email_report, export_report, report_data
-from .api import GitHubAPI
 from .auth import resolve_token
 from .cli_email_report import (
     _export_report,
@@ -18,7 +17,6 @@ from .cli_email_report import (
     _validate_report_sections,
 )
 from .cli_parsers import _email_parser, _legacy_parser
-from .legacy_report import main as legacy_main
 from .setup_config import SetupPaths, email_report_args, load_config, repo_root
 
 HELP = """GitHub Monthly Usage Report
@@ -335,7 +333,6 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
 
     export_format = _resolve_export_format(args)
 
-    legacy_argv = ["github-usage", *([token] if token else []), *flag_argv]
     if not resolve_token(argv=([token] if token else [])):
         from .auth import print_missing_token_error
 
@@ -345,37 +342,17 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
     if not export_format and sys.stdin.isatty() and not args.no_interactive:
         export_format = _prompt_export_format()
 
-    try:
-        username = (
-            legacy_main(
-                export=export_format,
-                output=args.output,
-                no_interactive=args.no_interactive,
-                month=None,
-                dry_run=args.dry_run,
-                timeout=getattr(args, "timeout", None),
-                max_retries=getattr(args, "max_retries", None),
-            )
-            or "unknown"
-        )
-    except SystemExit as exc:
-        return _safe_exit_code(exc.code)
+    from .legacy_report import run_legacy_report_session
 
-    if export_format and export_format != "none":
-        token = resolve_token(argv=legacy_argv)
-        api = GitHubAPI(token)
-        data = report_data.build_report_data(
-            api,
-            username,
-            include_actions=True,
-            include_copilot=True,
-            include_lfs=True,
-            include_consumers=True,
-            include_artifact_storage=True,
-            include_release_assets=False,
-            max_repos=100,
-            warn_over=None,
-        )
+    code, data, username = run_legacy_report_session(
+        timeout=getattr(args, "timeout", None),
+        max_retries=getattr(args, "max_retries", None),
+    )
+    if code != 0:
+        return code
+    username = username or "unknown"
+
+    if export_format and export_format != "none" and data is not None:
         if not args.json or args.output:
             path = export_report.export(
                 data,

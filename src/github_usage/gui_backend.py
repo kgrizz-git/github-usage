@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from . import cli, export_report, report_data
+from . import cli, export_report
 from .auth import resolve_token
 from .cli_email_report import _init_github_api
 from .cli_runs import list_local_runs
@@ -325,17 +325,14 @@ def run_legacy_report_data(
         return api_result, None, None
     api, username = api_result
     try:
-        data = report_data.build_report_data(
+        from .legacy_report_data import build_legacy_report_data
+
+        data = build_legacy_report_data(
             api,
             username,
-            include_actions=True,
-            include_copilot=True,
-            include_lfs=True,
-            include_consumers=True,
-            include_artifact_storage=True,
-            include_release_assets=False,
             max_repos=100,
             warn_over=None,
+            include_release_assets=False,
         )
         return 0, data, username
     except (RuntimeError, ValueError) as exc:
