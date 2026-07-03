@@ -75,7 +75,9 @@ class SetupView(VerticalScroll):
     def _current_profile_name(self) -> str:
         select = self.query_one("#profile-select", Select)
         value = select.value
-        return str(value) if value is not Select.BLANK else DEFAULT_PROFILE_NAME
+        if value == Select.BLANK or str(value) == "Select.NULL" or value is None:
+            return DEFAULT_PROFILE_NAME
+        return str(value)
 
     def _reload_form(self) -> None:
         secrets = read_secrets(self._paths)

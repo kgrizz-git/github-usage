@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import sys
 from collections.abc import Sequence
@@ -12,9 +13,9 @@ KNOWN_SUBCOMMANDS = frozenset({"setup", "email-report", "runs"})
 _MISSING_GUI_MESSAGE = """\
 Error: TUI dependencies are not installed.
 To launch the terminal interface, install the optional gui package:
-  pip install 'github-usage[gui]'
+  .venv/bin/pip install -e '.[gui]'
 Or if developing locally:
-  uv pip install -e '.[gui]'
+  uv pip install --python .venv -e '.[gui]'
 Or use command-line mode:
   github-usage --cli
   ./start.sh --cli
@@ -84,11 +85,11 @@ def route_entry(argv: Sequence[str]) -> RouteResult:
 
 def run_tui() -> int:
     """Launch the Textual application or print install instructions."""
-    try:
-        from .gui.app import GitHubUsageApp
-    except ImportError:
+    if importlib.util.find_spec("textual") is None:
         print(_MISSING_GUI_MESSAGE, file=sys.stderr)
         return 1
+    from .gui.app import GitHubUsageApp
+
     app = GitHubUsageApp()
     app.run()
     return 0

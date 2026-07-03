@@ -8,8 +8,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from github_usage.cli_gui import route_entry
+from github_usage.cli_gui import _MISSING_GUI_MESSAGE, route_entry
 from github_usage.gui_backend import (
+    DEFAULT_PROFILE_NAME,
     add_profile,
     delete_profile,
     load_profiles,
@@ -63,12 +64,15 @@ class RouteEntryTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         run_tui.assert_called_once()
 
+    def test_missing_gui_message_contains_venv_python(self) -> None:
+        self.assertIn("uv pip install --python .venv -e '.[gui]'", _MISSING_GUI_MESSAGE)
+
 
 @unittest.skipUnless(
     __import__("importlib").util.find_spec("textual") is not None,
     "textual not installed",
 )
-class SetupViewPilotTests(unittest.TestCase):
+class SetupViewPilotTests(unittest.IsolatedAsyncioTestCase):
     """Headless Textual pilot smoke for the setup screen."""
 
     async def test_setup_view_mounts(self) -> None:
@@ -86,6 +90,9 @@ class SetupViewPilotTests(unittest.TestCase):
 
 class GuiBackendProfileTests(unittest.TestCase):
     """Profile and secrets persistence via gui_backend."""
+
+    def test_default_profile_name_export(self) -> None:
+        self.assertEqual(DEFAULT_PROFILE_NAME, "default")
 
     def test_write_and_read_secrets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

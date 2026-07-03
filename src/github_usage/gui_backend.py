@@ -38,7 +38,11 @@ from .setup_launchd import (
     launch_agent_status,
 )
 from .setup_secrets import _apply_env
-from .setup_workflow import render_workflow, validate_cron, write_workflow
+from .setup_workflow import (
+    render_workflow,
+    validate_cron,
+    write_workflow,
+)
 
 
 @dataclass

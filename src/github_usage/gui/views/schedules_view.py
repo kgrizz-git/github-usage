@@ -64,7 +64,9 @@ class SchedulesView(VerticalScroll):
 
     def _profile_name(self) -> str:
         value = self.query_one("#profile-select", Select).value
-        return str(value) if value is not Select.BLANK else DEFAULT_PROFILE_NAME
+        if value == Select.BLANK or str(value) == "Select.NULL" or value is None:
+            return DEFAULT_PROFILE_NAME
+        return str(value)
 
     def _reload_form(self) -> None:
         config = load_profiles(self._paths)
