@@ -16,7 +16,7 @@ test -x start.sh
 ./start.sh </dev/null | grep -q "Usage: ./start.sh"
 PYTHONPATH=src scripts/python -m github_usage --help >/dev/null
 SMOKE_HOME="$(mktemp -d)"
-env -u GITHUB_TOKEN HOME="$SMOKE_HOME" PYTHONPATH=src scripts/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
+env -u GITHUB_TOKEN GITHUB_USAGE_CLI=1 HOME="$SMOKE_HOME" PYTHONPATH=src scripts/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
   cat /tmp/github-usage-smoke.out
   echo "Expected no-token smoke command to fail"
   exit 1

@@ -23,8 +23,17 @@ from .setup_config import SetupPaths, email_report_args, load_config, repo_root
 
 HELP = """GitHub Monthly Usage Report
 
-Usage:
-  github-usage [GITHUB_TOKEN] [options]
+Default (interactive terminal): launch the Textual TUI
+  github-usage
+  ./start.sh
+
+Command-line mode: pass --cli
+  github-usage --cli [GITHUB_TOKEN] [options]
+  github-usage --cli setup [options]
+  ./start.sh --cli                  Interactive bash menu
+  ./start.sh setup                  Setup shortcut (no --cli required)
+
+Subcommands (CLI shortcuts, no --cli required):
   github-usage email-report [options]
   github-usage setup [options]
   github-usage runs [options]
@@ -59,6 +68,9 @@ Email-report options:
   --yes-include-release-assets, --max-repos N, --warn-over VALUE,
   --skip-actions, --skip-copilot, --skip-lfs, --dry-run,
   --timeout SECONDS, --max-retries N
+
+TUI optional dependency:
+  pip install 'github-usage[gui]'
 
 Note: a --month YYYY-MM flag for historical billing queries is planned but
 deferred. GitHub's billing endpoints do not currently support date-range
@@ -382,7 +394,13 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the CLI and return a process exit code."""
     try:
-        args = list(sys.argv[1:] if argv is None else argv)
+        raw = list(sys.argv[1:] if argv is None else argv)
+        from .cli_gui import route_entry
+
+        routed = route_entry(raw)
+        if routed.handled:
+            return routed.exit_code
+        args = routed.argv
 
         if args and args[0] == "email-report":
             return _run_email_report(args[1:])

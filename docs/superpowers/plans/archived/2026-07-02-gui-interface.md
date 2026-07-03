@@ -1,4 +1,4 @@
-> **Status:** PROPOSED
+> **Status:** COMPLETE
 
 **Date:** 2026-07-02
 

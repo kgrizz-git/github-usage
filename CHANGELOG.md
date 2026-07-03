@@ -10,7 +10,8 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Added
 
-- **Interactive `start.sh` menu:** Running `./start.sh` with no arguments in an interactive terminal presents a numbered top-level menu (setup, report, email-report, runs, runs-diff, help, exit). Non-interactive contexts (redirected stdin, CI) still receive the standard help banner.
+- **Textual TUI (default in interactive terminals):** `./start.sh` and bare `github-usage` launch a Textual sidebar interface (Setup, Usage Report, Email Report, Schedules, Runs & Drift) when run in a TTY with `pip install -e '.[gui]'`. Command-line mode uses `--cli` (`github-usage --cli`, `./start.sh --cli` for the bash menu). Subcommand shortcuts (`setup`, `email-report`, `runs`, `./start.sh setup`, etc.) unchanged.
+- **Interactive `start.sh` menu:** Running `./start.sh --cli` with no arguments in an interactive terminal presents a numbered top-level menu (setup, report, email-report, runs, runs-diff, help, exit). Non-interactive contexts (redirected stdin, CI) still receive the standard help banner.
 
 ### Changed
 

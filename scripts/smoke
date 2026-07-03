@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-PYTHONPATH=src scripts/python -m github_usage --help
+PYTHONPATH=src scripts/python -m github_usage --cli --help >/dev/null
 PYTHONPATH=src scripts/python -m github_usage --version
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--timeout"
 PYTHONPATH=src scripts/python -m github_usage email-report --help | grep -q -- "--max-retries"
@@ -64,7 +64,7 @@ scripts/setup --help >/dev/null
 
 SMOKE_HOME="$(mktemp -d)"
 
-env -u GITHUB_TOKEN HOME="$SMOKE_HOME" PYTHONPATH=src scripts/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
+env -u GITHUB_TOKEN GITHUB_USAGE_CLI=1 HOME="$SMOKE_HOME" PYTHONPATH=src scripts/python -m github_usage >/tmp/github-usage-smoke.out 2>&1 && {
   cat /tmp/github-usage-smoke.out
   echo "Expected no-token smoke command to fail"
   exit 1
@@ -78,9 +78,9 @@ env -u GITHUB_TOKEN HOME="$SMOKE_HOME" ./start.sh report >/tmp/start-sh-smoke.ou
 }
 grep -q "No GitHub token found" /tmp/start-sh-smoke.out
 
-# Verify start.sh interactive menu prints menu and exits cleanly on choice 7
+# Verify start.sh CLI menu prints menu and exits cleanly on choice 7
 MENU_OUT="$(mktemp)"
-FORCE_INTERACTIVE=1 ./start.sh <<EOF >"$MENU_OUT" 2>&1
+FORCE_INTERACTIVE=1 ./start.sh --cli <<EOF >"$MENU_OUT" 2>&1
 7
 EOF
 grep -q "Run Guided Setup" "$MENU_OUT" || {

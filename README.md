@@ -38,14 +38,15 @@ python3 -m pip install -e .
 Then run:
 
 ```sh
-github-usage --help
-github-usage
+pip install -e '.[gui]'   # optional: Textual TUI (default in interactive terminals)
+github-usage --cli --help # command-line mode
+github-usage              # Textual TUI (interactive TTY)
 ```
 
 You can also run without installing:
 
 ```sh
-PYTHONPATH=src python3 -m github_usage --help
+PYTHONPATH=src python3 -m github_usage --cli --help
 PYTHONPATH=src python3 -m github_usage
 ```
 
@@ -60,22 +61,25 @@ python3 -m pip install -e '.[dev]'
 ./start.sh setup
 ```
 
-In an interactive terminal, `./start.sh` with no arguments opens a top-level menu; choose **1** (Run Guided Setup) to enter the wizard, or run `./start.sh setup` directly.
+In an interactive terminal, `./start.sh` with no arguments launches the **Textual TUI** (install `pip install -e '.[gui]'` first). Use `./start.sh --cli` for the numbered bash menu, or `./start.sh setup` directly for the setup wizard.
 
-### Interactive menus
+### Interactive interfaces
 
-Two numbered menus exist. Do not mix their option numbers.
+Two interfaces exist. Do not mix their option numbers.
 
-| Layer | Invocation | Options |
-|-------|------------|---------|
-| **Top-level** `start.sh` menu | `./start.sh` (TTY) | **1** setup · **2** report · **3** email-report · **4** runs · **5** runs-diff · **6** help · **7** exit |
-| **Setup wizard** menu | `./start.sh setup` or top-level **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify |
+| Interface | Invocation | Purpose |
+|-----------|------------|---------|
+| **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Sidebar navigation: Setup, Usage Report, Email Report, Schedules, Runs & Drift |
+| **CLI bash menu** | `./start.sh --cli` | **1** setup · **2** report · **3** email-report · **4** runs · **5** runs-diff · **6** help · **7** exit |
+| **Setup wizard** | `./start.sh setup` or bash menu **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify |
+
+Subcommand shortcuts (`./start.sh setup`, `github-usage runs`, etc.) work without `--cli`.
 
 **Convention:** wherever this README refers to a setup-wizard choice, use:
 
-> Run `./start.sh`, choose **1** (Run Guided Setup), then choose **N** (*wizard label*) — or run `./start.sh setup` and choose **N**.
+> Run `./start.sh --cli`, choose **1** (Run Guided Setup), then choose **N** (*wizard label*) — or run `./start.sh setup` and choose **N**.
 
-For top-level commands, either run `./start.sh` and choose the matching number, or use `./start.sh <command>` directly.
+For top-level commands, run `./start.sh --cli` and choose the matching number, use the TUI sidebar, or use `./start.sh <command>` directly.
 
 The guided wizard can:
 

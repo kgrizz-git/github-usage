@@ -1,0 +1,59 @@
+Screen {
+    layout: vertical;
+}
+
+#sidebar {
+    width: 28;
+    height: 100%;
+    dock: left;
+    border-right: solid $primary;
+    padding: 1;
+}
+
+#content {
+    width: 1fr;
+    height: 100%;
+    padding: 1;
+}
+
+.sidebar-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+SidebarButton {
+    width: 100%;
+    margin: 0 0 1 0;
+}
+
+SidebarButton.-active {
+    background: $primary 20%;
+}
+
+SectionTitle {
+    text-style: bold;
+    margin: 1 0 1 0;
+}
+
+FormRow {
+    height: auto;
+    margin-bottom: 1;
+}
+
+RichLog {
+    height: 12;
+    border: solid $primary;
+    margin-top: 1;
+}
+
+DataTable {
+    height: 1fr;
+    min-height: 10;
+}
+
+StatusPanel {
+    height: auto;
+    border: solid $primary;
+    padding: 1;
+    margin-bottom: 1;
+}

@@ -6,9 +6,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 show_help() {
   cat << 'EOF'
-Usage: ./start.sh <command> [options]
+Usage: ./start.sh [<command>] [options]
 
-Commands:
+Default (interactive terminal): launches the Textual TUI via github-usage.
+
+Commands (CLI shortcuts — no --cli required):
   setup         Configure local secrets, options, launchd, CI, and hooks.
   report        Run a legacy one-off usage report.
   email-report  Run and send an email report.
@@ -16,6 +18,7 @@ Commands:
   runs-diff     Check for drift between local workflows and the remote default branch.
 
 Global Options:
+  --cli         Command-line mode (bash menu when no subcommand, or forward to github-usage).
   -h, --help    Show this help message.
   -v, --version Show the version.
 
@@ -27,7 +30,7 @@ EOF
 show_menu() {
   while true; do
     echo ""
-    echo "github-usage"
+    echo "github-usage (CLI menu — use ./start.sh without --cli for the TUI)"
     echo ""
     echo "  1) Run Guided Setup (setup)"
     echo "  2) Run Legacy Usage Report (report)"
@@ -68,18 +71,41 @@ show_menu() {
   done
 }
 
+run_github_usage() {
+  exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage "$@"
+}
+
+# Parse --cli from arguments
+CLI_MODE=0
+FILTERED=()
+for arg in "$@"; do
+  if [ "$arg" = "--cli" ]; then
+    CLI_MODE=1
+  else
+    FILTERED+=("$arg")
+  fi
+done
+set -- "${FILTERED[@]}"
+
 COMMAND="${1:-}"
 case "$COMMAND" in
   -v|--version)
-    exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage --version
+    run_github_usage --version
     ;;
   -h|--help)
     show_help
     exit 0
     ;;
   "")
-    if [ -t 0 ] || [ "${FORCE_INTERACTIVE:-}" = "1" ]; then
-      show_menu
+    if [ "$CLI_MODE" = "1" ]; then
+      if [ -t 0 ] || [ "${FORCE_INTERACTIVE:-}" = "1" ]; then
+        show_menu
+      else
+        show_help
+        exit 0
+      fi
+    elif [ -t 0 ]; then
+      run_github_usage
     else
       show_help
       exit 0
@@ -129,36 +155,39 @@ case "$COMMAND" in
       esac
     done
 
-    # Execute legacy report without passing empty arguments
     if [[ -n "$TOKEN" ]]; then
       if [[ ${#ARGS[@]} -eq 0 ]]; then
-        exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage "$TOKEN"
+        GITHUB_USAGE_CLI=1 run_github_usage "$TOKEN"
       else
-        exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage "$TOKEN" "${ARGS[@]}"
+        GITHUB_USAGE_CLI=1 run_github_usage "$TOKEN" "${ARGS[@]}"
       fi
     else
       if [[ ${#ARGS[@]} -eq 0 ]]; then
-        exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage
+        GITHUB_USAGE_CLI=1 run_github_usage
       else
-        exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage "${ARGS[@]}"
+        GITHUB_USAGE_CLI=1 run_github_usage "${ARGS[@]}"
       fi
     fi
     ;;
   email-report)
     shift
-    exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage email-report "$@"
+    run_github_usage email-report "$@"
     ;;
   runs)
     shift
-    exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage runs "$@"
+    run_github_usage runs "$@"
     ;;
   runs-diff)
     shift
-    exec env PYTHONPATH="$ROOT_DIR/src" "$ROOT_DIR/scripts/python" -m github_usage runs --diff "$@"
+    run_github_usage runs --diff "$@"
     ;;
   *)
-    echo "Error: Unknown command '$COMMAND'" >&2
-    echo "Run './start.sh --help' for usage." >&2
-    exit 1
+    if [ "$CLI_MODE" = "1" ]; then
+      run_github_usage --cli "$COMMAND" "${@:2}"
+    else
+      echo "Error: Unknown command '$COMMAND'" >&2
+      echo "Run './start.sh --help' for usage." >&2
+      exit 1
+    fi
     ;;
 esac

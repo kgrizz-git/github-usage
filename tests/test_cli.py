@@ -21,7 +21,10 @@ class CliTests(unittest.TestCase):
     def test_missing_token_exits_one_with_clear_message(self):
         from github_usage import cli
 
-        with mock.patch("github_usage.cli.resolve_token", return_value=None):
+        with (
+            mock.patch.dict(os.environ, {"GITHUB_USAGE_CLI": "1"}),
+            mock.patch("github_usage.cli.resolve_token", return_value=None),
+        ):
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = cli.main([])
