@@ -9,6 +9,8 @@ from collections.abc import Sequence
 from typing import Any
 
 from . import __version__, export_report
+from . import email_report as _email_report
+from . import report_data as _report_data
 from .auth import resolve_token
 from .cli_email_report import (
     _check_email_env_vars,
@@ -21,6 +23,9 @@ from .cli_email_report import (
 )
 from .cli_parsers import _email_parser, _legacy_parser
 from .setup_config import SetupPaths, email_report_args, load_config, repo_root
+
+email_report = _email_report
+report_data = _report_data
 
 HELP = """GitHub Monthly Usage Report
 

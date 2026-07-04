@@ -46,10 +46,15 @@ from .setup_launchd import (
 )
 from .setup_secrets import _apply_env
 from .setup_workflow import (
+    DEFAULT_PROFILE_NAME as _DEFAULT_PROFILE_NAME,
+)
+from .setup_workflow import (
     render_workflow,
     validate_cron,
     write_workflow,
 )
+
+DEFAULT_PROFILE_NAME = _DEFAULT_PROFILE_NAME
 
 
 @dataclass
