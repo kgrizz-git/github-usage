@@ -5,11 +5,11 @@
 ## Email Report Follow-Ups
 
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
-- [ ] Add a 'forecast' for legacy and email reports that estimates total minutes, artifact storage, and premium requests (or AI credits) expected for the month based on the trajectory of the month so far and/or an estimate of when actions minutes, storage, and premium requests (or AI credits) will run out (based on the same).
 
 ## Code Health
 
 - [ ] Refactor `src/github_usage/setup_config.py` (507 lines, over the 500-line limit per `scripts/check-sizes`). Extract a focused submodule — e.g. profile schema/loading (`load_report_profiles`, `find_profile`, `ensure_profiles`, `_default_profile`) and/or the TOML writer helpers (`_emit_*_block`, `write_config`) — to bring the file back under the threshold. Also watch `setup_wizard.py` (461 lines) and the `_manage_profiles()`/`_run_email_report()` functions, which are approaching their limits.
+- [ ] Add `pyright` static type checking to the developer workflow/hooks to catch cross-module import and type errors without running code.
 
 ## Configuration & Setup
 
@@ -18,7 +18,6 @@
 
 ## Deferred
 
-- [ ] Add clearly labeled end-of-month spend projections based on elapsed days in the billing period.
 - [ ] Add optional CC/BCC delivery fields for team and finance distribution.
 - [ ] Evaluate report retention destinations such as GitHub Releases, S3, or shared drives after export/output support exists.
 

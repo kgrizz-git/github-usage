@@ -113,3 +113,75 @@ class LegacyReportSummaryTests(unittest.TestCase):
         rows = legacy_report_detail_rows(data, "user")
         note_rows = [value for metric, value in rows if metric == "Note"]
         self.assertTrue(any("No artifacts or release assets" in value for value in note_rows))
+
+    def test_detail_rows_include_forecast(self) -> None:
+        from datetime import date
+
+        data = {
+            "account": {"type": "User", "plan": {"name": "free"}},
+            "monthly_costs": {
+                "actions": {"net": 1.0},
+                "copilot": {"net": 0.0},
+                "git_lfs": {"net": 0.0},
+                "total": {"net": 1.0},
+            },
+            "actions": {
+                "minutes": 1000.0,
+                "minutes_limit": 2000,
+                "minutes_percent": 50.0,
+                "storage_gb_hours": 3.0,
+                "storage_avg_mb": 250.0,
+                "storage_limit_mb": 500,
+                "storage_percent": 50.0,
+            },
+            "copilot": {"total_requests": 100.0},
+            "repo_actions": [],
+            "storage_analysis": {"repos": []},
+            "errors": {},
+        }
+        rows = legacy_report_detail_rows(
+            data,
+            "octocat",
+            premium_requests_limit=1000.0,
+            reference_date=date(2026, 7, 15),
+        )
+        metrics = [metric for metric, _value in rows]
+        self.assertIn("── Forecast ──", metrics)
+        projected_values = [value for metric, value in rows if "Projected" in metric]
+        self.assertTrue(any("2066.7 / 2000" in value for value in projected_values))
+        self.assertTrue(any("516.7 MB / 500 MB" in value for value in projected_values))
+        self.assertTrue(any("206.7 / 1000" in value for value in projected_values))
+
+    def test_detail_rows_omit_forecast_before_day_3(self) -> None:
+        from datetime import date
+
+        data = {
+            "account": {},
+            "monthly_costs": {
+                "actions": {"net": 0.0},
+                "copilot": {"net": 0.0},
+                "git_lfs": {"net": 0.0},
+                "total": {"net": 0.0},
+            },
+            "actions": {
+                "minutes": 100.0,
+                "minutes_limit": 2000,
+                "storage_avg_mb": 50.0,
+                "storage_limit_mb": 500,
+            },
+            "copilot": {"total_requests": 10.0},
+            "repo_actions": [],
+            "storage_analysis": {"repos": []},
+            "errors": {},
+        }
+        from github_usage.report_forecast_data import build_report_forecast
+
+        self.assertIsNone(build_report_forecast(data, reference_date=date(2026, 7, 2)))
+        rows = legacy_report_detail_rows(
+            data,
+            "octocat",
+            premium_requests_limit=1000.0,
+            reference_date=date(2026, 7, 2),
+        )
+        metrics = [metric for metric, _value in rows]
+        self.assertNotIn("── Forecast ──", metrics)

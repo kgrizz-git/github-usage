@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 
 
@@ -155,20 +156,67 @@ def _git_lfs_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     return rows
 
 
-def legacy_report_detail_rows(data: dict[str, Any], username: str) -> list[tuple[str, str]]:
-    """Return full legacy report rows for TUI tables (section headers + detail)."""
+def _forecast_rows(
+    data: dict[str, Any],
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    reference_date=None,
+) -> list[tuple[str, str]]:
+    """Return projected end-of-month usage rows or empty list when not computable."""
+    if not include_forecast:
+        return []
+    forecast = build_report_forecast(
+        data,
+        premium_requests_limit=premium_requests_limit,
+        reference_date=reference_date,
+    )
+    if forecast is None:
+        return []
+
     rows: list[tuple[str, str]] = []
-    errors = data.get("errors") or {}
-    monthly = data.get("monthly_costs") or {}
+
+    minutes = forecast["minutes"]
+    minutes_line = f"{minutes['projected']:.1f} / {minutes['limit']:.0f}"
+    if minutes["limit"]:
+        minutes_line += f" ({minutes['projected'] / minutes['limit'] * 100:.1f}%)"
+    rows.append(("Projected minutes at month end", minutes_line))
+
+    storage = forecast["storage_avg_mb"]
+    storage_line = f"{storage['projected']:.1f} MB / {storage['limit']:.0f} MB"
+    if storage["limit"]:
+        storage_line += f" ({storage['projected'] / storage['limit'] * 100:.1f}%)"
+    rows.append(("Projected storage at month end", storage_line))
+
+    premium = forecast["premium_requests"]
+    if premium_requests_limit is not None:
+        premium_line = f"{premium['projected']:.1f} / {premium_requests_limit:.0f}"
+        if premium_requests_limit > 0:
+            premium_line += f" ({premium['projected'] / premium_requests_limit * 100:.1f}%)"
+        rows.append(("Projected premium requests at month end", premium_line))
+    else:
+        rows.append(("Projected premium requests at month end", f"{premium['projected']:.1f}"))
+
+    return rows
+
+
+def _overview_rows(data: dict[str, Any], username: str) -> list[tuple[str, str]]:
+    """Overview section rows for the detail table."""
     account = data.get("account") or {}
     plan = (account.get("plan") or {}).get("name", "n/a")
+    return [
+        _section("Overview"),
+        ("User", str(username)),
+        ("Account type", str(account.get("type", "n/a"))),
+        ("Plan", str(plan)),
+    ]
 
-    rows.append(_section("Overview"))
-    rows.append(("User", str(username)))
-    rows.append(("Account type", str(account.get("type", "n/a"))))
-    rows.append(("Plan", str(plan)))
 
-    rows.append(_section("Monthly costs (net)"))
+def _monthly_cost_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
+    """Monthly costs section rows for the detail table."""
+    errors = data.get("errors") or {}
+    monthly = data.get("monthly_costs") or {}
+    rows = [_section("Monthly costs (net)")]
     if errors.get("monthly_costs"):
         rows.append(("Costs", f"n/a ({errors['monthly_costs']})"))
     else:
@@ -176,13 +224,37 @@ def legacy_report_detail_rows(data: dict[str, Any], username: str) -> list[tuple
         rows.append(("Copilot", _format_cost_block(monthly, "copilot")))
         rows.append(("Git LFS", _format_cost_block(monthly, "git_lfs")))
         rows.append(("Total", _format_cost_block(monthly, "total")))
+    return rows
 
-    rows.append(_section("Actions usage"))
+
+def _actions_usage_rows(
+    data: dict[str, Any],
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    reference_date=None,
+) -> list[tuple[str, str]]:
+    """Actions usage and forecast rows for the detail table."""
+    rows = [_section("Actions usage")]
     rows.append(("Compute minutes", _format_actions_minutes(data)))
     avg_storage, gb_hours = _format_actions_storage(data)
     rows.append(("Storage (avg MB, billed)", avg_storage))
     rows.append(("Storage (GB-hrs, billed)", gb_hours))
+    forecast_rows = _forecast_rows(
+        data,
+        include_forecast=include_forecast,
+        premium_requests_limit=premium_requests_limit,
+        reference_date=reference_date,
+    )
+    if forecast_rows:
+        rows.append(_section("Forecast"))
+        rows.extend(forecast_rows)
+    return rows
 
+
+def _repo_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
+    """Repository-related rows for the detail table."""
+    rows: list[tuple[str, str]] = []
     consumers = data.get("repo_consumers") or {}
     by_minutes = consumers.get("by_minutes") or []
     by_cost = consumers.get("by_cost") or []
@@ -219,6 +291,14 @@ def legacy_report_detail_rows(data: dict[str, Any], username: str) -> list[tuple
             repo = item.get("repo", "?")
             gb = float(item.get("artifact_bytes", 0)) / (1024**3)
             rows.append((repo, f"{gb:.2f} GB"))
+
+    return rows
+
+
+def _tail_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
+    """Copilot, LFS, insights, warnings, and section-error rows."""
+    rows: list[tuple[str, str]] = []
+    errors = data.get("errors") or {}
 
     copilot_rows = _copilot_rows(data)
     if copilot_rows:
@@ -262,6 +342,29 @@ def legacy_report_detail_rows(data: dict[str, Any], username: str) -> list[tuple
             rows.append((key, message))
 
     return rows
+
+
+def legacy_report_detail_rows(
+    data: dict[str, Any],
+    username: str,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    reference_date=None,
+) -> list[tuple[str, str]]:
+    """Return full legacy report rows for TUI tables (section headers + detail)."""
+    return [
+        *_overview_rows(data, username),
+        *_monthly_cost_rows(data),
+        *_actions_usage_rows(
+            data,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
+            reference_date=reference_date,
+        ),
+        *_repo_rows(data),
+        *_tail_rows(data),
+    ]
 
 
 def legacy_report_summary_rows(data: dict[str, Any], username: str) -> list[tuple[str, str]]:

@@ -41,6 +41,7 @@ class WizardData:
     """Collected wizard answers (default profile only)."""
 
     secrets: dict[str, str] = field(default_factory=dict)
+    include_forecast: bool = True
     include_consumers: bool = False
     include_artifact_storage: bool = False
     include_release_assets: bool = False
@@ -68,6 +69,7 @@ def load_initial_data(paths: SetupPaths) -> WizardData:
         return data
     profile = next((p for p in profiles if p["name"] == DEFAULT_PROFILE_NAME), profiles[0])
     email = profile.get("email_report", {})
+    data.include_forecast = bool(email.get("include_forecast", True))
     data.include_consumers = bool(email.get("include_consumers"))
     data.include_artifact_storage = bool(email.get("include_artifact_storage"))
     data.include_release_assets = bool(email.get("include_release_assets"))
@@ -115,6 +117,7 @@ def save_options_step(paths: SetupPaths, data: WizardData) -> None:
         config["profiles"][0],
     )
     email = profile.setdefault("email_report", {})
+    email["include_forecast"] = data.include_forecast
     email["include_consumers"] = data.include_consumers
     email["include_artifact_storage"] = data.include_artifact_storage
     email["include_release_assets"] = data.include_release_assets
@@ -174,8 +177,9 @@ def review_summary(data: WizardData) -> str:
     lines = [
         "[b]Secrets[/b]: GitHub token, Resend key, and email addresses configured",
         f"[b]Recipient[/b]: {recipient}",
-        f"[b]Report sections[/b]: consumers={data.include_consumers}, "
-        f"artifacts={data.include_artifact_storage}, releases={data.include_release_assets}",
+        f"[b]Report sections[/b]: forecast={data.include_forecast}, "
+        f"consumers={data.include_consumers}, artifacts={data.include_artifact_storage}, "
+        f"releases={data.include_release_assets}",
         f"[b]Max repos[/b]: {data.max_repos}",
         f"[b]Local schedule[/b]: "
         f"{describe_local_schedule(data.local_weekday, data.local_hour, data.local_minute)}",

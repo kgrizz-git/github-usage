@@ -140,6 +140,22 @@ class EmailReportArgsTests(unittest.TestCase):
         self.assertIn("--subject", args)
         self.assertIn("Weekly Report", args)
 
+    def test_email_flags_include_forecast_and_premium_limit(self):
+        from github_usage.setup_config import DEFAULT_EMAIL_REPORT, _email_flags_from_dict
+
+        self.assertIn("include_forecast", DEFAULT_EMAIL_REPORT)
+        self.assertIn("premium_requests_limit", DEFAULT_EMAIL_REPORT)
+        args = _email_flags_from_dict({"include_forecast": True, "premium_requests_limit": 5000.0})
+        self.assertIn("--include-forecast", args)
+        self.assertIn("--premium-requests-limit", args)
+        self.assertIn("5000.0", args)
+
+    def test_email_flags_omit_forecast_when_disabled(self):
+        from github_usage.setup_config import _email_flags_from_dict
+
+        args = _email_flags_from_dict({"include_forecast": False})
+        self.assertNotIn("--include-forecast", args)
+
     def test_find_profile_raises_for_unknown(self):
         config = load_config(Path("/nonexistent"))
         with self.assertRaises(KeyError):

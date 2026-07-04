@@ -43,3 +43,10 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
+      - id: run-scripts-check
+        name: Run scripts/check test harness
+        entry: scripts/check
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false

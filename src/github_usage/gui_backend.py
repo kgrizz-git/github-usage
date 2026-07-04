@@ -386,6 +386,9 @@ def export_legacy_report(
     username: str,
     export_format: str,
     output_path: str | None,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
 ) -> tuple[int, str]:
     """Export report data to a file; return ``(exit_code, message)``."""
     try:
@@ -396,6 +399,8 @@ def export_legacy_report(
             username=username,
             month=None,
             redact_data=True,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
         )
         return 0, f"Exported to: {path}"
     except (RuntimeError, ValueError, ImportError) as exc:

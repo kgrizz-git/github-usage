@@ -177,6 +177,8 @@ github-usage email-report \
   [--include-consumers] \
   [--include-artifact-storage] \
   [--include-release-assets --yes-include-release-assets] \
+  [--include-forecast] [--no-include-forecast] \
+  [--premium-requests-limit N] \
   [--max-repos 100] \
   [--warn-over 25] \
   [--warn-over 80%] \

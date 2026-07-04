@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 
 from ._email_report_common import _bytes_to_mb, _generated_line
+from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 
 
@@ -199,6 +200,56 @@ def _format_html_errors_section(data: dict) -> list[str]:
     return parts
 
 
+def _format_html_forecast_section(
+    data: dict,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    reference_date=None,
+) -> list[str]:
+    """Format the monthly usage forecast as an HTML table."""
+    if not include_forecast:
+        return []
+    forecast = build_report_forecast(
+        data,
+        premium_requests_limit=premium_requests_limit,
+        reference_date=reference_date,
+    )
+    if forecast is None:
+        return []
+
+    def _limit(value: float | None) -> str:
+        return f"{value:,.0f}" if value is not None else "--"
+
+    def _run_out(value: int | None) -> str:
+        return f"day {value}" if value is not None else "--"
+
+    rows = [
+        ("Actions Minutes", forecast["minutes"]),
+        ("Storage (avg MB)", forecast["storage_avg_mb"]),
+        ("Premium Requests", forecast["premium_requests"]),
+    ]
+
+    parts = [
+        "<h2>Monthly Forecast</h2>",
+        (f"<p>Day {forecast['day_of_month']} of {forecast['days_in_month']}</p>"),
+        "<table>",
+        "<tr><th>Metric</th><th>Current</th><th>Projected</th><th>Limit</th><th>Run-out</th></tr>",
+    ]
+    for label, metric in rows:
+        parts.append(
+            "<tr>"
+            f"<td>{html.escape(label)}</td>"
+            f"<td>{metric['current']:,.1f}</td>"
+            f"<td>{metric['projected']:,.1f}</td>"
+            f"<td>{_limit(metric['limit'])}</td>"
+            f"<td>{html.escape(_run_out(metric['run_out_day']))}</td>"
+            "</tr>"
+        )
+    parts.append("</table>")
+    return parts
+
+
 _SECTION_HTML_FORMATTERS = (
     _format_html_actions_section,
     _format_html_copilot_section,
@@ -209,6 +260,7 @@ _SECTION_HTML_FORMATTERS = (
     _format_html_release_assets_section,
     _format_html_insights_section,
     _format_html_errors_section,
+    _format_html_forecast_section,
 )
 
 
@@ -237,7 +289,13 @@ _HTML_DOCUMENT_HEAD = (
 _HTML_DOCUMENT_TAIL = "</body>\n</html>\n"
 
 
-def format_html_report(data: dict) -> str:
+def format_html_report(
+    data: dict,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    reference_date=None,
+) -> str:
     """Format report data as an HTML email body."""
     username = html.escape(data.get("username") or "?")
     parts: list[str] = [_HTML_DOCUMENT_HEAD]
@@ -253,7 +311,17 @@ def format_html_report(data: dict) -> str:
         parts.append("</ul></div>")
 
     for formatter in _SECTION_HTML_FORMATTERS:
-        parts.extend(formatter(data))
+        if formatter is _format_html_forecast_section:
+            parts.extend(
+                formatter(
+                    data,
+                    include_forecast=include_forecast,
+                    premium_requests_limit=premium_requests_limit,
+                    reference_date=reference_date,
+                )
+            )
+        else:
+            parts.extend(formatter(data))
 
     estimate = data.get("api_estimate") or {}
     notes = estimate.get("notes") or []

@@ -314,6 +314,99 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("profile not found", stdout.getvalue())
 
+    def test_email_report_cli_forecast_flags_override_profile(self):
+        from github_usage import cli
+        from github_usage.report_cache import CacheHit
+
+        report_data = {
+            "username": "octocat",
+            "period": "current_month",
+            "generated_at": "2026-06-15T14:30:00Z",
+            "warnings": [],
+            "errors": {},
+            "actions": {"minutes": 1000.0, "storage_avg_mb": 250.0},
+            "copilot": {"total_requests": 100.0},
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        stdout = io.StringIO()
+        with (
+            mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
+            mock.patch(
+                "github_usage.report_cache.load_cached_report",
+                return_value=(report_data, "octocat", CacheHit(from_cache=True)),
+            ),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            contextlib.redirect_stdout(stdout),
+        ):
+            api = api_cls.return_value
+            api.request.return_value = {"login": "octocat"}
+            code = cli.main(
+                [
+                    "email-report",
+                    "--dry-run",
+                    "--skip-actions",
+                    "--no-include-forecast",
+                    "--premium-requests-limit",
+                    "5000",
+                ]
+            )
+        self.assertEqual(code, 0)
+        output = stdout.getvalue()
+        self.assertNotIn("Monthly Forecast", output)
+
+    def test_email_report_cached_path_passes_profile_premium_limit(self):
+        from github_usage import cli
+        from github_usage.report_cache import CacheHit
+
+        report_data = {
+            "username": "octocat",
+            "period": "current_month",
+            "generated_at": "2026-06-15T14:30:00Z",
+            "warnings": [],
+            "errors": {},
+            "actions": {"minutes": 1000.0, "storage_avg_mb": 250.0},
+            "copilot": {"total_requests": 500.0},
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        stdout = io.StringIO()
+        with (
+            mock.patch.dict(os.environ, {"GITHUB_TOKEN": "fake-token"}, clear=True),
+            mock.patch(
+                "github_usage.report_cache.load_cached_report",
+                return_value=(report_data, "octocat", CacheHit(from_cache=True)),
+            ),
+            mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            contextlib.redirect_stdout(stdout),
+        ):
+            api = api_cls.return_value
+            api.request.return_value = {"login": "octocat"}
+            code = cli.main(
+                [
+                    "email-report",
+                    "--dry-run",
+                    "--skip-actions",
+                    "--premium-requests-limit",
+                    "1000",
+                ]
+            )
+        self.assertEqual(code, 0)
+        output = stdout.getvalue()
+        self.assertIn("Monthly Forecast", output)
+        self.assertIn("Premium Requests", output)
+        self.assertIn("1,000", output)
+
 
 if __name__ == "__main__":
     unittest.main()

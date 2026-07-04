@@ -71,6 +71,18 @@ class ExportTextTests(unittest.TestCase):
         export_text.write("already ends\n", buf)
         self.assertEqual(buf.getvalue(), "already ends\n")
 
+    def test_dict_data_receives_premium_requests_limit(self):
+        from datetime import date
+        from unittest import mock
+
+        buf = io.StringIO()
+        with mock.patch("github_usage.report_forecast_data.date") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 15)
+            export_text.write(self.data, buf, premium_requests_limit=1000.0)
+        body = buf.getvalue()
+        self.assertIn("Monthly Forecast", body)
+        self.assertIn("Premium Requests", body)
+
 
 if __name__ == "__main__":
     unittest.main()

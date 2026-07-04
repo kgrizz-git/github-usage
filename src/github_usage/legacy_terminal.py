@@ -10,6 +10,7 @@ from .report_actions import (
     render_limits_summary,
     render_repo_actions_table,
 )
+from .report_forecast import render_forecast
 from .report_products import (
     render_base_costs,
     render_copilot_summary,
@@ -26,7 +27,13 @@ def _print_section_error(label: str, errors: dict, key: str) -> None:
         print(f"  ({label} unavailable: {message})")
 
 
-def render_legacy_report(data: dict) -> None:
+def render_legacy_report(
+    data: dict,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    reference_date=None,
+) -> None:
     """Print the full legacy v3 report from a :func:`build_legacy_report_data` dict."""
     errors = data.get("errors") or {}
 
@@ -60,6 +67,12 @@ def render_legacy_report(data: dict) -> None:
         render_base_costs(data.get("actions"), data.get("copilot_billing"), data.get("lfs_billing"))
 
     render_final_summary_from_data(data)
+    if include_forecast:
+        render_forecast(
+            data,
+            premium_requests_limit=premium_requests_limit,
+            reference_date=reference_date,
+        )
     render_what_else(str(data.get("username", "?")))
 
     print("=" * 70)

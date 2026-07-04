@@ -245,6 +245,7 @@ class SetupView(VerticalScroll, AsyncViewMixin):
             profile = next(
                 p for p in config["profiles"] if p["name"] == self.current_profile_name()
             )
+            profile["email_report"]["include_forecast"] = options["include_forecast"]
             profile["email_report"]["include_consumers"] = options["include_consumers"]
             profile["email_report"]["include_artifact_storage"] = options[
                 "include_artifact_storage"

@@ -49,6 +49,7 @@ PDF_SECTIONS = [
     "Release Assets",
     "Key Insights",
     "Unavailable Data",
+    "Usage Forecast",
 ]
 
 
@@ -89,9 +90,15 @@ class ExportPdfTests(unittest.TestCase):
         for section in PDF_SECTIONS:
             self.assertIn(section, text)
 
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_forecast_page_present(self):
+        text = _extract_text(self._save())
+        self.assertIn("Usage Forecast", text)
+        self.assertIn("Actions Minutes", text)
+
     def test_pages_count_with_all_sections(self):
-        # Cover page + 10 sections = 11 pages
-        self.assertEqual(_page_count(self._save()), 11)
+        # Cover page + 11 sections = 12 pages
+        self.assertEqual(_page_count(self._save()), 12)
 
     def test_empty_sections_reduce_page_count(self):
         self.data["artifact_storage"] = None
@@ -99,8 +106,8 @@ class ExportPdfTests(unittest.TestCase):
         self.data["errors"] = None
         self.data["insights"] = []
         self.data["repo_consumers"] = None
-        # Cover + Actions + Copilot + Git LFS + Monthly Costs = 5
-        self.assertEqual(_page_count(self._save()), 5)
+        # Cover + Actions + Copilot + Git LFS + Monthly Costs + Forecast = 6
+        self.assertEqual(_page_count(self._save()), 6)
 
     @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
     def test_truncates_large_sections(self):

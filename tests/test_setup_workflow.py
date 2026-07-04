@@ -115,10 +115,24 @@ class RenderWorkflowTests(unittest.TestCase):
         self.assertNotIn("__INCLUDE_CONSUMERS_DEFAULT__", rendered)
         self.assertNotIn("__INCLUDE_ARTIFACT_STORAGE_DEFAULT__", rendered)
         self.assertNotIn("__INCLUDE_RELEASE_ASSETS_DEFAULT__", rendered)
+        self.assertNotIn("__INCLUDE_FORECAST_DEFAULT__", rendered)
         self.assertNotIn("__WORKFLOW_NAME__", rendered)
         self.assertNotIn("__PROFILE_SUFFIX__", rendered)
         self.assertNotIn("__PROFILE_ARGS__", rendered)
         self.assertNotIn("__TARGET_EMAIL__", rendered)
+
+    def test_include_forecast_true_renders_true_fallback(self):
+        rendered = render_workflow(self._config(include_forecast=True), self.root)
+        self.assertIn("inputs.include_forecast || 'true'", rendered)
+
+    def test_include_forecast_false_renders_false_fallback(self):
+        rendered = render_workflow(self._config(include_forecast=False), self.root)
+        self.assertIn("inputs.include_forecast || 'false'", rendered)
+
+    def test_include_forecast_shell_block_present(self):
+        rendered = render_workflow(self._config(), self.root)
+        self.assertIn("inputs.include_forecast", rendered)
+        self.assertIn("args+=(--include-forecast)", rendered)
 
     def test_non_default_profile_renders_profile_suffix_and_path(self):
         config = {

@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .report_forecast_data import build_report_forecast
+
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
 _MAX_SHEET_NAME = 31
 
@@ -222,6 +224,28 @@ def _write_errors_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
         write_sheet("Errors", "Unavailable Data", [[k, v] for k, v in errors.items()])
 
 
+def _write_forecast_sheet(
+    write_sheet: WriteSheetFn, data: dict, *, premium_requests_limit: float | None = None
+) -> None:
+    """Write a forecast sheet derived from current usage values."""
+    forecast = build_report_forecast(data, premium_requests_limit=premium_requests_limit)
+    if forecast is None:
+        return
+    rows = [["Metric", "Current", "Projected", "Limit", "Run-out day"]]
+    for metric_name in ("minutes", "storage_avg_mb", "premium_requests"):
+        metric = forecast[metric_name]
+        rows.append(
+            [
+                metric_name,
+                metric["current"],
+                metric["projected"],
+                metric["limit"],
+                metric["run_out_day"],
+            ]
+        )
+    write_sheet("Forecast", "Usage Forecast", rows)
+
+
 _SECTION_WRITERS = (
     _write_metadata_sheet,
     _write_actions_sheet,
@@ -236,8 +260,16 @@ _SECTION_WRITERS = (
 )
 
 
-def write(data: dict, file_obj) -> None:
+def write(
+    data: dict,
+    file_obj,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    **kwargs,
+) -> None:
     """Write the report data dict as an XLSX workbook to ``file_obj``."""
+    del kwargs
     import openpyxl
 
     wb = openpyxl.Workbook()
@@ -245,4 +277,6 @@ def write(data: dict, file_obj) -> None:
     write_sheet = _make_write_sheet(wb)
     for writer in _SECTION_WRITERS:
         writer(write_sheet, data)
+    if include_forecast:
+        _write_forecast_sheet(write_sheet, data, premium_requests_limit=premium_requests_limit)
     wb.save(file_obj)

@@ -10,6 +10,7 @@ by ``cli`` and used only from ``_run_email_report``.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 
 from . import email_report, export_report
 from .api import GitHubAPI
@@ -30,6 +31,40 @@ def _validate_report_sections(
         )
         return 1
     return None
+
+
+def _cli_flag_present(argv: Sequence[str], *flags: str) -> bool:
+    """Return True when any of ``flags`` appears in the raw CLI argv."""
+    return any(item in flags for item in argv)
+
+
+def _resolve_forecast_options(
+    argv: Sequence[str],
+    profile_flags: Sequence[str],
+    args: argparse.Namespace,
+) -> tuple[bool, float | None]:
+    """Apply CLI > profile > default precedence for forecast options."""
+    from .setup_config import DEFAULT_EMAIL_REPORT
+
+    if _cli_flag_present(argv, "--include-forecast", "--no-include-forecast"):
+        include_forecast = args.include_forecast and not args.no_include_forecast
+    elif "--include-forecast" in profile_flags or "--no-include-forecast" in profile_flags:
+        include_forecast = "--include-forecast" in profile_flags
+    else:
+        include_forecast = bool(DEFAULT_EMAIL_REPORT["include_forecast"])
+
+    if _cli_flag_present(argv, "--premium-requests-limit"):
+        premium_requests_limit = args.premium_requests_limit
+    elif "--premium-requests-limit" in profile_flags:
+        index = list(profile_flags).index("--premium-requests-limit")
+        try:
+            premium_requests_limit = float(profile_flags[index + 1])
+        except (ValueError, IndexError):
+            premium_requests_limit = None
+    else:
+        premium_requests_limit = DEFAULT_EMAIL_REPORT["premium_requests_limit"]
+
+    return include_forecast, premium_requests_limit
 
 
 def _init_github_api(
@@ -97,6 +132,9 @@ def _export_report(
     body: str,
     data: dict,
     username: str,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
 ) -> None:
     """Export the report if an export format was requested; print the path on success."""
     if not export_format or export_format == "none":
@@ -108,5 +146,128 @@ def _export_report(
         output_path=args.output,
         username=username,
         redact_data=True,
+        include_forecast=include_forecast,
+        premium_requests_limit=premium_requests_limit,
     )
     print(f"Exported to: {path}")
+
+
+def _format_email_bodies(
+    data: dict,
+    email_format: str,
+    *,
+    include_forecast: bool,
+    premium_requests_limit: float | None,
+) -> tuple[str, str | None]:
+    """Return ``(text_body, html_body_or_none)`` from report data."""
+    body = email_report.format_report_email(
+        data,
+        include_forecast=include_forecast,
+        premium_requests_limit=premium_requests_limit if include_forecast else None,
+    )
+    html_body = None
+    if email_format == "html":
+        html_body = email_report.format_html_report(
+            data,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit if include_forecast else None,
+        )
+    return body, html_body
+
+
+def _check_email_env_vars(args: argparse.Namespace) -> int | None:
+    """Return 1 if required email environment variables are missing, else None."""
+    import os
+
+    recipient = (getattr(args, "to", None) or "").strip() or os.environ.get(
+        "REPORT_EMAIL", ""
+    ).strip()
+    missing = []
+    for name in ("RESEND_API_KEY", "RESEND_FROM"):
+        if not os.environ.get(name, "").strip():
+            missing.append(name)
+    if not recipient:
+        missing.append("REPORT_EMAIL")
+    if missing:
+        print("Error: missing required email environment variable(s):")
+        for name in missing:
+            print(f"  - {name}")
+        return 1
+    return None
+
+
+def _load_or_fetch_email_data(
+    args: argparse.Namespace,
+    token: str,
+) -> tuple[dict, str] | int:
+    """Load cached email data or fetch fresh; return ``(data, username)`` or exit code."""
+    from .report_cache import (
+        email_cache_params,
+        format_cache_hit_message,
+        load_cached_report,
+        resolve_cache_max_age,
+        store_cached_report,
+    )
+    from .setup_config import SetupPaths, repo_root
+
+    include_actions = not args.skip_actions
+    include_copilot = not args.skip_copilot
+    include_lfs = not args.skip_lfs
+
+    paths = SetupPaths.from_root(repo_root())
+    max_age = resolve_cache_max_age(paths)
+    cache_params = email_cache_params(
+        include_actions=include_actions,
+        include_copilot=include_copilot,
+        include_lfs=include_lfs,
+        include_consumers=args.include_consumers,
+        include_artifact_storage=args.include_artifact_storage,
+        include_release_assets=args.include_release_assets,
+        max_repos=args.max_repos,
+        warn_over=args.warn_over,
+    )
+    cached_data, cached_username, cache_hit = load_cached_report(
+        paths,
+        kind="email",
+        token=token,
+        params=cache_params,
+        max_age_seconds=max_age,
+        refresh=getattr(args, "refresh", False),
+    )
+    if cache_hit.from_cache and cached_data is not None:
+        if cache_hit.age_seconds is not None and cache_hit.max_age_seconds is not None:
+            print(format_cache_hit_message(cache_hit.age_seconds, cache_hit.max_age_seconds))
+        return cached_data, cached_username or "unknown"
+
+    api_result = _init_github_api(token, args.timeout, args.max_retries)
+    if isinstance(api_result, int):
+        return api_result
+    api, username = api_result
+    try:
+        from . import report_data
+
+        data = report_data.build_report_data(
+            api,
+            username,
+            include_actions=include_actions,
+            include_copilot=include_copilot,
+            include_lfs=include_lfs,
+            include_consumers=args.include_consumers,
+            include_artifact_storage=args.include_artifact_storage,
+            include_release_assets=args.include_release_assets,
+            max_repos=args.max_repos,
+            warn_over=args.warn_over,
+        )
+        if max_age > 0:
+            store_cached_report(
+                paths,
+                kind="email",
+                token=token,
+                params=cache_params,
+                username=username,
+                data=data,
+            )
+        return data, username
+    except (RuntimeError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1

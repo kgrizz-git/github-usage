@@ -18,12 +18,27 @@ from __future__ import annotations
 
 import csv
 
+from .report_forecast_data import build_report_forecast
 
-def write(data: dict, file_obj) -> None:
+
+def write(
+    data: dict,
+    file_obj,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    **kwargs,
+) -> None:
     """Write the report data dict as CSV to ``file_obj``."""
+    del kwargs
     file_obj.write("\ufeff")
     writer = csv.writer(file_obj)
-    _write_sections(writer, data)
+    _write_sections(
+        writer,
+        data,
+        include_forecast=include_forecast,
+        premium_requests_limit=premium_requests_limit,
+    )
     writer.writerow([])
 
 
@@ -34,9 +49,18 @@ def _coerce_section(value, default):
     return value
 
 
-def _write_sections(writer: csv.writer, data: dict) -> None:
+def _write_sections(
+    writer: csv.writer,
+    data: dict,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+) -> None:
     _write_section_header(writer, "Report Metadata")
     _write_kv(writer, data, ["username", "period", "generated_at"])
+
+    if include_forecast:
+        _write_forecast_section(writer, data, premium_requests_limit=premium_requests_limit)
 
     _write_section_header(writer, "Warnings")
     for warning in data.get("warnings") or []:
@@ -113,6 +137,30 @@ def _write_sections(writer: csv.writer, data: dict) -> None:
     _write_section_header(writer, "Unavailable Data")
     for error_key, error_msg in (data.get("errors") or {}).items():
         writer.writerow([error_key, error_msg])
+
+
+def _write_forecast_section(
+    writer: csv.writer, data: dict, *, premium_requests_limit: float | None = None
+) -> None:
+    """Write a flattened forecast section derived from current usage values."""
+    forecast = build_report_forecast(data, premium_requests_limit=premium_requests_limit)
+    if forecast is None:
+        return
+    _write_section_header(writer, "Forecast")
+    writer.writerow(["metric", "current", "projected", "limit", "run_out_day"])
+    for metric_name in ("minutes", "storage_avg_mb", "premium_requests"):
+        metric = forecast[metric_name]
+        limit = metric["limit"]
+        run_out = metric["run_out_day"]
+        writer.writerow(
+            [
+                metric_name,
+                metric["current"],
+                metric["projected"],
+                limit if limit is not None else "",
+                run_out if run_out is not None else "",
+            ]
+        )
 
 
 def _write_copilot_by_model(writer: csv.writer, by_model) -> None:

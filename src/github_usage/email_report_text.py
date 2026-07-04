@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ._email_report_common import _bytes_to_mb, _generated_line
+from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 
 
@@ -150,6 +151,50 @@ def _format_errors_section(data: dict) -> list[str]:
     return lines
 
 
+def _format_forecast_section(
+    data: dict,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    reference_date=None,
+) -> list[str]:
+    """Format the monthly usage forecast as an aligned text table."""
+    if not include_forecast:
+        return []
+    forecast = build_report_forecast(
+        data,
+        premium_requests_limit=premium_requests_limit,
+        reference_date=reference_date,
+    )
+    if forecast is None:
+        return []
+
+    lines = [
+        f"Monthly Forecast (day {forecast['day_of_month']} of {forecast['days_in_month']})",
+        "───────────────────────────────────────────",
+        "Metric              Current    Projected  Limit    Run-out",
+    ]
+
+    def _limit(value: float | None) -> str:
+        return f"{value:,.0f}" if value is not None else "--"
+
+    def _run_out(value: int | None) -> str:
+        return f"day {value}" if value is not None else "--"
+
+    rows = [
+        ("Actions Minutes", forecast["minutes"]),
+        ("Storage (avg MB)", forecast["storage_avg_mb"]),
+        ("Premium Requests", forecast["premium_requests"]),
+    ]
+    for label, metric in rows:
+        lines.append(
+            f"{label:19} {metric['current']:>9,.1f} {metric['projected']:>10,.1f} "
+            f"{_limit(metric['limit']):>8} {_run_out(metric['run_out_day']):>8}"
+        )
+    lines.append("")
+    return lines
+
+
 _SECTION_FORMATTERS = (
     _format_actions_section,
     _format_copilot_section,
@@ -160,10 +205,17 @@ _SECTION_FORMATTERS = (
     _format_release_assets_section,
     _format_insights_section,
     _format_errors_section,
+    _format_forecast_section,
 )
 
 
-def format_report_email(data: dict) -> str:
+def format_report_email(
+    data: dict,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    reference_date=None,
+) -> str:
     """Format report data as a plain-text email body."""
     lines = [
         f"GitHub Usage Report for {data.get('username', '?')}",
@@ -177,7 +229,17 @@ def format_report_email(data: dict) -> str:
         lines.extend(["WARNING", *[f"- {warning}" for warning in warnings], ""])
 
     for formatter in _SECTION_FORMATTERS:
-        lines.extend(formatter(data))
+        if formatter is _format_forecast_section:
+            lines.extend(
+                formatter(
+                    data,
+                    include_forecast=include_forecast,
+                    premium_requests_limit=premium_requests_limit,
+                    reference_date=reference_date,
+                )
+            )
+        else:
+            lines.extend(formatter(data))
 
     estimate = data.get("api_estimate") or {}
     notes = estimate.get("notes") or []

@@ -99,6 +99,7 @@ class SetupWizardScreen(ModalScreen[bool]):
                         yield Input(id=f"wizard-{field_id}", password=hidden)
                 with Vertical(id="step-options"):
                     yield Static("Email report options", classes="SectionTitle")
+                    yield Checkbox("Include forecast", id="wizard-forecast", value=True)
                     yield Checkbox("Include top consumers", id="wizard-consumers")
                     yield Checkbox("Include artifact storage", id="wizard-artifact")
                     yield Checkbox("Include release assets", id="wizard-release")
@@ -174,6 +175,7 @@ class SetupWizardScreen(ModalScreen[bool]):
             self.query_one(f"#wizard-{field_id}", Input).value = self._data.secrets.get(env_key, "")
 
     def _populate_options(self) -> None:
+        self.query_one("#wizard-forecast", Checkbox).value = self._data.include_forecast
         self.query_one("#wizard-consumers", Checkbox).value = self._data.include_consumers
         self.query_one("#wizard-artifact", Checkbox).value = self._data.include_artifact_storage
         self.query_one("#wizard-release", Checkbox).value = self._data.include_release_assets
@@ -192,6 +194,7 @@ class SetupWizardScreen(ModalScreen[bool]):
         except ValueError:
             max_repos = 0
         self._data.max_repos = max_repos
+        self._data.include_forecast = self.query_one("#wizard-forecast", Checkbox).value
         self._data.include_consumers = self.query_one("#wizard-consumers", Checkbox).value
         self._data.include_artifact_storage = self.query_one("#wizard-artifact", Checkbox).value
         self._data.include_release_assets = self.query_one("#wizard-release", Checkbox).value

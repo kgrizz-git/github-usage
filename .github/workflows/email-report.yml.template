@@ -29,6 +29,14 @@ on:
         options:
           - 'false'
           - 'true'
+      include_forecast:
+        description: Include monthly usage forecast
+        required: false
+        default: '__INCLUDE_FORECAST_DEFAULT__'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
       report_email:
         description: Override the REPORT_EMAIL secret for this manual run
         required: false
@@ -66,6 +74,9 @@ jobs:
           fi
           if [ "${{ inputs.include_release_assets || '__INCLUDE_RELEASE_ASSETS_DEFAULT__' }}" = "true" ]; then
             args+=(--include-release-assets --yes-include-release-assets)
+          fi
+          if [ "${{ inputs.include_forecast || '__INCLUDE_FORECAST_DEFAULT__' }}" = "true" ]; then
+            args+=(--include-forecast)
           fi
           profile_args=(__PROFILE_ARGS__)
           if [ ${#profile_args[@]} -gt 0 ]; then

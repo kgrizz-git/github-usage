@@ -12,6 +12,10 @@ max_age_seconds = 3600
 include_consumers = false
 include_artifact_storage = false
 include_release_assets = false
+include_forecast = true
+# Optional: set a monthly premium-requests limit to show a run-out day.
+# When omitted, premium requests are projected but no run-out day is shown.
+# premium_requests_limit = 10000
 max_repos = 100
 # Email body format: "text" (default) or "html". HTML requires the renderer
 # in github_usage.email_report.format_html_report; text uses format_report_email.

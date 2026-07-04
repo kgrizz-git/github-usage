@@ -69,6 +69,7 @@ class SetupProfilesPanel(VerticalScroll):
                 classes="HelpText",
             )
             yield Static("Report options (config.toml)", classes="SectionTitle")
+            yield Checkbox("Include forecast", id="include-forecast")
             yield Checkbox("Include top consumers", id="include-consumers")
             yield Checkbox("Include artifact storage", id="include-artifact")
             yield Checkbox("Include release assets", id="include-release")
@@ -122,6 +123,9 @@ class SetupProfilesPanel(VerticalScroll):
     def reload_profile_options(self, profile: dict[str, Any]) -> None:
         """Populate report-option fields for the active profile."""
         email = profile["email_report"]
+        self.query_one("#include-forecast", Checkbox).value = bool(
+            email.get("include_forecast", True)
+        )
         self.query_one("#include-consumers", Checkbox).value = bool(email.get("include_consumers"))
         self.query_one("#include-artifact", Checkbox).value = bool(
             email.get("include_artifact_storage")
@@ -136,6 +140,7 @@ class SetupProfilesPanel(VerticalScroll):
         """Return report-option values from the form."""
         max_repos_str = self.query_one("#max-repos", Input).value.strip() or "100"
         return {
+            "include_forecast": self.query_one("#include-forecast", Checkbox).value,
             "include_consumers": self.query_one("#include-consumers", Checkbox).value,
             "include_artifact_storage": self.query_one("#include-artifact", Checkbox).value,
             "include_release_assets": self.query_one("#include-release", Checkbox).value,

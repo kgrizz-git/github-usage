@@ -17,6 +17,7 @@ DEFAULT_WORKFLOW_CONFIG = {
     "include_consumers": False,
     "include_artifact_storage": False,
     "include_release_assets": False,
+    "include_forecast": True,
 }
 
 
@@ -147,6 +148,7 @@ def render_workflow(
         "__INCLUDE_ARTIFACT_STORAGE_DEFAULT__", bval(ga["include_artifact_storage"])
     )
     text = text.replace("__INCLUDE_RELEASE_ASSETS_DEFAULT__", bval(ga["include_release_assets"]))
+    text = text.replace("__INCLUDE_FORECAST_DEFAULT__", bval(ga["include_forecast"]))
     text = text.replace("__TARGET_EMAIL__", target_email_expr)
     text = text.replace("__PROFILE_ARGS__", _shell_quote_args(extra_args))
     return text

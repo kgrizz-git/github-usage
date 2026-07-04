@@ -19,9 +19,10 @@ from textual.widgets import (
     Static,
 )
 
-from ...gui_backend import export_legacy_report, run_legacy_report_data
+from ...gui_backend import export_legacy_report, load_profiles, run_legacy_report_data
 from ...legacy_report_summary import legacy_report_detail_rows
 from ...report_cache import format_cache_hit_message
+from ...setup_config import DEFAULT_EMAIL_REPORT, find_profile
 from ..async_ops import AsyncViewMixin
 from ..errors import format_error
 from ..layout import FormGrid, ViewActions, ViewOutput, ViewSection
@@ -201,6 +202,18 @@ class ReportView(VerticalScroll, AsyncViewMixin):
         finally:
             self._call_ui(self._end_async, button, "Run Report")
 
+    def _forecast_options(self) -> tuple[bool, float | None]:
+        """Return ``(include_forecast, premium_requests_limit)`` from the active profile."""
+        try:
+            config = load_profiles(self.app.app_state.paths)
+            profile = find_profile(config, self.app.app_state.current_profile)
+        except (KeyError, ValueError):
+            return bool(DEFAULT_EMAIL_REPORT["include_forecast"]), DEFAULT_EMAIL_REPORT[
+                "premium_requests_limit"
+            ]
+        email = {**DEFAULT_EMAIL_REPORT, **profile.get("email_report", {})}
+        return bool(email.get("include_forecast", True)), email.get("premium_requests_limit")
+
     def _maybe_export(
         self,
         log: RichLog,
@@ -212,8 +225,16 @@ class ReportView(VerticalScroll, AsyncViewMixin):
         export_format = params.export_format
         if not export_format or export_format == "none":
             return
+        include_forecast, premium_requests_limit = self._forecast_options()
         self._call_ui(write_log, log, f"Exporting to {export_format}...", level="progress")
-        exp_code, message = export_legacy_report(data, username, export_format, params.output_path)
+        exp_code, message = export_legacy_report(
+            data,
+            username,
+            export_format,
+            params.output_path,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
+        )
         level = "success" if exp_code == 0 else "error"
         self._call_ui(write_log, log, message, level=level)
 
@@ -249,7 +270,13 @@ class ReportView(VerticalScroll, AsyncViewMixin):
             )
         write_log(log, "Populating report table...", level="progress")
 
-        detail_rows = legacy_report_detail_rows(data, str(username_or_err))
+        include_forecast, premium_requests_limit = self._forecast_options()
+        detail_rows = legacy_report_detail_rows(
+            data,
+            str(username_or_err),
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
+        )
         for metric, value in detail_rows:
             table.add_row(metric, value)
 

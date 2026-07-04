@@ -347,3 +347,152 @@ class EmailReportTests(unittest.TestCase):
         self.assertEqual(payload["text"], "Plain body")
         self.assertEqual(payload["to"], ["to@example.com"])
         conn.close.assert_called_once()
+
+    def test_format_report_email_includes_forecast(self):
+        from datetime import date
+
+        from github_usage.email_report import format_report_email
+
+        data = {
+            "username": "octocat",
+            "generated_at": None,
+            "warnings": [],
+            "errors": {},
+            "actions": {
+                "minutes": 1000.0,
+                "minutes_limit": 2000,
+                "minutes_percent": 50.0,
+                "storage_avg_mb": 250.0,
+                "storage_limit_mb": 500,
+                "storage_percent": 50.0,
+            },
+            "copilot": {"total_requests": 100.0},
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        body = format_report_email(
+            data, premium_requests_limit=1000.0, reference_date=date(2026, 7, 15)
+        )
+        self.assertIn("Monthly Forecast", body)
+        self.assertIn("Actions Minutes", body)
+        self.assertIn("Storage (avg MB)", body)
+        self.assertIn("Premium Requests", body)
+        self.assertIn("day 15 of 31", body)
+
+    def test_format_report_email_omits_forecast_before_day_3(self):
+        from datetime import date
+
+        from github_usage.email_report import format_report_email
+
+        data = {
+            "username": "octocat",
+            "generated_at": None,
+            "warnings": [],
+            "errors": {},
+            "actions": {"minutes": 100.0, "storage_avg_mb": 50.0},
+            "copilot": {"total_requests": 10.0},
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        body = format_report_email(
+            data, premium_requests_limit=1000.0, reference_date=date(2026, 7, 2)
+        )
+        self.assertNotIn("Monthly Forecast", body)
+
+    def test_format_report_email_reference_date_overrides_generated_at(self):
+        from datetime import date
+
+        from github_usage.email_report import format_report_email
+
+        data = {
+            "username": "octocat",
+            "generated_at": "2026-01-15T00:00:00Z",
+            "warnings": [],
+            "errors": {},
+            "actions": {"minutes": 100.0, "storage_avg_mb": 50.0},
+            "copilot": {"total_requests": 10.0},
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        body = format_report_email(
+            data, premium_requests_limit=None, reference_date=date(2026, 7, 20)
+        )
+        self.assertIn("day 20 of 31", body)
+
+    def test_format_report_email_premium_limit_controls_run_out(self):
+        from datetime import date
+
+        from github_usage.email_report import format_report_email
+
+        data = {
+            "username": "octocat",
+            "generated_at": None,
+            "warnings": [],
+            "errors": {},
+            "actions": {"minutes": 100.0, "storage_avg_mb": 50.0},
+            "copilot": {"total_requests": 500.0},
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        body_with_limit = format_report_email(
+            data, premium_requests_limit=1000.0, reference_date=date(2026, 7, 15)
+        )
+        self.assertIn("1,000", body_with_limit)
+        self.assertRegex(body_with_limit, r"Premium Requests\s+.*\s+.*\s+1,000\s+day")
+
+        body_without_limit = format_report_email(
+            data, premium_requests_limit=None, reference_date=date(2026, 7, 15)
+        )
+        self.assertIn("Premium Requests", body_without_limit)
+        self.assertRegex(body_without_limit, r"Premium Requests\s+.*\s+.*\s+--")
+
+    def test_format_html_report_includes_forecast(self):
+        from datetime import date
+
+        from github_usage.email_report import format_html_report
+
+        data = {
+            "username": "octocat",
+            "generated_at": None,
+            "warnings": [],
+            "errors": {},
+            "actions": {"minutes": 100.0, "storage_avg_mb": 50.0},
+            "copilot": {"total_requests": 10.0},
+            "git_lfs": None,
+            "monthly_costs": {"total": {"gross": 0.0, "discount": 0.0, "net": 0.0}},
+            "repo_consumers": None,
+            "artifact_storage": None,
+            "release_assets": None,
+            "api_estimate": {"notes": []},
+            "insights": [],
+        }
+        html = format_html_report(
+            data, premium_requests_limit=1000.0, reference_date=date(2026, 7, 15)
+        )
+        self.assertIn("Monthly Forecast", html)
+        self.assertIn("Day 15 of 31", html)
+        self.assertIn("Actions Minutes", html)
+
+
+if __name__ == "__main__":
+    unittest.main()

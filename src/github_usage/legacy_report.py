@@ -17,8 +17,27 @@ from .report_cache import (
     resolve_cache_max_age,
     store_cached_report,
 )
-from .setup_config import SetupPaths, repo_root
+from .setup_config import (
+    DEFAULT_EMAIL_REPORT,
+    SetupPaths,
+    find_profile,
+    load_config,
+    repo_root,
+)
 from .terminal import print_header
+
+
+def _legacy_forecast_options(paths: SetupPaths) -> tuple[bool, float | None]:
+    """Return ``(include_forecast, premium_requests_limit)`` from the default profile."""
+    config = load_config(paths.config_file)
+    try:
+        profile = find_profile(config, "default")
+    except KeyError:
+        return bool(DEFAULT_EMAIL_REPORT["include_forecast"]), DEFAULT_EMAIL_REPORT[
+            "premium_requests_limit"
+        ]
+    email = {**DEFAULT_EMAIL_REPORT, **profile.get("email_report", {})}
+    return bool(email.get("include_forecast", True)), email.get("premium_requests_limit")
 
 
 def run_legacy_report_session(
@@ -40,6 +59,7 @@ def run_legacy_report_session(
         return 1, None, None, CacheHit()
 
     resolved_paths = paths or SetupPaths.from_root(repo_root())
+    include_forecast, premium_requests_limit = _legacy_forecast_options(resolved_paths)
     max_age = resolve_cache_max_age(resolved_paths, override_seconds=cache_max_age_seconds)
     params = legacy_cache_params(
         max_repos=max_repos,
@@ -58,7 +78,11 @@ def run_legacy_report_session(
         print_header()
         if cache_hit.age_seconds is not None and cache_hit.max_age_seconds is not None:
             print(format_cache_hit_message(cache_hit.age_seconds, cache_hit.max_age_seconds))
-        render_legacy_report(cached_data)
+        render_legacy_report(
+            cached_data,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
+        )
         return 0, cached_data, cached_username, cache_hit
 
     try:
@@ -89,7 +113,11 @@ def run_legacy_report_session(
                 username=username,
                 data=data,
             )
-        render_legacy_report(data)
+        render_legacy_report(
+            data,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
+        )
         return 0, data, username, CacheHit(max_age_seconds=max_age)
 
     except RuntimeError as exc:

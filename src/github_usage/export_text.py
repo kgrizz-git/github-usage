@@ -8,19 +8,31 @@ dict input. The import is deferred to avoid a circular dependency if
 from __future__ import annotations
 
 
-def write(data, file_obj) -> None:
+def write(
+    data,
+    file_obj,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    **kwargs,
+) -> None:
     """Write ``data`` as plain text to ``file_obj``.
 
     If ``data`` is a string, write it directly. If it is a dict, format
     it via :func:`github_usage.email_report.format_report_email`. A
     trailing newline is appended if missing.
     """
+    del kwargs
     if isinstance(data, str):
         body = data
     else:
         from . import email_report
 
-        body = email_report.format_report_email(data)
+        body = email_report.format_report_email(
+            data,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
+        )
 
     file_obj.write(body)
     if not body.endswith("\n"):

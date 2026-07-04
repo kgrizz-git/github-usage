@@ -24,6 +24,8 @@ DEFAULT_EMAIL_REPORT = {
     "include_consumers": False,
     "include_artifact_storage": False,
     "include_release_assets": False,
+    "include_forecast": True,
+    "premium_requests_limit": None,
     "max_repos": 100,
     "email_format": "text",
     "warn_over": ["25", "80%"],
@@ -256,12 +258,19 @@ def _emit_email_report_block(email: dict, *, prefix: str = "") -> str:
     if isinstance(warn_over, str):
         warn_over = [warn_over]
     warn_lines = "\n".join(f'  "{item}",' for item in warn_over)
+    premium_requests_limit = email.get("premium_requests_limit")
+    premium_requests_line = (
+        f"premium_requests_limit = {premium_requests_limit}\n"
+        if premium_requests_limit is not None
+        else "# premium_requests_limit = 10000\n"
+    )
     header = f"[{prefix}email_report]" if prefix else "[email_report]"
     return f"""{header}
 include_consumers = {_bool(email.get("include_consumers"))}
 include_artifact_storage = {_bool(email.get("include_artifact_storage"))}
 include_release_assets = {_bool(email.get("include_release_assets"))}
-max_repos = {int(email.get("max_repos", 100))}
+include_forecast = {_bool(email.get("include_forecast", True))}
+{premium_requests_line}max_repos = {int(email.get("max_repos", 100))}
 email_format = "{email.get("email_format", "text")}"
 warn_over = [
 {warn_lines}
@@ -342,6 +351,11 @@ def _email_flags_from_dict(email: dict, *, include_delivery: bool = True) -> lis
         args.append("--include-artifact-storage")
     if email.get("include_release_assets"):
         args.extend(["--include-release-assets", "--yes-include-release-assets"])
+    if email.get("include_forecast"):
+        args.append("--include-forecast")
+    premium_requests_limit = email.get("premium_requests_limit")
+    if premium_requests_limit is not None:
+        args.extend(["--premium-requests-limit", str(premium_requests_limit)])
     max_repos = int(email.get("max_repos", 100))
     args.extend(["--max-repos", str(max_repos)])
     args.extend(["--email-format", str(email.get("email_format", "text"))])

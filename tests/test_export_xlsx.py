@@ -18,6 +18,7 @@ XLSX_SECTIONS = [
     "Releases",
     "Insights",
     "Errors",
+    "Forecast",
 ]
 
 
@@ -235,6 +236,18 @@ class ExportXlsxTests(unittest.TestCase):
         # row 4 = Minutes row, row 5 = Storage row.
         self.assertEqual(rows[3], ("Minutes", 1250.0, 2000, 62.5))
         self.assertEqual(rows[4][0], "Storage (avg MB)")
+
+    def test_forecast_sheet_present(self):
+        from datetime import date
+        from unittest import mock
+
+        with mock.patch("github_usage.report_forecast_data.date") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 15)
+            wb = self._open()
+        self.assertIn("Forecast", wb.sheetnames)
+        ws = wb["Forecast"]
+        rows = list(ws.iter_rows(values_only=True))
+        self.assertEqual(rows[3], ("Metric", "Current", "Projected", "Limit", "Run-out day"))
 
     def test_dependency_check_at_orchestrator(self):
         # The orchestrator raises RuntimeError when openpyxl is missing.

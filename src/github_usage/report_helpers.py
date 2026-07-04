@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 from datetime import date, timedelta
 
 
@@ -11,6 +12,18 @@ def hours_in_month(reference_date: date | None = None) -> int:
     first_day = today.replace(day=1)
     next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
     return (next_month - first_day).days * 24
+
+
+def days_in_month(reference_date: date | None = None) -> int:
+    """Return the number of days in the reference date's calendar month."""
+    today = reference_date or date.today()
+    return calendar.monthrange(today.year, today.month)[1]
+
+
+def day_of_month(reference_date: date | None = None) -> int:
+    """Return the day of the month for the reference date."""
+    today = reference_date or date.today()
+    return today.day
 
 
 def gb_hours_to_avg_mb(gb_hours: float, reference_date: date | None = None) -> float:

@@ -8,22 +8,18 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
-from . import __version__, email_report, export_report, report_data
+from . import __version__, export_report
 from .auth import resolve_token
 from .cli_email_report import (
+    _check_email_env_vars,
     _export_report,
-    _init_github_api,
+    _format_email_bodies,
+    _load_or_fetch_email_data,
+    _resolve_forecast_options,
     _send_email,
     _validate_report_sections,
 )
 from .cli_parsers import _email_parser, _legacy_parser
-from .report_cache import (
-    email_cache_params,
-    format_cache_hit_message,
-    load_cached_report,
-    resolve_cache_max_age,
-    store_cached_report,
-)
 from .setup_config import SetupPaths, email_report_args, load_config, repo_root
 
 HELP = """GitHub Monthly Usage Report
@@ -117,10 +113,6 @@ def _split_optional_token(argv: Sequence[str]) -> tuple[str | None, list[str]]:
     return None, argv
 
 
-def _missing_env(names: list[str]) -> list[str]:
-    return [name for name in names if not os.environ.get(name, "").strip()]
-
-
 def _confirm_release_assets(args: argparse.Namespace) -> bool:
     if not args.include_release_assets or args.yes_include_release_assets:
         return True
@@ -191,8 +183,16 @@ def _validate_email_flags(args: argparse.Namespace) -> int | None:
     return None
 
 
-def _expand_profile_argv(argv: Sequence[str]) -> tuple[list[str], str | None]:
-    """Expand ``--profile NAME`` into profile CLI flags; return (argv, error)."""
+def _expand_profile_argv(
+    argv: Sequence[str],
+) -> tuple[list[str], list[str], str | None]:
+    """Expand ``--profile NAME`` into profile CLI flags.
+
+    Returns ``(expanded_argv, profile_flags, error)``. ``profile_flags`` is the
+    list emitted from the config profile (empty when no profile is selected) so
+    callers can apply option-precedence rules for flags that overlap between
+    the CLI and the active profile.
+    """
     argv_list = list(argv)
     profile_name: str | None = None
     stripped: list[str] = []
@@ -201,7 +201,7 @@ def _expand_profile_argv(argv: Sequence[str]) -> tuple[list[str], str | None]:
         item = argv_list[index]
         if item == "--profile":
             if index + 1 >= len(argv_list):
-                return argv_list, "Error: --profile requires a profile name."
+                return argv_list, [], "Error: --profile requires a profile name."
             profile_name = argv_list[index + 1]
             index += 2
             continue
@@ -213,20 +213,20 @@ def _expand_profile_argv(argv: Sequence[str]) -> tuple[list[str], str | None]:
         index += 1
 
     if not profile_name:
-        return argv_list, None
+        return argv_list, [], None
 
     config_path = SetupPaths.from_root(repo_root()).config_file
     config = load_config(config_path)
     try:
         profile_flags = email_report_args(config, profile_name)
     except KeyError:
-        return argv_list, f"Error: report profile not found: {profile_name!r}"
+        return argv_list, [], f"Error: report profile not found: {profile_name!r}"
 
-    return [*profile_flags, *stripped], None
+    return [*profile_flags, *stripped], profile_flags, None
 
 
 def _run_email_report(argv: Sequence[str]) -> int:
-    expanded_argv, profile_error = _expand_profile_argv(argv)
+    expanded_argv, profile_flags, profile_error = _expand_profile_argv(argv)
     if profile_error:
         print(profile_error)
         return 1
@@ -264,83 +264,38 @@ def _run_email_report(argv: Sequence[str]) -> int:
         return 1
 
     if not args.dry_run:
-        recipient = (getattr(args, "to", None) or "").strip() or os.environ.get(
-            "REPORT_EMAIL", ""
-        ).strip()
-        missing = _missing_env(["RESEND_API_KEY", "RESEND_FROM"])
-        if not recipient:
-            missing.append("REPORT_EMAIL")
-        if missing:
-            print("Error: missing required email environment variable(s):")
-            for name in missing:
-                print(f"  - {name}")
-            return 1
+        error = _check_email_env_vars(args)
+        if error is not None:
+            return error
 
     if not _confirm_release_assets(args):
         return 1
 
-    paths = SetupPaths.from_root(repo_root())
-    max_age = resolve_cache_max_age(paths)
-    cache_params = email_cache_params(
-        include_actions=include_actions,
-        include_copilot=include_copilot,
-        include_lfs=include_lfs,
-        include_consumers=args.include_consumers,
-        include_artifact_storage=args.include_artifact_storage,
-        include_release_assets=args.include_release_assets,
-        max_repos=args.max_repos,
-        warn_over=args.warn_over,
-    )
-    cached_data, cached_username, cache_hit = load_cached_report(
-        paths,
-        kind="email",
-        token=token,
-        params=cache_params,
-        max_age_seconds=max_age,
-        refresh=getattr(args, "refresh", False),
-    )
-    if cache_hit.from_cache and cached_data is not None:
-        data = cached_data
-        username = cached_username or "unknown"
-        if cache_hit.age_seconds is not None and cache_hit.max_age_seconds is not None:
-            print(format_cache_hit_message(cache_hit.age_seconds, cache_hit.max_age_seconds))
-    else:
-        api_result = _init_github_api(token, args.timeout, args.max_retries)
-        if isinstance(api_result, int):
-            return api_result
-        api, username = api_result
-        try:
-            data = report_data.build_report_data(
-                api,
-                username,
-                include_actions=include_actions,
-                include_copilot=include_copilot,
-                include_lfs=include_lfs,
-                include_consumers=args.include_consumers,
-                include_artifact_storage=args.include_artifact_storage,
-                include_release_assets=args.include_release_assets,
-                max_repos=args.max_repos,
-                warn_over=args.warn_over,
-            )
-            if max_age > 0:
-                store_cached_report(
-                    paths,
-                    kind="email",
-                    token=token,
-                    params=cache_params,
-                    username=username,
-                    data=data,
-                )
-        except (RuntimeError, ValueError) as exc:
-            print(f"Error: {exc}")
-            return 1
+    result = _load_or_fetch_email_data(args, token)
+    if isinstance(result, int):
+        return result
+    data, username = result
+
+    include_forecast, premium_requests_limit = _resolve_forecast_options(argv, profile_flags, args)
 
     try:
-        body = email_report.format_report_email(data)
-        html_body = email_report.format_html_report(data) if args.email_format == "html" else None
-        _export_report(args, export_format, body, data, username)
+        body, html_body = _format_email_bodies(
+            data,
+            args.email_format,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
+        )
+        _export_report(
+            args,
+            export_format,
+            body,
+            data,
+            username,
+            include_forecast=include_forecast,
+            premium_requests_limit=premium_requests_limit,
+        )
         if args.dry_run:
-            print(html_body if args.email_format == "html" else body, end="")
+            print(html_body if html_body is not None else body, end="")
             return 0
         recipient = (getattr(args, "to", None) or "").strip() or os.environ.get(
             "REPORT_EMAIL", ""

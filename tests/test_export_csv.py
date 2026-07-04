@@ -7,6 +7,7 @@ from tests.conftest import load_export_report_data
 
 CSV_SECTIONS = [
     "Report Metadata",
+    "Forecast",
     "Warnings",
     "Actions Usage",
     "Copilot Usage",
@@ -130,6 +131,24 @@ class ExportCsvTests(unittest.TestCase):
     def test_trailing_empty_row(self):
         rows = self._rows()
         self.assertEqual(rows[-1], [])
+
+    def test_forecast_section_present(self):
+        from datetime import date
+        from unittest import mock
+
+        with mock.patch("github_usage.report_forecast_data.date") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 15)
+            rows = self._rows()
+        forecast_idx = next(i for i, r in enumerate(rows) if r and r[0] == "### Forecast ###")
+        self.assertEqual(
+            rows[forecast_idx + 1],
+            ["metric", "current", "projected", "limit", "run_out_day"],
+        )
+        data_rows = [r for r in rows[forecast_idx + 2 :] if r]
+        metrics = {r[0] for r in data_rows}
+        self.assertIn("minutes", metrics)
+        self.assertIn("storage_avg_mb", metrics)
+        self.assertIn("premium_requests", metrics)
 
     def test_write_nested_uses_canonical_column_order(self):
         # Fix #6: values must be looked up by key, not by .values() order,

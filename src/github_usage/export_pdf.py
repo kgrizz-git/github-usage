@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .report_forecast_data import build_report_forecast
+
 _MAX_SECTION_ROWS = 30
 
 AddSectionFn = Callable[[str, list], None]
@@ -208,6 +210,37 @@ def _write_errors_page(add_section: AddSectionFn, data: dict) -> None:
         add_section("Unavailable Data", list(errors.items()))
 
 
+def _write_forecast_page(
+    add_section: AddSectionFn, data: dict, *, premium_requests_limit: float | None = None
+) -> None:
+    """Write a forecast page derived from current usage values."""
+    forecast = build_report_forecast(data, premium_requests_limit=premium_requests_limit)
+    if forecast is None:
+        return
+    rows = [
+        ("Day", f"{forecast['day_of_month']} of {forecast['days_in_month']}"),
+    ]
+    for metric_name, label in [
+        ("minutes", "Actions Minutes"),
+        ("storage_avg_mb", "Storage (avg MB)"),
+        ("premium_requests", "Premium Requests"),
+    ]:
+        metric = forecast[metric_name]
+        limit = metric["limit"]
+        run_out = metric["run_out_day"]
+        limit_str = _fmt_num(limit) if limit is not None else "--"
+        run_out_str = f"day {run_out}" if run_out is not None else "--"
+        rows.append(
+            (
+                label,
+                f"current {_fmt_num(metric['current'])}, "
+                f"projected {_fmt_num(metric['projected'])}, "
+                f"limit {limit_str}, run-out {run_out_str}",
+            )
+        )
+    add_section("Usage Forecast", rows)
+
+
 _SECTION_PAGES = (
     _write_actions_page,
     _write_copilot_page,
@@ -221,8 +254,16 @@ _SECTION_PAGES = (
 )
 
 
-def write(data: dict, file_obj) -> None:
+def write(
+    data: dict,
+    file_obj,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
+    **kwargs,
+) -> None:
     """Write the report data dict as a multi-page PDF to ``file_obj``."""
+    del kwargs
     from fpdf import FPDF
 
     pdf = FPDF()
@@ -231,4 +272,6 @@ def write(data: dict, file_obj) -> None:
     _write_cover_page(pdf, data)
     for page_writer in _SECTION_PAGES:
         page_writer(add_section, data)
+    if include_forecast:
+        _write_forecast_page(add_section, data, premium_requests_limit=premium_requests_limit)
     pdf.output(file_obj)

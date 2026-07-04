@@ -47,6 +47,9 @@ def export(
     month: str | None = None,
     redact_data: bool = True,
     to_stdout: bool = False,
+    *,
+    include_forecast: bool = True,
+    premium_requests_limit: float | None = None,
 ) -> str:
     """Write ``data`` to a file in ``export_format``.
 
@@ -74,18 +77,22 @@ def export(
             data = redact.redact_text(data)
 
     writer = _WRITERS[export_format]
+    writer_kwargs = {
+        "include_forecast": include_forecast,
+        "premium_requests_limit": premium_requests_limit,
+    }
 
     if to_stdout:
         if export_format in _BINARY_FORMATS:
-            writer.write(data, sys.stdout.buffer)
+            writer.write(data, sys.stdout.buffer, **writer_kwargs)
         else:
-            writer.write(data, sys.stdout)
+            writer.write(data, sys.stdout, **writer_kwargs)
         return ""
 
     path = output_path or generate_filename(export_format, username, month)
     if export_format in _BINARY_FORMATS:
-        return _atomic_write_bytes(path, lambda f: writer.write(data, f))
-    return _atomic_write_text(path, lambda f: writer.write(data, f))
+        return _atomic_write_bytes(path, lambda f: writer.write(data, f, **writer_kwargs))
+    return _atomic_write_text(path, lambda f: writer.write(data, f, **writer_kwargs))
 
 
 def generate_filename(

@@ -66,6 +66,37 @@ class ExportJsonTests(unittest.TestCase):
         result = json.loads(captured.getvalue())
         self.assertEqual(result["username"], "octocat")
 
+    def test_includes_derived_forecast(self):
+        from datetime import date
+        from unittest import mock
+
+        with mock.patch("github_usage.report_forecast_data.date") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 15)
+            result = self._roundtrip()
+        self.assertIn("forecast", result)
+        self.assertEqual(result["forecast"]["day_of_month"], 15)
+
+    def test_includes_forecast_with_premium_limit(self):
+        from datetime import date
+        from unittest import mock
+
+        buf = io.StringIO()
+        with mock.patch("github_usage.report_forecast_data.date") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 15)
+            export_json.write(self.data, buf, premium_requests_limit=1000.0)
+        result = json.loads(buf.getvalue())
+        self.assertEqual(result["forecast"]["premium_requests"]["limit"], 1000.0)
+
+    def test_does_not_mutate_input_dict(self):
+        from datetime import date
+        from unittest import mock
+
+        original_keys = set(self.data.keys())
+        with mock.patch("github_usage.report_forecast_data.date") as mock_date:
+            mock_date.today.return_value = date(2026, 7, 15)
+            self._roundtrip()
+        self.assertEqual(set(self.data.keys()), original_keys)
+
 
 if __name__ == "__main__":
     unittest.main()
