@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install package
-        run: scripts/python -m pip install -e '.[gui]'
+        run: scripts/python -m pip install -e '.[dev,gui]'
       - name: Run checks
         run: scripts/check
 

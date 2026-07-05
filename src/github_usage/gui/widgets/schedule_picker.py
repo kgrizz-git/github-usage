@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.widgets import Checkbox, Collapsible, Input, Label, Select, Static
 
@@ -158,6 +159,8 @@ class SchedulePicker(Vertical):
             self.query_one(f"#{self._field_id('local-weekday')}", Select).value = str(weekday)
             self.query_one(f"#{self._field_id('local-hour')}", Input).value = str(hour)
             self.query_one(f"#{self._field_id('local-minute')}", Input).value = str(minute)
+        except NoMatches:
+            pass
         finally:
             self._loading = False
         self._refresh_previews()
@@ -185,6 +188,8 @@ class SchedulePicker(Vertical):
                 self.query_one(f"#{self._field_id('ga-minute')}", Input).value = str(minute)
             self._set_ga_picker_disabled(self._ga_advanced)
             self._sync_advanced_panel()
+        except NoMatches:
+            pass
         finally:
             self._loading = False
         self._refresh_previews()
@@ -192,8 +197,11 @@ class SchedulePicker(Vertical):
     def _sync_advanced_panel(self) -> None:
         if not self._show_ga:
             return
-        panel = self.query_one(f"#{self._field_id('ga-cron-advanced')}", Collapsible)
-        panel.collapsed = not self._ga_advanced
+        try:
+            panel = self.query_one(f"#{self._field_id('ga-cron-advanced')}", Collapsible)
+            panel.collapsed = not self._ga_advanced
+        except NoMatches:
+            pass
 
     def get_local_schedule(self) -> LocalScheduleValues | None:
         """Return local schedule values or ``None`` when invalid."""
@@ -277,26 +285,37 @@ class SchedulePicker(Vertical):
         return normalize_launchd_weekday(weekday), hour, minute
 
     def _set_ga_picker_disabled(self, disabled: bool) -> None:
-        for widget_id in (
-            self._field_id("ga-weekday"),
-            self._field_id("ga-hour"),
-            self._field_id("ga-minute"),
-        ):
-            self.query_one(f"#{widget_id}").disabled = disabled
-        self.query_one(f"#{self._field_id('ga-cron')}", Input).disabled = not disabled
+        try:
+            for widget_id in (
+                self._field_id("ga-weekday"),
+                self._field_id("ga-hour"),
+                self._field_id("ga-minute"),
+            ):
+                self.query_one(f"#{widget_id}").disabled = disabled
+            self.query_one(f"#{self._field_id('ga-cron')}", Input).disabled = not disabled
+        except NoMatches:
+            pass
 
     def _refresh_previews(self) -> None:
         if self._show_local:
-            preview = self.query_one(f"#{self._field_id('local-preview')}", Static)
-            values = self.get_local_schedule()
-            preview.update(
-                describe_local_schedule(values.weekday, values.hour, values.minute)
-                if values
-                else "Enter a valid local day and time"
-            )
+            try:
+                preview = self.query_one(f"#{self._field_id('local-preview')}", Static)
+            except NoMatches:
+                preview = None
+            if preview is not None:
+                values = self.get_local_schedule()
+                preview.update(
+                    describe_local_schedule(values.weekday, values.hour, values.minute)
+                    if values
+                    else "Enter a valid local day and time"
+                )
         if self._show_ga:
-            ga_preview = self.query_one(f"#{self._field_id('ga-preview')}", Static)
-            cron_text = self.query_one(f"#{self._field_id('ga-cron')}", Input).value.strip()
+            try:
+                ga_preview = self.query_one(f"#{self._field_id('ga-preview')}", Static)
+                cron_input = self.query_one(f"#{self._field_id('ga-cron')}", Input)
+            except NoMatches:
+                return
+            cron_text = cron_input.value.strip()
             if self._ga_advanced:
                 human = describe_cron_human(cron_text)
                 ga_preview.update(
@@ -328,8 +347,16 @@ class SchedulePicker(Vertical):
         self._refresh_previews()
         self.post_message(self.Changed(self))
 
-    def on_mount(self) -> None:
+    def _init_mount_state(self) -> None:
         if self._show_ga:
-            self._ga_advanced = self.query_one(f"#{self._field_id('ga-advanced')}", Checkbox).value
-            self._set_ga_picker_disabled(self._ga_advanced)
+            try:
+                self._ga_advanced = self.query_one(
+                    f"#{self._field_id('ga-advanced')}", Checkbox
+                ).value
+                self._set_ga_picker_disabled(self._ga_advanced)
+            except NoMatches:
+                pass
         self._refresh_previews()
+
+    def on_mount(self) -> None:
+        self.call_after_refresh(self._init_mount_state)
