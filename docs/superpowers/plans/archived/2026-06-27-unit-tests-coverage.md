@@ -1,6 +1,4 @@
-> **Status:** IN PROGRESS — **NEEDS REVIEW**
->
-> **DO NOT MERGE** until review is complete. This plan is submitted for discussion.
+> **Status:** COMPLETE (merged in 0e2c547)
 
 **Date:** 2026-06-27
 
