@@ -128,7 +128,7 @@ class AppStateNotifyTests(unittest.TestCase):
 
         tmp, paths = _temp_paths()
         self.addCleanup(tmp.cleanup)
-        state = AppState(paths=paths)
+        state = AppState(paths=paths)  # type: ignore[arg-type]
         state.reload()
         calls = 0
 

@@ -26,7 +26,7 @@ def _paths(root: Path) -> SetupPaths:
 
 class ReportCacheTests(unittest.TestCase):
     def setUp(self) -> None:
-        self._cache_env = unittest.mock.patch.dict(
+        self._cache_env = unittest.mock.patch.dict(  # type: ignore[attr-defined]
             os.environ, {"GITHUB_USAGE_DISABLE_CACHE": "0"}, clear=False
         )
         self._cache_env.start()
@@ -190,7 +190,7 @@ class ReportCacheTests(unittest.TestCase):
             paths = _paths(root)
             token = "fake-token"
             params = legacy_cache_params(max_repos=100)
-            with unittest.mock.patch.dict(os.environ, {"GITHUB_USAGE_DISABLE_CACHE": "1"}):
+            with unittest.mock.patch.dict(os.environ, {"GITHUB_USAGE_DISABLE_CACHE": "1"}):  # type: ignore[attr-defined]
                 store_cached_report(
                     paths,
                     kind="legacy",

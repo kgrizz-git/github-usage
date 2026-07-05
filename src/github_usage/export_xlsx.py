@@ -133,7 +133,7 @@ def _write_copilot_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
         for model_name, model_data in by_model.items():
             if isinstance(model_data, dict):
                 model_rows.append(
-                    [
+                    [  # type: ignore[arg-type]
                         model_name,
                         model_data.get("requests"),
                         model_data.get("gross"),
@@ -162,7 +162,7 @@ def _write_monthly_costs_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
     cost_rows = [["Category", "Gross", "Discount", "Net"]]
     for category in ("actions", "copilot", "git_lfs", "total"):
         cat = costs.get(category) or {}
-        cost_rows.append([category, cat.get("gross"), cat.get("discount"), cat.get("net")])
+        cost_rows.append([category, cat.get("gross"), cat.get("discount"), cat.get("net")])  # type: ignore[arg-type]
     write_sheet("Monthly Costs", "Monthly Costs", cost_rows)
 
 
@@ -273,7 +273,7 @@ def write(
     import openpyxl
 
     wb = openpyxl.Workbook()
-    wb.remove(wb.active)
+    wb.remove(wb.active)  # type: ignore[arg-type]
     write_sheet = _make_write_sheet(wb)
     for writer in _SECTION_WRITERS:
         writer(write_sheet, data)

@@ -11,7 +11,7 @@ from .report_forecast_data import build_report_forecast
 class _DatetimeEncoder(json.JSONEncoder):
     """Serialize ``datetime.datetime`` and ``datetime.date`` as ISO-8601 strings."""
 
-    def default(self, obj):
+    def default(self, obj):  # type: ignore[override]
         if isinstance(obj, datetime.datetime | datetime.date):
             return obj.isoformat()
         return super().default(obj)

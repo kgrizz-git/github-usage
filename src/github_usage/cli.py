@@ -313,7 +313,7 @@ def _run_email_report(argv: Sequence[str]) -> int:
             body,
             html_body,
             username,
-            data.get("generated_at"),
+            data.get("generated_at") or "",
             subject=subject or None,
             recipient=recipient or None,
         )

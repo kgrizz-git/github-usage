@@ -233,9 +233,9 @@ def format_report_email(
             lines.extend(
                 formatter(
                     data,
-                    include_forecast=include_forecast,
-                    premium_requests_limit=premium_requests_limit,
-                    reference_date=reference_date,
+                    include_forecast=include_forecast,  # type: ignore[call-arg]
+                    premium_requests_limit=premium_requests_limit,  # type: ignore[call-arg]
+                    reference_date=reference_date,  # type: ignore[call-arg]
                 )
             )
         else:

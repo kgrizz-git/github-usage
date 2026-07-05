@@ -34,10 +34,10 @@ class BillingTests(unittest.TestCase):
 
         result = get_billing_summary(api, "octocat", "Actions")
 
-        self.assertEqual(result["total_gross"], 3.0)
-        self.assertEqual(result["total_discount"], 0.5)
-        self.assertEqual(result["total_net"], 2.5)
-        self.assertIn("linux", result["items"])
+        self.assertEqual(result["total_gross"], 3.0)  # type: ignore[index]
+        self.assertEqual(result["total_discount"], 0.5)  # type: ignore[index]
+        self.assertEqual(result["total_net"], 2.5)  # type: ignore[index]
+        self.assertIn("linux", result["items"])  # type: ignore[arg-type]
 
     def test_get_premium_request_usage_groups_by_model(self):
         from github_usage.billing import get_premium_request_usage
@@ -64,8 +64,8 @@ class BillingTests(unittest.TestCase):
 
         result = get_premium_request_usage(api, "octocat")
 
-        self.assertEqual(result["gpt-4.1"]["total_requests"], 2)
-        self.assertEqual(result["gpt-4.1"]["total_net"], 0.06)
+        self.assertEqual(result["gpt-4.1"]["total_requests"], 2)  # type: ignore[index]
+        self.assertEqual(result["gpt-4.1"]["total_net"], 0.06)  # type: ignore[index]
 
     def test_get_user_actions_billing_splits_minutes_and_storage(self):
         from github_usage.billing import get_user_actions_billing
@@ -208,7 +208,7 @@ class BillingTests(unittest.TestCase):
         def none_pages(path, params=None):
             return None
 
-        api.get_all_pages = none_pages
+        api.get_all_pages = none_pages  # type: ignore[assignment]
 
         # Should not raise; returns defaults
         result = get_actions_from_runs(api, "octocat", "api")
@@ -252,8 +252,8 @@ class BillingTests(unittest.TestCase):
         )
 
         result = get_full_billing(api, "octocat")
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["sku"], "linux")
+        self.assertEqual(len(result), 1)  # type: ignore[arg-type]
+        self.assertEqual(result[0]["sku"], "linux")  # type: ignore[index]
 
     def test_get_full_billing_failure(self):
         from github_usage.billing import get_full_billing
@@ -315,12 +315,12 @@ class BillingTests(unittest.TestCase):
 
         result = get_billing_summary(api, "octocat", "Actions")
 
-        self.assertEqual(result["total_gross"], 0.0)
-        self.assertEqual(result["total_discount"], 0.0)
-        self.assertEqual(result["total_net"], 0.0)
+        self.assertEqual(result["total_gross"], 0.0)  # type: ignore[index]
+        self.assertEqual(result["total_discount"], 0.0)  # type: ignore[index]
+        self.assertEqual(result["total_net"], 0.0)  # type: ignore[index]
         # Sanitized item stored
-        self.assertEqual(result["items"]["linux"]["grossAmount"], 0.0)
-        self.assertEqual(result["items"]["linux"]["netAmount"], 0.0)
+        self.assertEqual(result["items"]["linux"]["grossAmount"], 0.0)  # type: ignore[index]
+        self.assertEqual(result["items"]["linux"]["netAmount"], 0.0)  # type: ignore[index]
 
     def test_get_premium_request_usage_nondict(self):
         from github_usage.billing import get_premium_request_usage
@@ -363,12 +363,12 @@ class BillingTests(unittest.TestCase):
 
         result = get_premium_request_usage(api, "octocat")
 
-        self.assertEqual(result["gpt-4.1"]["total_requests"], 0.0)
-        self.assertEqual(result["gpt-4.1"]["total_gross"], 0.0)
-        self.assertIn("gpt-4.1", result)
+        self.assertEqual(result["gpt-4.1"]["total_requests"], 0.0)  # type: ignore[index]
+        self.assertEqual(result["gpt-4.1"]["total_gross"], 0.0)  # type: ignore[index]
+        self.assertIn("gpt-4.1", result)  # type: ignore[arg-type]
         # Item list is preserved (with sanitized entries)
-        self.assertEqual(len(result["gpt-4.1"]["items"]), 1)
-        self.assertEqual(result["gpt-4.1"]["items"][0]["grossAmount"], 0.0)
+        self.assertEqual(len(result["gpt-4.1"]["items"]), 1)  # type: ignore[index,arg-type]
+        self.assertEqual(result["gpt-4.1"]["items"][0]["grossAmount"], 0.0)  # type: ignore[index]
 
     def test_get_actions_per_repo_nondict(self):
         from github_usage.billing import get_actions_per_repo

@@ -37,7 +37,7 @@ class SetupProfilesPanel(VerticalScroll):
     """
 
     def __init__(self, coordinator: SetupView, **kwargs: object) -> None:
-        super().__init__(**kwargs)
+        super().__init__(**kwargs)  # type: ignore[arg-type]
         self._coordinator = coordinator
 
     def compose(self) -> ComposeResult:
@@ -115,8 +115,8 @@ class SetupProfilesPanel(VerticalScroll):
         def _apply_selection() -> None:
             select.value = target
             label.update(f"Active: [b]{target}[/b]")
-            if self.app.app_state.current_profile != target:
-                self.app.app_state.set_current_profile(target, persist=False, notify=False)
+            if self.app.app_state.current_profile != target:  # type: ignore[attr-defined]
+                self.app.app_state.set_current_profile(target, persist=False, notify=False)  # type: ignore[attr-defined]
 
         self.call_after_refresh(_apply_selection)
 
@@ -173,7 +173,7 @@ class SetupProfilesPanel(VerticalScroll):
                 if previous:
                     select.value = previous
                 return
-        self.app.app_state.set_current_profile(new_name)
+        self.app.app_state.set_current_profile(new_name)  # type: ignore[attr-defined]
         self._coordinator.reload_form()
 
     @on(Input.Changed)
@@ -194,13 +194,13 @@ class SetupProfilesPanel(VerticalScroll):
         if self._coordinator.is_running:
             return
         log = self._coordinator.verify_log
-        paths = self.app.app_state.paths
+        paths = self.app.app_state.paths  # type: ignore[attr-defined]
         config = load_profiles(paths)
         name = f"profile{len(config.get('profiles', [])) + 1}"
         try:
             config = add_profile(config, name)
             save_profiles(paths, config)
-            self.app.app_state.reload()
+            self.app.app_state.reload()  # type: ignore[attr-defined]
             write_log(log, f"Created profile '{name}'", level="success")
         except (ValueError, PermissionError, OSError) as exc:
             write_log(log, format_error(exc), level="error")
@@ -211,7 +211,7 @@ class SetupProfilesPanel(VerticalScroll):
             return
         log = self._coordinator.verify_log
         profile_name = self._coordinator.current_profile_name()
-        paths = self.app.app_state.paths
+        paths = self.app.app_state.paths  # type: ignore[attr-defined]
 
         config = load_profiles(paths)
         if len(config.get("profiles", [])) <= 1:
@@ -230,7 +230,7 @@ class SetupProfilesPanel(VerticalScroll):
         try:
             config = delete_profile(config, profile_name)
             save_profiles(paths, config)
-            self.app.app_state.reload()
+            self.app.app_state.reload()  # type: ignore[attr-defined]
             write_log(log, f"Profile '{profile_name}' deleted", level="warning")
         except (ValueError, KeyError, PermissionError, OSError) as exc:
             write_log(log, format_error(exc), level="error")

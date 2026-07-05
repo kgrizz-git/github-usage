@@ -19,7 +19,7 @@ class GitHubUsageApp(App):
     """Top-level Textual TUI for github-usage."""
 
     TITLE = "github-usage"
-    theme = "monokai"
+    theme = "monokai"  # type: ignore[assignment]
     CSS_PATH = Path(__file__).parent / "styles" / "app.tcss"
     BINDINGS = [
         ("q", "quit", "Quit"),

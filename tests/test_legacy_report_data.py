@@ -143,8 +143,8 @@ class LegacyReportDataTests(unittest.TestCase):
 
         api = FakeAPI()
         api.request = _request  # type: ignore[method-assign]
-        api.get_all_pages = (
-            lambda path, params=None, limit=None: repos if path == "/user/repos" else []
+        api.get_all_pages = lambda path, params=None, limit=None: (
+            repos if path == "/user/repos" else []
         )  # type: ignore[method-assign]
         data = build_legacy_report_data(
             api,

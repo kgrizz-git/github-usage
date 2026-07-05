@@ -10,9 +10,9 @@ class LegacyCompatTests(unittest.TestCase):
         self.assertTrue(callable(legacy.get_actions_per_repo))
         self.assertTrue(callable(legacy.main))
 
-    @unittest.mock.patch("github_usage.legacy_report.GitHubAPI")
-    @unittest.mock.patch("github_usage.legacy_report.resolve_token", return_value="fake")
-    @unittest.mock.patch("github_usage.legacy_report.check_user_scope", return_value=False)
+    @unittest.mock.patch("github_usage.legacy_report.GitHubAPI")  # type: ignore[attr-defined]
+    @unittest.mock.patch("github_usage.legacy_report.resolve_token", return_value="fake")  # type: ignore[attr-defined]
+    @unittest.mock.patch("github_usage.legacy_report.check_user_scope", return_value=False)  # type: ignore[attr-defined]
     def test_legacy_report_passes_timeout_and_max_retries(
         self, mock_check, mock_resolve, mock_api_class
     ):

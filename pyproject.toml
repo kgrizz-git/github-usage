@@ -28,6 +28,7 @@ github-usage = "github_usage.cli:main"
 [project.optional-dependencies]
 dev = [
   "bandit>=1.7.10",
+  "basedpyright>=1.30",
   "black>=24.0",
   "pip-audit>=2.7",
   "pre-commit>=3.7",
@@ -69,6 +70,20 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D100", "D103", "D104"]
 "scripts/**/*" = ["D100", "D103", "D104"]
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+include = ["src", "tests"]
+exclude = ["backups", ".venv"]
+reportMissingImports = "error"
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUntypedFunctionDecorator = "none"
+reportUntypedClassDecorator = "none"
+reportPrivateImportUsage = "none"
+pythonVersion = "3.11"
 
 [tool.bandit]
 exclude_dirs = ["tests", "backups"]

@@ -69,7 +69,7 @@ class SchedulePicker(Vertical):
         id_prefix: str = "",
         **kwargs: object,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__(**kwargs)  # type: ignore[arg-type]
         self._show_local = show_local
         self._show_ga = show_ga
         self._ga_first = ga_first

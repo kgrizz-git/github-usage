@@ -161,7 +161,7 @@ def _describe_dow_field(field: str) -> str | None:
         if names and all(names):
             if len(names) == 1:
                 return names[0]
-            return ", ".join(names[:-1]) + f", and {names[-1]}"
+            return ", ".join(names[:-1]) + f", and {names[-1]}"  # type: ignore[call-overload]
     if "-" in field and not field.startswith("*/"):
         start, end = field.split("-", 1)
         if start.isdigit() and end.isdigit():

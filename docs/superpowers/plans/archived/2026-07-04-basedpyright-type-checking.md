@@ -1,6 +1,4 @@
-> **Status:** NEEDS REVIEW
->
-> **DO NOT MERGE** until review is complete. This plan is submitted for discussion.
+> **Status:** COMPLETE
 
 # Add basedpyright Static Type Checking
 

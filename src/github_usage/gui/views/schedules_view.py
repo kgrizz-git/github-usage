@@ -103,7 +103,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         self._loading = True
         self._applying_selection = False
         self._previous_profile: str | None = None
-        state = self.app.app_state
+        state = self.app.app_state  # type: ignore[attr-defined]
         state.add_listener(self._on_state_changed)
         try:
             self._on_state_changed()
@@ -127,7 +127,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             )
 
     def on_unmount(self) -> None:
-        self.app.app_state.remove_listener(self._on_state_changed)
+        self.app.app_state.remove_listener(self._on_state_changed)  # type: ignore[attr-defined]
 
     def has_unsaved_changes(self) -> bool:
         return self._dirty
@@ -146,13 +146,13 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
     def _profile_name(self) -> str:
         value = self.query_one("#profile-select", Select).value
         if value == Select.BLANK or str(value) == "Select.NULL" or value is None:
-            return self.app.app_state.current_profile
+            return self.app.app_state.current_profile  # type: ignore[attr-defined]
         return str(value)
 
     def _reload_form(self) -> None:
         self._loading = True
         try:
-            state = self.app.app_state
+            state = self.app.app_state  # type: ignore[attr-defined]
             paths = state.paths
             names = list(state.profile_names)
             select = self.query_one("#profile-select", Select)
@@ -196,8 +196,8 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
                 try:
                     select.value = target
                     label.update(f"Active: [b]{target}[/b]")
-                    if self.app.app_state.current_profile != target:
-                        self.app.app_state.set_current_profile(target, persist=False, notify=False)
+                    if self.app.app_state.current_profile != target:  # type: ignore[attr-defined]
+                        self.app.app_state.set_current_profile(target, persist=False, notify=False)  # type: ignore[attr-defined]
                 finally:
                     self._applying_selection = False
                     self._loading = False
@@ -239,7 +239,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
                     finally:
                         self._applying_selection = False
                 return
-        self.app.app_state.set_current_profile(new_name)
+        self.app.app_state.set_current_profile(new_name)  # type: ignore[attr-defined]
         self._reload_form()
 
     @on(SchedulePicker.Changed)
@@ -274,7 +274,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         log = self.query_one("#sched-log", RichLog)
         if not self._validate_schedule_fields(log):
             return
-        paths = self.app.app_state.paths
+        paths = self.app.app_state.paths  # type: ignore[attr-defined]
         picker = self.query_one("#schedule-picker", SchedulePicker)
         local = picker.get_local_schedule()
         cron = picker.get_ga_cron()
@@ -298,7 +298,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
                 include_release_assets=self.query_one("#ga-release", Checkbox).value,
             )
             self._clear_dirty()
-            self.app.app_state.reload()
+            self.app.app_state.reload()  # type: ignore[attr-defined]
             write_log(log, "Schedules saved", level="success")
         except (ValueError, KeyError, PermissionError, OSError) as exc:
             write_log(log, format_error(exc), level="error")
@@ -309,7 +309,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             return
         log = self.query_one("#sched-log", RichLog)
         try:
-            path = regenerate_launchd_plist(self.app.app_state.paths, self._profile_name())
+            path = regenerate_launchd_plist(self.app.app_state.paths, self._profile_name())  # type: ignore[attr-defined]
             write_log(log, f"Generated {path}", level="success")
         except (ValueError, FileNotFoundError, KeyError, OSError) as exc:
             write_log(log, format_error(exc), level="error")
@@ -330,7 +330,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         if not confirmed:
             return
         try:
-            path = regenerate_workflow_file(self.app.app_state.paths, self._profile_name())
+            path = regenerate_workflow_file(self.app.app_state.paths, self._profile_name())  # type: ignore[attr-defined]
             write_log(log, f"Wrote workflow {path}", level="success")
         except (ValueError, FileNotFoundError, KeyError, OSError) as exc:
             write_log(log, format_error(exc), level="error")
@@ -367,7 +367,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             if self._is_cancelled():
                 self._call_ui(write_log, log, "Install cancelled", level="warning")
                 return
-            paths = self.app.app_state.paths
+            paths = self.app.app_state.paths  # type: ignore[attr-defined]
             code, message = install_launch_agent_for_paths(paths)
             status = get_launch_agent_status(paths)
             self._call_ui(write_log, log, message or f"LaunchAgent status: {status}", level="info")

@@ -31,7 +31,7 @@ def scroll_target(app: App) -> Widget | None:
     while widget is not None:
         if isinstance(widget, _SCROLLABLE_TYPES):
             return widget
-        widget = widget.parent
+        widget = widget.parent  # type: ignore[assignment]
 
     from .main_window import MainWindow
 

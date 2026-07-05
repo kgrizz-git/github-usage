@@ -156,7 +156,7 @@ class SetupWizardScreen(ModalScreen[bool]):
                 yield Button("Next", id="wizard-next", variant="primary")
 
     def on_mount(self) -> None:
-        paths = self.app.app_state.paths
+        paths = self.app.app_state.paths  # type: ignore[attr-defined]
         self._data = load_initial_data(paths)
         self._populate_secrets()
         self._populate_options()
@@ -259,7 +259,7 @@ class SetupWizardScreen(ModalScreen[bool]):
 
     @on(Button.Pressed, "#wizard-skip")
     def _skip_wizard(self) -> None:
-        self.app.app_state.dismiss_setup_wizard()
+        self.app.app_state.dismiss_setup_wizard()  # type: ignore[attr-defined]
         self.dismiss(False)
 
     @on(Button.Pressed, "#wizard-back")
@@ -289,7 +289,7 @@ class SetupWizardScreen(ModalScreen[bool]):
         self._update_progress()
 
     def _validate_and_save_current_step(self) -> str | None:
-        paths = self.app.app_state.paths
+        paths = self.app.app_state.paths  # type: ignore[attr-defined]
         log = self.query_one("#wizard-verify-log", RichLog)
 
         if self._step == 1:
@@ -353,7 +353,7 @@ class SetupWizardScreen(ModalScreen[bool]):
 
     @work(thread=True)
     def _run_verify_worker(self) -> None:
-        paths = self.app.app_state.paths
+        paths = self.app.app_state.paths  # type: ignore[attr-defined]
         try:
             result = run_verify(paths)
             self._data.verify_result = result
@@ -381,7 +381,7 @@ class SetupWizardScreen(ModalScreen[bool]):
             self._verifying = False
 
     def _finish(self) -> None:
-        paths = self.app.app_state.paths
+        paths = self.app.app_state.paths  # type: ignore[attr-defined]
         log = self.query_one("#wizard-verify-log", RichLog)
         if sys.platform == "darwin":
             install_box = self.query_one("#wizard-install-la", Checkbox)
@@ -391,6 +391,6 @@ class SetupWizardScreen(ModalScreen[bool]):
                     write_log(log, message or f"LaunchAgent exit {code}", level="info")
                 except Exception as exc:
                     write_log(log, format_error(exc), level="error")
-        self.app.app_state.reload()
-        self.app.app_state.set_wizard_completed(True)
+        self.app.app_state.reload()  # type: ignore[attr-defined]
+        self.app.app_state.set_wizard_completed(True)  # type: ignore[attr-defined]
         self.dismiss(True)

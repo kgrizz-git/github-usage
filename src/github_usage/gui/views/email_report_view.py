@@ -42,14 +42,14 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
         self._is_running = False
         self._cancel_requested = False
         self._loading = True
-        state = self.app.app_state
+        state = self.app.app_state  # type: ignore[attr-defined]
         state.add_listener(self._on_state_changed)
         self._on_state_changed()
         if state.config_error:
             self._show_error(state.config_error)
 
     def on_unmount(self) -> None:
-        self.app.app_state.remove_listener(self._on_state_changed)
+        self.app.app_state.remove_listener(self._on_state_changed)  # type: ignore[attr-defined]
 
     def _on_state_changed(self) -> None:
         self._reload_profiles()
@@ -64,7 +64,7 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
     def _reload_profiles(self) -> None:
         self._loading = True
         try:
-            state = self.app.app_state
+            state = self.app.app_state  # type: ignore[attr-defined]
             names = list(state.profile_names)
             select = self.query_one("#profile-select", Select)
             select.set_options([(n, n) for n in names])
@@ -85,9 +85,9 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
         if self._loading:
             return
         name = self._profile_name()
-        if name == self.app.app_state.current_profile:
+        if name == self.app.app_state.current_profile:  # type: ignore[attr-defined]
             return
-        self.app.app_state.set_current_profile(name)
+        self.app.app_state.set_current_profile(name)  # type: ignore[attr-defined]
 
     @on(Button.Pressed, "#preview-btn")
     def _preview(self) -> None:
@@ -119,7 +119,7 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
                 return
             self._call_ui(write_log, preview, "Fetching report data...", level="progress")
 
-            paths = self.app.app_state.paths
+            paths = self.app.app_state.paths  # type: ignore[attr-defined]
             code, body = run_email_dry_run(paths, profile)
             if self._is_cancelled():
                 self._call_ui(write_log, preview, "Preview cancelled", level="warning")
@@ -172,7 +172,7 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
                 self._call_ui(write_log, preview, "Send cancelled", level="warning")
                 return
 
-            paths = self.app.app_state.paths
+            paths = self.app.app_state.paths  # type: ignore[attr-defined]
             code, message = send_email_report(paths, profile)
             if self._is_cancelled():
                 self._call_ui(write_log, preview, "Send cancelled", level="warning")

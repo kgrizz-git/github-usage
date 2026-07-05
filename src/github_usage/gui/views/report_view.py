@@ -93,7 +93,7 @@ class ReportView(VerticalScroll, AsyncViewMixin):
         self._username: str | None = None
         self._is_running = False
         self._cancel_requested = False
-        prefs = self.app.app_state.prefs
+        prefs = self.app.app_state.prefs  # type: ignore[attr-defined]
         self.query_one("#timeout", Input).value = str(prefs.report_timeout)
         self.query_one("#max-retries", Input).value = str(prefs.report_max_retries)
 
@@ -151,7 +151,7 @@ class ReportView(VerticalScroll, AsyncViewMixin):
         export_format = str(self.query_one("#export-format", Select).value)
         output_path = self.query_one("#output-path", Input).value.strip() or None
         refresh = bool(self.query_one("#report-refresh", Checkbox).value)
-        self.app.app_state.save_report_settings(timeout, max_retries)
+        self.app.app_state.save_report_settings(timeout, max_retries)  # type: ignore[attr-defined]
         return _ReportRunParams(timeout, max_retries, export_format, output_path, refresh)
 
     @work(thread=True)
@@ -182,8 +182,8 @@ class ReportView(VerticalScroll, AsyncViewMixin):
                 timeout=params.timeout,
                 max_retries=params.max_retries,
                 refresh=params.refresh,
-                paths=self.app.app_state.paths,
-                gui_cache_max_age_seconds=self.app.app_state.prefs.report_cache_max_age_seconds,
+                paths=self.app.app_state.paths,  # type: ignore[attr-defined]
+                gui_cache_max_age_seconds=self.app.app_state.prefs.report_cache_max_age_seconds,  # type: ignore[attr-defined]
             )
 
             if self._is_cancelled():
@@ -205,8 +205,8 @@ class ReportView(VerticalScroll, AsyncViewMixin):
     def _forecast_options(self) -> tuple[bool, float | None]:
         """Return ``(include_forecast, premium_requests_limit)`` from the active profile."""
         try:
-            config = load_profiles(self.app.app_state.paths)
-            profile = find_profile(config, self.app.app_state.current_profile)
+            config = load_profiles(self.app.app_state.paths)  # type: ignore[attr-defined]
+            profile = find_profile(config, self.app.app_state.current_profile)  # type: ignore[attr-defined]
         except (KeyError, ValueError):
             return bool(DEFAULT_EMAIL_REPORT["include_forecast"]), DEFAULT_EMAIL_REPORT[
                 "premium_requests_limit"

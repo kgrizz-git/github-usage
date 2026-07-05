@@ -50,7 +50,7 @@ def _coerce_section(value, default):
 
 
 def _write_sections(
-    writer: csv.writer,
+    writer: csv.writer,  # type: ignore[type-arg]
     data: dict,
     *,
     include_forecast: bool = True,
@@ -140,7 +140,10 @@ def _write_sections(
 
 
 def _write_forecast_section(
-    writer: csv.writer, data: dict, *, premium_requests_limit: float | None = None
+    writer: csv.writer,  # type: ignore[type-arg]
+    data: dict,
+    *,
+    premium_requests_limit: float | None = None,
 ) -> None:
     """Write a flattened forecast section derived from current usage values."""
     forecast = build_report_forecast(data, premium_requests_limit=premium_requests_limit)
@@ -163,7 +166,7 @@ def _write_forecast_section(
         )
 
 
-def _write_copilot_by_model(writer: csv.writer, by_model) -> None:
+def _write_copilot_by_model(writer: csv.writer, by_model) -> None:  # type: ignore[type-arg]
     if not by_model:
         return
     writer.writerow(["by_model"])
@@ -183,19 +186,19 @@ def _write_copilot_by_model(writer: csv.writer, by_model) -> None:
             writer.writerow([model_name, model_data])
 
 
-def _write_section_header(writer: csv.writer, title: str) -> None:
+def _write_section_header(writer: csv.writer, title: str) -> None:  # type: ignore[type-arg]
     """Write a section delimiter row like ``### Section Name ###`` (single cell)."""
     writer.writerow([f"### {title} ###"])
 
 
-def _write_kv(writer: csv.writer, data: dict, keys: list) -> None:
+def _write_kv(writer: csv.writer, data: dict, keys: list) -> None:  # type: ignore[type-arg]
     for key in keys:
         value = data.get(key)
         if value is not None:
             writer.writerow([key, value])
 
 
-def _write_nested(writer: csv.writer, section_name: str, row_label: str, nested) -> None:
+def _write_nested(writer: csv.writer, section_name: str, row_label: str, nested) -> None:  # type: ignore[type-arg]
     """Write a nested dict as a sub-table with a header row.
 
     The dict key is included as the first column (``row_label``) so rows are

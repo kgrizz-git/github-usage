@@ -44,7 +44,7 @@ class ScrollActionsTests(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(100, 32)) as pilot:
             await pilot.pause(0.05)
             main = app.query_one("MainWindow")
-            main.action_show_view("schedules")
+            main.action_show_view("schedules")  # type: ignore[attr-defined]
             target = scroll_target(app)
             self.assertIsInstance(target, SchedulesView)
 

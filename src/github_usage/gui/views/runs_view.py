@@ -49,7 +49,7 @@ class RunsView(VerticalScroll, AsyncViewMixin):
         table = self.query_one("#runs-table", DataTable)
         table.clear(columns=False)
         try:
-            paths = self.app.app_state.paths
+            paths = self.app.app_state.paths  # type: ignore[attr-defined]
             rows = formatted_scheduled_runs(paths)
             for row in rows:
                 table.add_row(
@@ -92,7 +92,7 @@ class RunsView(VerticalScroll, AsyncViewMixin):
             if self._is_cancelled():
                 self._call_ui(write_log, log, "Drift check cancelled", level="warning")
                 return
-            paths = self.app.app_state.paths
+            paths = self.app.app_state.paths  # type: ignore[attr-defined]
             result = check_workflow_drift(paths)
             if self._is_cancelled():
                 self._call_ui(write_log, log, "Drift check cancelled", level="warning")

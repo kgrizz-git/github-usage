@@ -123,7 +123,7 @@ class ApiTests(unittest.TestCase):
             from github_usage.http_retry import Response
 
             headers = http.client.HTTPMessage()
-            if params.get("page") == 1:
+            if params.get("page") == 1:  # type: ignore[union-attr]
                 headers["Link"] = '<https://api.github.com/resource?page=2>; rel="next"'
                 return Response(status=200, body=b'[{"id": 1}]', headers=headers)
             else:
@@ -151,9 +151,9 @@ class ApiTests(unittest.TestCase):
             headers = http.client.HTTPMessage()
             # Always advertise a next page so the loop would run forever without limit
             headers["Link"] = (
-                f'<https://api.github.com/resource?page={params["page"] + 1}>; rel="next"'
+                f'<https://api.github.com/resource?page={params["page"] + 1}>; rel="next"'  # type: ignore[index]
             )
-            items = [{"id": params["page"]}]
+            items = [{"id": params["page"]}]  # type: ignore[index]
             return Response(
                 status=200, body=__import__("json").dumps(items).encode(), headers=headers
             )

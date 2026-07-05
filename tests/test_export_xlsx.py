@@ -79,7 +79,7 @@ class ExportXlsxTests(unittest.TestCase):
         rows = list(ws.iter_rows(values_only=True))
         header = rows[3]
         self.assertEqual(header, ("SKU", "Minutes", "Storage GB-Hrs", "Gross", "Discount", "Net"))
-        skus = {r[0] for r in rows[4:] if r[0]}
+        skus = {r[0] for r in rows[4:] if r[0]}  # type: ignore[has-type]
         self.assertIn("enterprise", skus)
         self.assertIn("free", skus)
 
@@ -94,7 +94,7 @@ class ExportXlsxTests(unittest.TestCase):
         ws = wb["By Model"]
         rows = list(ws.iter_rows(values_only=True))
         self.assertEqual(rows[3], ("Model", "Requests", "Gross", "Discount", "Net"))
-        models = {r[0] for r in rows[4:] if r[0]}
+        models = {r[0] for r in rows[4:] if r[0]}  # type: ignore[has-type]
         self.assertIn("gpt-4.1", models)
         self.assertIn("claude-sonnet-4", models)
 
@@ -109,7 +109,7 @@ class ExportXlsxTests(unittest.TestCase):
         ws = wb["Monthly Costs"]
         rows = list(ws.iter_rows(values_only=True))
         self.assertEqual(rows[3], ("Category", "Gross", "Discount", "Net"))
-        categories = {r[0] for r in rows[4:] if r[0]}
+        categories = {r[0] for r in rows[4:] if r[0]}  # type: ignore[has-type]
         for cat in ("actions", "copilot", "git_lfs", "total"):
             self.assertIn(cat, categories)
 
@@ -140,7 +140,7 @@ class ExportXlsxTests(unittest.TestCase):
         ws = wb["Insights"]
         rows = list(ws.iter_rows(values_only=True))
         findings = [r[0] for r in rows[3:] if r[0]]
-        self.assertTrue(any("72%" in f for f in findings))
+        self.assertTrue(any("72%" in f for f in findings))  # type: ignore[operator]
 
     def test_errors_sheet(self):
         wb = self._open()
@@ -216,7 +216,7 @@ class ExportXlsxTests(unittest.TestCase):
         from github_usage.export_xlsx import _make_write_sheet, _write_actions_sheet
 
         wb = openpyxl.Workbook()
-        wb.remove(wb.active)
+        wb.remove(wb.active)  # type: ignore[arg-type]
         write_sheet = _make_write_sheet(wb)
         data = {
             "actions": {

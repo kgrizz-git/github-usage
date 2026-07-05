@@ -154,7 +154,7 @@ class LegacyExportCliTests(unittest.TestCase):
         seen_argv: list[list[str]] = []
 
         def capture_token(*, argv=None):
-            seen_argv.append(list(argv) if argv is not None else None)
+            seen_argv.append(list(argv) if argv is not None else None)  # type: ignore[arg-type]
             return "ghp_fake"
 
         with (

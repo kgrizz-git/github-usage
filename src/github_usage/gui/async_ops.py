@@ -23,7 +23,7 @@ class AsyncViewMixin:
 
     def _call_ui(self, callback: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
         """Schedule ``callback`` on the main UI thread from a ``@work`` worker."""
-        self.app.call_from_thread(callback, *args, **kwargs)
+        self.app.call_from_thread(callback, *args, **kwargs)  # type: ignore[attr-defined]
 
     def _set_button_state(self, button: Button, disabled: bool, label: str) -> None:
         """Update a button label/disabled state from the main thread."""

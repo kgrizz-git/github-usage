@@ -49,7 +49,7 @@ class SetupSecretsPanel(VerticalScroll):
     """GitHub token and Resend secrets stored in .env.email-report."""
 
     def __init__(self, coordinator: SetupView, **kwargs: object) -> None:
-        super().__init__(**kwargs)
+        super().__init__(**kwargs)  # type: ignore[arg-type]
         self._coordinator = coordinator
 
     def compose(self) -> ComposeResult:

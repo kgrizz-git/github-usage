@@ -75,7 +75,7 @@ class MainWindow(Container):
 
     def restore_last_view(self) -> None:
         """Open the view the user last visited."""
-        view_id = self.app.app_state.prefs.last_view
+        view_id = self.app.app_state.prefs.last_view  # type: ignore[attr-defined]
         if view_id in self.VIEWS:
             self._set_active(view_id)
 
@@ -115,14 +115,14 @@ class MainWindow(Container):
         title = self.VIEWS[view_id]
         if view_id not in self._PROFILE_AWARE_VIEWS:
             return title
-        profile = (self.app.app_state.current_profile or "").strip() or "(none)"
+        profile = (self.app.app_state.current_profile or "").strip() or "(none)"  # type: ignore[attr-defined]
         return f"{title} · profile: {profile}"
 
     def _commit_tab_switch(self, view_id: str) -> None:
         """Update tracked view state after the tab widget has switched."""
         self._active_view_id = view_id
         self.app.sub_title = self._subtitle_for(view_id)
-        self.app.app_state.set_last_view(view_id)
+        self.app.app_state.set_last_view(view_id)  # type: ignore[attr-defined]
 
     def _set_active(self, view_id: str) -> None:
         """Switch tabs programmatically (keyboard shortcuts and restore)."""
@@ -135,7 +135,7 @@ class MainWindow(Container):
             if tabs.active != view_id:
                 tabs.active = view_id
             self.app.sub_title = self._subtitle_for(view_id)
-            self.app.app_state.set_last_view(view_id)
+            self.app.app_state.set_last_view(view_id)  # type: ignore[attr-defined]
         finally:
             self._programmatic_tab_change = False
 
@@ -181,7 +181,7 @@ class MainWindow(Container):
 
         old_id = self._active_view_id
         if self._has_unsaved_changes_for(old_id):
-            self.run_worker(self._confirm_tab_switch(old_id, new_id), exclusive=True)
+            self.run_worker(self._confirm_tab_switch(old_id, new_id), exclusive=True)  # type: ignore[arg-type]
             return
         self._commit_tab_switch(new_id)
 

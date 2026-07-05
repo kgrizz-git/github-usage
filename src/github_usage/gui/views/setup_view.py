@@ -51,7 +51,7 @@ class SetupView(VerticalScroll, AsyncViewMixin):
     ]
 
     def __init__(self, **kwargs: object) -> None:
-        super().__init__(**kwargs)
+        super().__init__(**kwargs)  # type: ignore[arg-type]
         self._is_running = False
         self._cancel_requested = False
         self._dirty = False
@@ -76,14 +76,14 @@ class SetupView(VerticalScroll, AsyncViewMixin):
                 yield SetupVerifyPanel(self, id="verify-panel")
 
     def on_mount(self) -> None:
-        state = self.app.app_state
+        state = self.app.app_state  # type: ignore[attr-defined]
         state.add_listener(self._on_state_changed)
         self._on_state_changed()
         if state.config_error:
             self.verify_panel.show_error(state.config_error)
 
     def on_unmount(self) -> None:
-        self.app.app_state.remove_listener(self._on_state_changed)
+        self.app.app_state.remove_listener(self._on_state_changed)  # type: ignore[attr-defined]
 
     @property
     def dirty(self) -> bool:
@@ -160,7 +160,7 @@ class SetupView(VerticalScroll, AsyncViewMixin):
         """Reload form data from config files."""
         self._loading = True
         try:
-            state = self.app.app_state
+            state = self.app.app_state  # type: ignore[attr-defined]
             paths = state.paths
             try:
                 secrets = read_secrets(paths)
@@ -212,13 +212,13 @@ class SetupView(VerticalScroll, AsyncViewMixin):
         select = self.profiles_panel.query_one("#profile-select", Select)
         value = select.value
         if value == Select.BLANK or str(value) == "Select.NULL" or value is None:
-            return self.app.app_state.current_profile
+            return self.app.app_state.current_profile  # type: ignore[attr-defined]
         return str(value)
 
     def action_save(self) -> None:
         """Persist secrets and the active profile."""
         log = self.verify_log
-        paths = self.app.app_state.paths
+        paths = self.app.app_state.paths  # type: ignore[attr-defined]
         options = self.profiles_panel.read_profile_options()
         max_repos_str = options["max_repos_str"]
 
@@ -260,7 +260,7 @@ class SetupView(VerticalScroll, AsyncViewMixin):
 
             self._dirty = False
             self.profiles_panel.update_dirty_indicator(False)
-            self.app.app_state.reload()
+            self.app.app_state.reload()  # type: ignore[attr-defined]
             write_log(log, "All changes saved successfully", level="success")
         except (PermissionError, FileNotFoundError, KeyError, ValueError, OSError) as exc:
             write_log(log, format_error(exc, context="Save failed"), level="error")
@@ -286,7 +286,7 @@ class SetupView(VerticalScroll, AsyncViewMixin):
                 self._call_ui(write_log, log, "Verification cancelled", level="warning")
                 return
             self._call_ui(write_log, log, "Checking configuration...", level="dim")
-            paths = self.app.app_state.paths
+            paths = self.app.app_state.paths  # type: ignore[attr-defined]
             result: VerifyResult = verify_configuration(paths, self.current_profile_name())
             if self._is_cancelled():
                 self._call_ui(write_log, log, "Verification cancelled", level="warning")

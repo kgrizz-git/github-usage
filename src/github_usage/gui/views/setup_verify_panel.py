@@ -21,7 +21,7 @@ class SetupVerifyPanel(VerticalScroll):
     """Dry-run verification and configuration status."""
 
     def __init__(self, coordinator: SetupView, **kwargs: object) -> None:
-        super().__init__(**kwargs)
+        super().__init__(**kwargs)  # type: ignore[arg-type]
         self._coordinator = coordinator
 
     def compose(self) -> ComposeResult:
@@ -69,7 +69,7 @@ class SetupVerifyPanel(VerticalScroll):
             )
 
     @property
-    def log(self) -> RichLog:
+    def log(self) -> RichLog:  # type: ignore[override]
         return self.query_one("#verify-log", RichLog)
 
     @on(Button.Pressed, "#verify-btn")

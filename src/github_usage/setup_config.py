@@ -506,7 +506,7 @@ def _configure_schedule(paths: SetupPaths, profile_name: str | None = None) -> N
     schedule["hour"] = _prompt_int("Hour (0-23)", int(schedule["hour"]))
     schedule["minute"] = _prompt_int("Minute (0-59)", int(schedule["minute"]))
     if profile_name:
-        profile["schedule"] = schedule
+        profile["schedule"] = schedule  # type: ignore[possibly-unbound]
         if config.get("reports"):
             for entry in config["reports"]:
                 if entry["name"] == profile_name:

@@ -282,7 +282,7 @@ def _github_actions_only(paths: SetupPaths) -> int:
     return 0
 
 
-_MENU_OPTIONS: list[tuple[str, str, str, callable]] = [
+_MENU_OPTIONS: list[tuple[str, str, str, callable]] = [  # type: ignore[type-arg]
     (
         "1",
         "Recommended full setup",
