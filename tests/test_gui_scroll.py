@@ -5,7 +5,6 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 from github_usage.gui.scroll_actions import scroll_target
 from github_usage.gui_backend import load_profiles, load_setup_paths, save_profiles, write_secrets
@@ -27,39 +26,52 @@ def _paths():
     return tmp, paths
 
 
+def _make_app(paths: object) -> object:
+    """Create a GitHubUsageApp wired to isolated temp paths.
+
+    ``mock.patch("github_usage.gui.state.load_setup_paths")`` does not
+    propagate into ``AppState`` because the dataclass ``default_factory``
+    captures a direct reference to the original function object at class
+    definition time.  The correct isolation strategy is to construct
+    ``AppState(paths=paths)`` explicitly and assign it to the app before
+    ``run_test`` begins.
+    """
+    from github_usage.gui.app import GitHubUsageApp
+    from github_usage.gui.state import AppState
+
+    app = GitHubUsageApp()
+    app.app_state = AppState(paths=paths)  # type: ignore[arg-type]
+    return app
+
+
 @unittest.skipUnless(
     __import__("importlib").util.find_spec("textual") is not None,
     "textual not installed",
 )
 class ScrollActionsTests(unittest.IsolatedAsyncioTestCase):
     async def test_scroll_target_is_active_view(self) -> None:
-        from github_usage.gui.app import GitHubUsageApp
         from github_usage.gui.views.schedules_view import SchedulesView
 
         tmp, paths = _paths()
         self.addCleanup(tmp.cleanup)
-        with mock.patch("github_usage.gui.state.load_setup_paths", return_value=paths):
-            app = GitHubUsageApp()
+        app = _make_app(paths)
 
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 32)) as pilot:  # type: ignore[union-attr]
             await pilot.pause(0.05)
-            main = app.query_one("MainWindow")
+            main = app.query_one("MainWindow")  # type: ignore[union-attr]
             main.action_show_view("schedules")  # type: ignore[attr-defined]
-            target = scroll_target(app)
+            target = scroll_target(app)  # type: ignore[arg-type]
             self.assertIsInstance(target, SchedulesView)
 
     async def test_j_key_scrolls_without_error(self) -> None:
-        from github_usage.gui.app import GitHubUsageApp
-
         tmp, paths = _paths()
         self.addCleanup(tmp.cleanup)
-        with mock.patch("github_usage.gui.state.load_setup_paths", return_value=paths):
-            app = GitHubUsageApp()
+        app = _make_app(paths)
 
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 32)) as pilot:  # type: ignore[union-attr]
             await pilot.pause(0.05)
-            app.action_scroll_down_line()
-            self.assertIsNotNone(scroll_target(app))
+            app.action_scroll_down_line()  # type: ignore[union-attr]
+            self.assertIsNotNone(scroll_target(app))  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

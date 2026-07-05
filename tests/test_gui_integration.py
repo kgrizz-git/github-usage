@@ -5,7 +5,6 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 from github_usage.gui_backend import load_profiles, load_setup_paths, save_profiles, write_secrets
 
@@ -27,6 +26,25 @@ def _temp_paths() -> tuple[tempfile.TemporaryDirectory[str], object]:
     return tmp, paths
 
 
+def _make_app(paths: object) -> object:
+    """Create a GitHubUsageApp wired to isolated temp paths.
+
+    ``mock.patch("github_usage.gui.state.load_setup_paths")`` does not
+    propagate into ``AppState`` because the dataclass ``default_factory``
+    captures a direct reference to the original function object at class
+    definition time — patching the module attribute has no effect on the
+    already-captured reference.  The correct isolation strategy is to
+    construct ``AppState(paths=paths)`` explicitly and assign it to the
+    app before ``run_test`` begins.
+    """
+    from github_usage.gui.app import GitHubUsageApp
+    from github_usage.gui.state import AppState
+
+    app = GitHubUsageApp()
+    app.app_state = AppState(paths=paths)  # type: ignore[arg-type]
+    return app
+
+
 @unittest.skipUnless(
     __import__("importlib").util.find_spec("textual") is not None,
     "textual not installed",
@@ -37,16 +55,14 @@ class GitHubUsageAppIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_app_mounts_clean_and_switches_tabs(self) -> None:
         from textual.widgets import TabbedContent
 
-        from github_usage.gui.app import GitHubUsageApp
         from github_usage.gui.main_window import MainWindow
         from github_usage.gui.views.setup_view import SetupView
 
         tmp, paths = _temp_paths()
         self.addCleanup(tmp.cleanup)
-        with mock.patch("github_usage.gui.state.load_setup_paths", return_value=paths):
-            app = GitHubUsageApp()
+        app = _make_app(paths)
 
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 32)) as pilot:  # type: ignore[union-attr]
             await pilot.pause(0.05)
             setup = pilot.app.query_one(SetupView)
             main = pilot.app.query_one(MainWindow)
@@ -66,15 +82,13 @@ class GitHubUsageAppIntegrationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(tabs.active, "email")
 
     async def test_guided_setup_button_opens_wizard(self) -> None:
-        from github_usage.gui.app import GitHubUsageApp
         from github_usage.gui.wizard import SetupWizardScreen
 
         tmp, paths = _temp_paths()
         self.addCleanup(tmp.cleanup)
-        with mock.patch("github_usage.gui.state.load_setup_paths", return_value=paths):
-            app = GitHubUsageApp()
+        app = _make_app(paths)
 
-        async with app.run_test(size=(100, 40)) as pilot:
+        async with app.run_test(size=(100, 40)) as pilot:  # type: ignore[union-attr]
             await pilot.pause(0.05)
             await pilot.click("#start-guided-setup")
             await pilot.pause(0.05)
@@ -83,17 +97,16 @@ class GitHubUsageAppIntegrationTests(unittest.IsolatedAsyncioTestCase):
             await pilot.click("#wizard-cancel")
 
     async def test_setup_secrets_show_hide_toggle(self) -> None:
-        from textual.widgets import Checkbox, Input
+        from textual.widgets import Checkbox, Input, TabbedContent
 
-        from github_usage.gui.app import GitHubUsageApp
+        from github_usage.gui.main_window import MainWindow
         from github_usage.gui.views.setup_secrets_panel import SetupSecretsPanel
 
         tmp, paths = _temp_paths()
         self.addCleanup(tmp.cleanup)
-        with mock.patch("github_usage.gui.state.load_setup_paths", return_value=paths):
-            app = GitHubUsageApp()
+        app = _make_app(paths)
 
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app.run_test(size=(100, 32)) as pilot:  # type: ignore[union-attr]
             await pilot.pause(0.05)
             panel = pilot.app.query_one(SetupSecretsPanel)
             token = panel.query_one("#github-token", Input)
@@ -103,17 +116,11 @@ class GitHubUsageAppIntegrationTests(unittest.IsolatedAsyncioTestCase):
             show = panel.query_one("#show-secrets", Checkbox)
             self.assertTrue(show.value)
 
-        from textual.widgets import TabbedContent
+        tmp2, paths2 = _temp_paths()
+        self.addCleanup(tmp2.cleanup)
+        app2 = _make_app(paths2)
 
-        from github_usage.gui.app import GitHubUsageApp
-        from github_usage.gui.main_window import MainWindow
-
-        tmp, paths = _temp_paths()
-        self.addCleanup(tmp.cleanup)
-        with mock.patch("github_usage.gui.state.load_setup_paths", return_value=paths):
-            app = GitHubUsageApp()
-
-        async with app.run_test(size=(100, 32)) as pilot:
+        async with app2.run_test(size=(100, 32)) as pilot:  # type: ignore[union-attr]
             await pilot.pause(0.05)
             tabs = pilot.app.query_one(MainWindow).query_one("#main-tabs", TabbedContent)
             await pilot.press("2")
