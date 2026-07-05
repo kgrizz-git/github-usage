@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install package
-        run: scripts/python -m pip install -e '.[dev,gui]'
+        run: scripts/python -m pip install -e '.[dev,gui,test-xlsx,test-pdf]'
       - name: Run checks
         run: scripts/check
 
@@ -35,6 +35,6 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install package
-        run: scripts/python -m pip install -e '.[dev,gui]'
+        run: scripts/python -m pip install -e '.[dev,gui,test-xlsx,test-pdf]'
       - name: Run basedpyright
         run: scripts/typecheck

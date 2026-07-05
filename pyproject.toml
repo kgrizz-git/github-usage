@@ -43,7 +43,7 @@ export-pdf = ["fpdf2>=2.7"]
 # Test extras for the optional writers; run with:
 #   uv run --extra test-xlsx --extra test-pdf pytest
 test-xlsx = ["openpyxl>=3.1"]
-test-pdf = ["fpdf2>=2.7"]
+test-pdf = ["fpdf2>=2.7", "pypdf>=3.0"]
 gui = [
   "textual>=0.70.0",
 ]
