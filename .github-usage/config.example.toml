@@ -27,6 +27,8 @@ warn_over = [
 skip_actions = false
 skip_copilot = false
 skip_lfs = false
+only_public = false
+only_private = false
 
 [schedule]
 weekday = 1

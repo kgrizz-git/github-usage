@@ -15,6 +15,9 @@ class WorkflowTemplateTests(unittest.TestCase):
         self.assertIn("include_consumers:", workflow)
         self.assertIn("include_artifact_storage:", workflow)
         self.assertIn("include_release_assets:", workflow)
+        self.assertIn("only_public:", workflow)
+        self.assertIn("only_private:", workflow)
+        self.assertIn("--only-public", workflow)
 
     def test_launchd_email_report_runs_monday_morning(self):
         plist_path = Path("launchd/com.github.github-usage.email-report.plist")

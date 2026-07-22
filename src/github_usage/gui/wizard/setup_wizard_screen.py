@@ -103,6 +103,8 @@ class SetupWizardScreen(ModalScreen[bool]):
                     yield Checkbox("Include top consumers", id="wizard-consumers")
                     yield Checkbox("Include artifact storage", id="wizard-artifact")
                     yield Checkbox("Include release assets", id="wizard-release")
+                    yield Checkbox("Only public repos", id="wizard-only-public")
+                    yield Checkbox("Only private repos (incl. internal)", id="wizard-only-private")
                     with FormGrid():
                         yield Label("Max repos:")
                         yield Input(value="100", id="wizard-max-repos")
@@ -179,6 +181,8 @@ class SetupWizardScreen(ModalScreen[bool]):
         self.query_one("#wizard-consumers", Checkbox).value = self._data.include_consumers
         self.query_one("#wizard-artifact", Checkbox).value = self._data.include_artifact_storage
         self.query_one("#wizard-release", Checkbox).value = self._data.include_release_assets
+        self.query_one("#wizard-only-public", Checkbox).value = self._data.only_public
+        self.query_one("#wizard-only-private", Checkbox).value = self._data.only_private
         self.query_one("#wizard-max-repos", Input).value = str(self._data.max_repos)
         self.query_one("#wizard-target-email", Input).value = self._data.target_email
 
@@ -198,6 +202,8 @@ class SetupWizardScreen(ModalScreen[bool]):
         self._data.include_consumers = self.query_one("#wizard-consumers", Checkbox).value
         self._data.include_artifact_storage = self.query_one("#wizard-artifact", Checkbox).value
         self._data.include_release_assets = self.query_one("#wizard-release", Checkbox).value
+        self._data.only_public = self.query_one("#wizard-only-public", Checkbox).value
+        self._data.only_private = self.query_one("#wizard-only-private", Checkbox).value
         self._data.target_email = self.query_one("#wizard-target-email", Input).value.strip()
 
     def _read_local_from_form(self) -> bool:
@@ -252,6 +258,13 @@ class SetupWizardScreen(ModalScreen[bool]):
         for field_id, _, _, hidden in SECRET_FIELDS:
             if hidden:
                 self.query_one(f"#wizard-{field_id}", Input).password = not visible
+
+    @on(Checkbox.Changed, "#wizard-only-public, #wizard-only-private")
+    def _toggle_wizard_visibility_filters(self, event: Checkbox.Changed) -> None:
+        if event.checkbox.id == "wizard-only-public" and event.value:
+            self.query_one("#wizard-only-private", Checkbox).value = False
+        elif event.checkbox.id == "wizard-only-private" and event.value:
+            self.query_one("#wizard-only-public", Checkbox).value = False
 
     @on(Button.Pressed, "#wizard-cancel")
     def _cancel_wizard(self) -> None:

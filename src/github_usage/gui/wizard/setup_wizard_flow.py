@@ -45,6 +45,8 @@ class WizardData:
     include_consumers: bool = False
     include_artifact_storage: bool = False
     include_release_assets: bool = False
+    only_public: bool = False
+    only_private: bool = False
     max_repos: int = 100
     target_email: str = ""
     local_weekday: int = 1
@@ -73,6 +75,8 @@ def load_initial_data(paths: SetupPaths) -> WizardData:
     data.include_consumers = bool(email.get("include_consumers"))
     data.include_artifact_storage = bool(email.get("include_artifact_storage"))
     data.include_release_assets = bool(email.get("include_release_assets"))
+    data.only_public = bool(email.get("only_public"))
+    data.only_private = bool(email.get("only_private"))
     data.max_repos = int(email.get("max_repos", 100))
     data.target_email = profile.get("target_email", "")
     sched = profile.get("schedule", {})
@@ -100,6 +104,8 @@ def validate_options(data: WizardData) -> str | None:
     """Return an error message when report option fields are invalid."""
     if data.max_repos < 1:
         return "Max repos must be at least 1"
+    if data.only_public and data.only_private:
+        return "Only one visibility filter can be enabled: public or private"
     return None
 
 
@@ -121,6 +127,8 @@ def save_options_step(paths: SetupPaths, data: WizardData) -> None:
     email["include_consumers"] = data.include_consumers
     email["include_artifact_storage"] = data.include_artifact_storage
     email["include_release_assets"] = data.include_release_assets
+    email["only_public"] = data.only_public
+    email["only_private"] = data.only_private
     email["max_repos"] = data.max_repos
     profile["target_email"] = data.target_email
     update_profile(config, profile)
@@ -179,7 +187,8 @@ def review_summary(data: WizardData) -> str:
         f"[b]Recipient[/b]: {recipient}",
         f"[b]Report sections[/b]: forecast={data.include_forecast}, "
         f"consumers={data.include_consumers}, artifacts={data.include_artifact_storage}, "
-        f"releases={data.include_release_assets}",
+        f"releases={data.include_release_assets}, "
+        f"only_public={data.only_public}, only_private={data.only_private}",
         f"[b]Max repos[/b]: {data.max_repos}",
         f"[b]Local schedule[/b]: "
         f"{describe_local_schedule(data.local_weekday, data.local_hour, data.local_minute)}",

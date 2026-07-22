@@ -156,6 +156,34 @@ class EmailReportArgsTests(unittest.TestCase):
         args = _email_flags_from_dict({"include_forecast": False})
         self.assertNotIn("--include-forecast", args)
 
+    def test_email_flags_emit_visibility_filters(self):
+        from github_usage.setup_config import (
+            DEFAULT_EMAIL_REPORT,
+            _email_flags_from_dict,
+            _emit_email_report_block,
+            profile_workflow_extra_args,
+        )
+
+        self.assertFalse(DEFAULT_EMAIL_REPORT["only_public"])
+        self.assertFalse(DEFAULT_EMAIL_REPORT["only_private"])
+        args = _email_flags_from_dict({"only_public": True})
+        self.assertIn("--only-public", args)
+        self.assertNotIn("--only-private", args)
+        block = _emit_email_report_block({"only_public": True, "only_private": False})
+        self.assertIn("only_public = true", block)
+        config = {
+            "profiles": [
+                {
+                    "name": "default",
+                    "email_report": {"only_private": True},
+                    "schedule": {},
+                    "github_actions": {},
+                }
+            ]
+        }
+        workflow_args = profile_workflow_extra_args(config, "default")
+        self.assertIn("--only-private", workflow_args)
+
     def test_find_profile_raises_for_unknown(self):
         config = load_config(Path("/nonexistent"))
         with self.assertRaises(KeyError):

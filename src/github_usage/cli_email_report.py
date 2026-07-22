@@ -225,6 +225,8 @@ def _load_or_fetch_email_data(
         include_release_assets=args.include_release_assets,
         max_repos=args.max_repos,
         warn_over=args.warn_over,
+        only_public=getattr(args, "only_public", False),
+        only_private=getattr(args, "only_private", False),
     )
     cached_data, cached_username, cache_hit = load_cached_report(
         paths,
@@ -257,6 +259,8 @@ def _load_or_fetch_email_data(
             include_release_assets=args.include_release_assets,
             max_repos=args.max_repos,
             warn_over=args.warn_over,
+            only_public=getattr(args, "only_public", False),
+            only_private=getattr(args, "only_private", False),
         )
         if max_age > 0:
             store_cached_report(

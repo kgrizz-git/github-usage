@@ -29,6 +29,7 @@ from .report_data import (
 )
 from .report_products import fetch_billing_history
 from .storage import get_storage_analysis
+from .visibility import filter_repos_by_visibility, repo_visibility
 
 LEGACY_DEFAULT_MAX_REPOS = 100
 OS_BREAKDOWN_LIMIT = 10
@@ -51,6 +52,7 @@ def derive_repo_consumers(
             "minutes": float(row["minutes"]),
             "gross": float(row["gross"]),
             "storage_avg_mb": float(row["avg_mb"]),
+            "visibility": repo_visibility(row),
         }
         for row in repo_actions
     ]
@@ -87,7 +89,13 @@ def derive_artifact_storage(
     for repo in storage_analysis.get("repos", []):
         artifact_bytes = _bytes_from_storage_items(repo.get("items", []), "Artifact")
         if artifact_bytes:
-            rows.append({"repo": repo["name"], "artifact_bytes": artifact_bytes})
+            rows.append(
+                {
+                    "repo": repo["name"],
+                    "artifact_bytes": artifact_bytes,
+                    "visibility": repo_visibility(repo),
+                }
+            )
     return {
         "scanned_repo_count": scanned_repo_count,
         "max_repos": max_repos,
@@ -108,7 +116,13 @@ def derive_release_assets(
     for repo in storage_analysis.get("repos", []):
         release_bytes = _bytes_from_storage_items(repo.get("items", []), "Release Asset")
         if release_bytes:
-            rows.append({"repo": repo["name"], "release_asset_bytes": release_bytes})
+            rows.append(
+                {
+                    "repo": repo["name"],
+                    "release_asset_bytes": release_bytes,
+                    "visibility": repo_visibility(repo),
+                }
+            )
     return {
         "scanned_repo_count": scanned_repo_count,
         "max_repos": max_repos,
@@ -194,6 +208,8 @@ def build_legacy_report_data(
     max_repos: int = LEGACY_DEFAULT_MAX_REPOS,
     warn_over: list[str] | str | None = None,
     include_release_assets: bool = False,
+    only_public: bool = False,
+    only_private: bool = False,
     account: dict | None = None,
     rate_limits: dict | None = None,
 ) -> dict[str, Any]:
@@ -204,6 +220,7 @@ def build_legacy_report_data(
     if rate_limits is None:
         rate_limits = fetch_rate_limits(api)
     repos, truncated = _limited_repos(api, max_repos)
+    repos = filter_repos_by_visibility(repos, only_public=only_public, only_private=only_private)
     scanned_repo_count = len(repos)
     repo_count = scanned_repo_count + (1 if truncated else 0)
     core_limit, core_remaining = _rate_limit(api)

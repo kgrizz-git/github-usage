@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .billing import BillingFetchError, get_actions_per_repo
 from .report_helpers import gb_hours_to_avg_mb
+from .visibility import repo_visibility
 
 
 def _safe_int_size(value) -> int | None:
@@ -38,6 +39,7 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
                 "minutes": float(minutes),
                 "gross": sum(float(item.get("grossAmount", 0.0)) for item in sku.values()),
                 "storage_avg_mb": gb_hours_to_avg_mb(float(storage_gb_hours)),
+                "visibility": repo_visibility(repo),
             }
         )
     return {
@@ -65,7 +67,11 @@ def get_artifact_storage_details(api, repos: list[dict], max_repos: int = 100) -
         )
         if size:
             rows.append(
-                {"repo": repo.get("full_name") or f"{owner}/{name}", "artifact_bytes": size}
+                {
+                    "repo": repo.get("full_name") or f"{owner}/{name}",
+                    "artifact_bytes": size,
+                    "visibility": repo_visibility(repo),
+                }
             )
     return {
         "scanned_repo_count": len(considered),
@@ -94,7 +100,11 @@ def get_release_asset_details(api, repos: list[dict], max_repos: int = 100) -> d
         )
         if size:
             rows.append(
-                {"repo": repo.get("full_name") or f"{owner}/{name}", "release_asset_bytes": size}
+                {
+                    "repo": repo.get("full_name") or f"{owner}/{name}",
+                    "release_asset_bytes": size,
+                    "visibility": repo_visibility(repo),
+                }
             )
     return {
         "scanned_repo_count": len(considered),

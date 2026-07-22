@@ -5,6 +5,7 @@ from __future__ import annotations
 from .billing import get_premium_request_usage
 from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .terminal import print_section
+from .visibility import repo_visibility, visibility_label
 
 
 def show_final_summary(
@@ -98,6 +99,10 @@ def render_final_summary_from_data(data: dict) -> None:
                 for model, values in by_model.items()
             }
 
+    visibility_by_repo = {
+        row["repo"]: repo_visibility(row) for row in (data.get("repo_actions") or [])
+    }
+
     print_section("FINAL SUMMARY — Key Insights & Biggest Consumers")
     copilot_gross = copilot_summary["total_gross"] if copilot_summary else 0
     copilot_discount = copilot_summary["total_discount"] if copilot_summary else 0
@@ -110,7 +115,9 @@ def render_final_summary_from_data(data: dict) -> None:
         (actions_net or 0) + (copilot_summary["total_net"] if copilot_summary else 0) + lfs_net
     )
     _print_cost_overview(total_gross, total_discount, total_net)
-    _print_top_consumers(user_minutes, actions_gross, repo_data, premium_by_model, lfs_summary)
+    _print_top_consumers(
+        user_minutes, actions_gross, repo_data, premium_by_model, lfs_summary, visibility_by_repo
+    )
     _print_storage_breakdown(storage_analysis)
     _print_utilization(user_minutes, user_storage_gb_hours)
     _print_impactful_findings(
@@ -122,8 +129,16 @@ def render_final_summary_from_data(data: dict) -> None:
         repo_data,
         premium_by_model,
         storage_analysis,
+        visibility_by_repo,
     )
-    _print_recommendations(user_minutes, repo_data, premium_by_model, lfs_summary, storage_analysis)
+    _print_recommendations(
+        user_minutes,
+        repo_data,
+        premium_by_model,
+        lfs_summary,
+        storage_analysis,
+        visibility_by_repo,
+    )
 
 
 def _print_cost_overview(total_gross, total_discount, total_net):
@@ -140,7 +155,20 @@ def _print_cost_overview(total_gross, total_discount, total_net):
     print()
 
 
-def _print_top_consumers(user_minutes, actions_gross, repo_data, premium_by_model, lfs_summary):
+def _repo_label(full: str, visibility_by_repo: dict[str, str] | None) -> str:
+    if not visibility_by_repo:
+        return full
+    return f"{full}{visibility_label(visibility_by_repo.get(full, 'public'))}"
+
+
+def _print_top_consumers(
+    user_minutes,
+    actions_gross,
+    repo_data,
+    premium_by_model,
+    lfs_summary,
+    visibility_by_repo=None,
+):
     print("  2. BIGGEST CONSUMERS BY CATEGORY")
     print(f"  {'─' * 55}")
 
@@ -149,7 +177,8 @@ def _print_top_consumers(user_minutes, actions_gross, repo_data, premium_by_mode
     print("\n    Actions Minutes (top 5 repos):")
     for full, mins, _gb, _avg_mb, gross, _ in sorted_repos[:5]:
         pct = mins / user_minutes * 100 if user_minutes and user_minutes > 0 else 0
-        print(f"      {full:<45} {mins:>8.1f} min  ({pct:5.1f}%)  {fmt_price(gross)}")
+        label = _repo_label(full, visibility_by_repo)
+        print(f"      {label:<45} {mins:>8.1f} min  ({pct:5.1f}%)  {fmt_price(gross)}")
     if not sorted_repos:
         print("      No Actions usage found.")
     print()
@@ -159,7 +188,8 @@ def _print_top_consumers(user_minutes, actions_gross, repo_data, premium_by_mode
     print("    Actions Cost (top 5 repos):")
     for full, _mins, _gb, _avg_mb, gross, _ in sorted_by_cost[:5]:
         pct = gross / actions_gross * 100 if (actions_gross or 0) > 0 else 0
-        print(f"      {full:<45} {fmt_price(gross):>10}  ({pct:5.1f}%)")
+        label = _repo_label(full, visibility_by_repo)
+        print(f"      {label:<45} {fmt_price(gross):>10}  ({pct:5.1f}%)")
     print()
 
     # Copilot — by model
@@ -208,13 +238,13 @@ def _print_storage_breakdown(storage_analysis):
         print(f"\n    {'REPO':<45} {'TOTAL':>10}")
         print(f"    {'-' * 45} {'-' * 10}")
         for r in sorted_by_storage[:10]:
-            print(f"      {r['name']:<45} {r['total_storage']:>10.2f} GB")
+            label = f"{r['name']}{visibility_label(repo_visibility(r))}"
+            print(f"      {label:<45} {r['total_storage']:>10.2f} GB")
         print()
 
         top_storage = sorted_by_storage[0]
-        print(
-            f"    Top storage consumer: {top_storage['name']} ({top_storage['total_storage']:.2f} GB)"
-        )
+        top_label = f"{top_storage['name']}{visibility_label(repo_visibility(top_storage))}"
+        print(f"    Top storage consumer: {top_label} ({top_storage['total_storage']:.2f} GB)")
         print("    Breakdown:")
         for item in top_storage.get("items", []):
             print(
@@ -269,6 +299,7 @@ def _print_impactful_findings(
     repo_data,
     premium_by_model,
     storage_analysis,
+    visibility_by_repo=None,
 ):
     print("  5. TOP 3 MOST IMPACTFUL FINDINGS")
     print(f"  {'─' * 55}")
@@ -284,21 +315,22 @@ def _print_impactful_findings(
         top_repo = sorted_repos[0]
         pct_of_total = top_repo[1] / user_minutes * 100 if user_minutes else 0
         findings.append(
-            f"Biggest Actions consumer: {top_repo[0]} at {top_repo[1]:.0f} min ({pct_of_total:.1f}% of total)"
+            f"Biggest Actions consumer: {_repo_label(top_repo[0], visibility_by_repo)} at {top_repo[1]:.0f} min ({pct_of_total:.1f}% of total)"
         )
 
     if sorted_by_cost:
         top_cost = sorted_by_cost[0]
         pct_cost = top_cost[4] / actions_gross * 100 if actions_gross else 0
         findings.append(
-            f"Highest Actions cost: {top_cost[0]} at {fmt_price(top_cost[4])} ({pct_cost:.1f}% of total)"
+            f"Highest Actions cost: {_repo_label(top_cost[0], visibility_by_repo)} at {fmt_price(top_cost[4])} ({pct_cost:.1f}% of total)"
         )
 
     if sorted_by_storage:
         top_st = sorted_by_storage[0]
         total_gb = top_st["total_storage"]
         size_str = f"{total_gb:.2f} GB" if total_gb >= 1 else f"{total_gb * 1024:.0f} MB"
-        findings.append(f"Biggest storage consumer: {top_st['name']} ({size_str})")
+        st_label = f"{top_st['name']}{visibility_label(repo_visibility(top_st))}"
+        findings.append(f"Biggest storage consumer: {st_label} ({size_str})")
 
     if premium_by_model:
         top_model = max(premium_by_model.items(), key=lambda x: x[1]["total_requests"])
@@ -323,7 +355,12 @@ def _print_impactful_findings(
 
 
 def _print_recommendations(
-    user_minutes, repo_data, premium_by_model, lfs_summary, storage_analysis
+    user_minutes,
+    repo_data,
+    premium_by_model,
+    lfs_summary,
+    storage_analysis,
+    visibility_by_repo=None,
 ):
     print("  6. QUICK RECOMMENDATIONS")
     print(f"  {'─' * 55}")
@@ -364,8 +401,9 @@ def _print_recommendations(
         if release_assets:
             total_release_size = sum(a["storage"] for a in release_assets)
             if total_release_size > 0.1:  # 100MB in GB
+                st_label = f"{top_st['name']}{visibility_label(repo_visibility(top_st))}"
                 recs.append(
-                    f"Release assets in {top_st['name']} use {total_release_size:.2f} GB — consider using GitHub Pages or external storage for large binaries."
+                    f"Release assets in {st_label} use {total_release_size:.2f} GB — consider using GitHub Pages or external storage for large binaries."
                 )
 
     if not recs:

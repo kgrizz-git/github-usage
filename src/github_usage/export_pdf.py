@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from .report_forecast_data import build_report_forecast
+from .visibility import repo_visibility, visibility_label
 
 _MAX_SECTION_ROWS = 30
 
@@ -159,19 +160,24 @@ def _write_monthly_costs_page(add_section: AddSectionFn, data: dict) -> None:
         add_section("Monthly Costs", rows)
 
 
+def _annotated_repo_label(entry: dict) -> str:
+    repo = str(entry.get("repo", "unknown"))
+    return f"{repo}{visibility_label(repo_visibility(entry))}"
+
+
 def _write_consumers_page(add_section: AddSectionFn, data: dict) -> None:
     consumers = data.get("repo_consumers") or {}
     by_minutes = consumers.get("by_minutes") or []
     if by_minutes:
         rows = [
-            (entry.get("repo", "unknown"), f"{_fmt_num(entry.get('minutes'))} minutes")
+            (_annotated_repo_label(entry), f"{_fmt_num(entry.get('minutes'))} minutes")
             for entry in by_minutes
         ]
         add_section("Top Repos by Minutes", rows)
     by_cost = consumers.get("by_cost") or []
     if by_cost:
         rows = [
-            (entry.get("repo", "unknown"), f"${_fmt_num(entry.get('gross'))}") for entry in by_cost
+            (_annotated_repo_label(entry), f"${_fmt_num(entry.get('gross'))}") for entry in by_cost
         ]
         add_section("Top Repos by Cost", rows)
 
@@ -181,7 +187,10 @@ def _write_artifact_storage_page(add_section: AddSectionFn, data: dict) -> None:
     artifact_repos = artifacts.get("top_repos") or []
     if artifact_repos:
         rows = [
-            (entry.get("repo", "unknown"), f"{_fmt_num(entry.get('artifact_bytes'))} bytes")
+            (
+                _annotated_repo_label(entry),
+                f"{_fmt_num(entry.get('artifact_bytes'))} bytes",
+            )
             for entry in artifact_repos
         ]
         add_section("Artifact Storage", rows)
@@ -192,7 +201,10 @@ def _write_release_assets_page(add_section: AddSectionFn, data: dict) -> None:
     release_repos = releases.get("top_repos") or []
     if release_repos:
         rows = [
-            (entry.get("repo", "unknown"), f"{_fmt_num(entry.get('release_asset_bytes'))} bytes")
+            (
+                _annotated_repo_label(entry),
+                f"{_fmt_num(entry.get('release_asset_bytes'))} bytes",
+            )
             for entry in release_repos
         ]
         add_section("Release Assets", rows)

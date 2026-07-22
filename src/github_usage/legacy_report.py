@@ -47,6 +47,8 @@ def run_legacy_report_session(
     warn_over: list[str] | str | None = None,
     max_repos: int = LEGACY_DEFAULT_MAX_REPOS,
     refresh: bool = False,
+    only_public: bool = False,
+    only_private: bool = False,
     paths: SetupPaths | None = None,
     cache_max_age_seconds: int | None = None,
 ) -> tuple[int, dict | None, str | None, CacheHit]:
@@ -65,6 +67,8 @@ def run_legacy_report_session(
         max_repos=max_repos,
         warn_over=warn_over,
         include_release_assets=False,
+        only_public=only_public,
+        only_private=only_private,
     )
     cached_data, cached_username, cache_hit = load_cached_report(
         resolved_paths,
@@ -101,6 +105,8 @@ def run_legacy_report_session(
             max_repos=max_repos,
             warn_over=warn_over,
             include_release_assets=False,
+            only_public=only_public,
+            only_private=only_private,
             account=account,
             rate_limits=rate_limits,
         )

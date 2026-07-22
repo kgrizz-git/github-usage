@@ -21,8 +21,20 @@ def _repo(name: str) -> dict:
 class LegacyReportDataTests(unittest.TestCase):
     def test_derive_repo_consumers_from_repo_actions(self) -> None:
         rows = [
-            {"repo": "octocat/a", "minutes": 10.0, "gross": 1.0, "avg_mb": 1.0},
-            {"repo": "octocat/b", "minutes": 50.0, "gross": 2.0, "avg_mb": 2.0},
+            {
+                "repo": "octocat/a",
+                "minutes": 10.0,
+                "gross": 1.0,
+                "avg_mb": 1.0,
+                "visibility": "private",
+            },
+            {
+                "repo": "octocat/b",
+                "minutes": 50.0,
+                "gross": 2.0,
+                "avg_mb": 2.0,
+                "visibility": "public",
+            },
         ]
         consumers = derive_repo_consumers(
             rows,
@@ -31,14 +43,15 @@ class LegacyReportDataTests(unittest.TestCase):
             truncated=False,
             scanned_repo_count=2,
         )
-        self.assertEqual(consumers["by_minutes"][0]["repo"], "octocat/b")
-        self.assertEqual(consumers["by_cost"][0]["repo"], "octocat/b")
+        self.assertEqual(consumers["by_minutes"][0]["visibility"], "public")
+        self.assertEqual(consumers["by_cost"][0]["visibility"], "public")
 
     def test_derive_artifact_storage_from_storage_analysis(self) -> None:
         storage = {
             "repos": [
                 {
                     "name": "octocat/a",
+                    "visibility": "internal",
                     "items": [
                         {"type": "Artifact", "storage": 1.0},
                         {"type": "Release Asset", "storage": 0.5},
@@ -51,6 +64,7 @@ class LegacyReportDataTests(unittest.TestCase):
         )
         self.assertEqual(len(derived["top_repos"]), 1)
         self.assertEqual(derived["top_repos"][0]["repo"], "octocat/a")
+        self.assertEqual(derived["top_repos"][0]["visibility"], "internal")
         self.assertGreater(derived["top_repos"][0]["artifact_bytes"], 0)
 
     def test_estimate_legacy_counts_storage_once_per_repo(self) -> None:

@@ -360,6 +360,8 @@ def _run_legacy_report(argv: Sequence[str]) -> int:
         timeout=getattr(args, "timeout", None),
         max_retries=getattr(args, "max_retries", None),
         refresh=getattr(args, "refresh", False),
+        only_public=getattr(args, "only_public", False),
+        only_private=getattr(args, "only_private", False),
     )
     if code != 0:
         return code

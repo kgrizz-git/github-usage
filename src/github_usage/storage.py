@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .visibility import repo_visibility
+
 
 def get_storage_analysis(api, repos):
     """Analyze storage per repo: artifacts, releases, LFS."""
@@ -65,6 +67,7 @@ def get_storage_analysis(api, repos):
                         "name": full,
                         "total_storage": total_storage,
                         "items": items,
+                        "visibility": repo_visibility(repo),
                     }
                 )
         except (KeyError, RuntimeError):

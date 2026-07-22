@@ -256,6 +256,8 @@ def legacy_cache_params(
     max_repos: int,
     warn_over: list[str] | str | None = None,
     include_release_assets: bool = False,
+    only_public: bool = False,
+    only_private: bool = False,
 ) -> dict[str, Any]:
     """Build cache-key parameters for the legacy report superset."""
     warn_values: list[str] | None
@@ -269,6 +271,8 @@ def legacy_cache_params(
         "max_repos": int(max_repos),
         "warn_over": warn_values,
         "include_release_assets": bool(include_release_assets),
+        "only_public": bool(only_public),
+        "only_private": bool(only_private),
     }
 
 
@@ -282,6 +286,8 @@ def email_cache_params(
     include_release_assets: bool,
     max_repos: int,
     warn_over: list[str] | str | None,
+    only_public: bool = False,
+    only_private: bool = False,
 ) -> dict[str, Any]:
     """Build cache-key parameters for :func:`report_data.build_report_data`."""
     warn_values: list[str] | None
@@ -300,4 +306,6 @@ def email_cache_params(
         "include_release_assets": bool(include_release_assets),
         "max_repos": int(max_repos),
         "warn_over": warn_values,
+        "only_public": bool(only_public),
+        "only_private": bool(only_private),
     }

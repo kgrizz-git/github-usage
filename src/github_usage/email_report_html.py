@@ -7,6 +7,16 @@ import html
 from ._email_report_common import _bytes_to_mb, _generated_line
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
+from .visibility import repo_visibility, visibility_label
+
+
+def _html_repo_cell(row: dict) -> str:
+    repo = html.escape(row["repo"])
+    vis = repo_visibility(row)
+    if vis == "public":
+        return repo
+    tag = html.escape(visibility_label(vis).strip())
+    return f'{repo} <span class="visibility-tag">[{tag}]</span>'
 
 
 def _html_cost_row(label: str, cost: dict[str, float]) -> str:
@@ -106,7 +116,7 @@ def _format_html_consumers_section(data: dict) -> list[str]:
     ]
     for row in consumers.get("by_minutes", []):
         parts.append(
-            f"<tr><td>{html.escape(row['repo'])}</td>"
+            f"<tr><td>{_html_repo_cell(row)}</td>"
             f"<td>{row['minutes']:,.1f} min</td>"
             f"<td>{fmt_price(row['gross'])}</td>"
             f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
@@ -117,7 +127,7 @@ def _format_html_consumers_section(data: dict) -> list[str]:
     parts.append("<tr><th>Repo</th><th>Gross</th><th>Minutes</th><th>Storage</th></tr>")
     for row in consumers.get("by_cost", []):
         parts.append(
-            f"<tr><td>{html.escape(row['repo'])}</td>"
+            f"<tr><td>{_html_repo_cell(row)}</td>"
             f"<td>{fmt_price(row['gross'])}</td>"
             f"<td>{row['minutes']:,.1f} min</td>"
             f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
@@ -140,7 +150,7 @@ def _format_html_artifact_storage_section(data: dict) -> list[str]:
     ]
     for row in artifact_storage.get("top_repos", []):
         parts.append(
-            f"<li>{html.escape(row['repo'])}: "
+            f"<li>{_html_repo_cell(row)}: "
             f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
         )
     parts.append("</ul>")
@@ -162,7 +172,7 @@ def _format_html_release_assets_section(data: dict) -> list[str]:
     ]
     for row in release_assets.get("top_repos", []):
         parts.append(
-            f"<li>{html.escape(row['repo'])}: "
+            f"<li>{_html_repo_cell(row)}: "
             f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets</li>"
         )
     parts.append("</ul>")
@@ -282,6 +292,7 @@ _HTML_DOCUMENT_HEAD = (
     "    .warning { background: #fff8c5; border: 1px solid #d4a72c; padding: 8px; border-radius: 4px; }\n"
     "    .meta, p em { color: #656d76; }\n"
     "    .meta { font-size: 14px; }\n"
+    "    .visibility-tag { color: #656d76; font-weight: normal; }\n"
     "  </style>\n"
     "</head>\n"
     "<body>\n"

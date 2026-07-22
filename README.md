@@ -183,6 +183,7 @@ github-usage email-report \
   [--warn-over 25] \
   [--warn-over 80%] \
   [--skip-actions] [--skip-copilot] [--skip-lfs] \
+  [--only-public | --only-private] \
   [--dry-run] \
   [--export csv|xlsx|pdf|json|text|none] \
   [--output PATH] \
@@ -190,6 +191,8 @@ github-usage email-report \
 ```
 
 `--include-consumers`, `--include-artifact-storage`, and `--include-release-assets` add repo-level API calls. They consume GitHub REST API request quota, not Actions minutes, Actions storage, Copilot requests, Git LFS quota, or billable GitHub usage. Use monthly schedules and conservative `--max-repos` values for accounts with many repositories.
+
+Repo-level sections annotate non-public repositories with `[private]` or `[internal]` tags. The legacy Usage Report per-repo Actions table groups rows by visibility with subtotals. `--only-public` and `--only-private` (mutually exclusive) filter which repositories are included in repo-level sections; filtering applies after the `--max-repos` limit. Set `only_public` / `only_private` in `[email_report]` in `config.toml` for scheduled runs.
 
 Release assets are optional inventory, not a billing/quota report. The CLI asks for confirmation in interactive terminals, and CI must pass `--yes-include-release-assets`.
 

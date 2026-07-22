@@ -251,6 +251,8 @@ class SetupView(VerticalScroll, AsyncViewMixin):
                 "include_artifact_storage"
             ]
             profile["email_report"]["include_release_assets"] = options["include_release_assets"]
+            profile["email_report"]["only_public"] = options["only_public"]
+            profile["email_report"]["only_private"] = options["only_private"]
             profile["email_report"]["max_repos"] = max_repos
             profile["target_email"] = options["target_email"]
             update_profile(config, profile)

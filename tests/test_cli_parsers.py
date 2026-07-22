@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from github_usage.cli_parsers import _email_parser
+from github_usage.cli_parsers import _email_parser, _legacy_parser
 
 
 class EmailParserTests(unittest.TestCase):
@@ -25,6 +25,22 @@ class EmailParserTests(unittest.TestCase):
         parser = _email_parser()
         args = parser.parse_args([])
         self.assertIsNone(args.premium_requests_limit)
+
+    def test_email_only_public_and_only_private_mutually_exclusive(self):
+        parser = _email_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["--only-public", "--only-private"])
+
+    def test_legacy_only_public_and_only_private_mutually_exclusive(self):
+        parser = _legacy_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["--only-public", "--only-private"])
+
+    def test_email_only_public_flag(self):
+        parser = _email_parser()
+        args = parser.parse_args(["--only-public"])
+        self.assertTrue(args.only_public)
+        self.assertFalse(args.only_private)
 
 
 if __name__ == "__main__":
