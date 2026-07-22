@@ -32,6 +32,8 @@ DEFAULT_EMAIL_REPORT = {
     "skip_actions": False,
     "skip_copilot": False,
     "skip_lfs": False,
+    "only_public": False,
+    "only_private": False,
 }
 
 DEFAULT_SCHEDULE = {
@@ -278,6 +280,8 @@ warn_over = [
 skip_actions = {_bool(email.get("skip_actions"))}
 skip_copilot = {_bool(email.get("skip_copilot"))}
 skip_lfs = {_bool(email.get("skip_lfs"))}
+only_public = {_bool(email.get("only_public"))}
+only_private = {_bool(email.get("only_private"))}
 """
 
 
@@ -370,6 +374,10 @@ def _email_flags_from_dict(email: dict, *, include_delivery: bool = True) -> lis
         args.append("--skip-copilot")
     if email.get("skip_lfs"):
         args.append("--skip-lfs")
+    if email.get("only_public"):
+        args.append("--only-public")
+    if email.get("only_private"):
+        args.append("--only-private")
     return args
 
 
@@ -407,6 +415,10 @@ def profile_workflow_extra_args(
         args.append("--skip-copilot")
     if email.get("skip_lfs"):
         args.append("--skip-lfs")
+    if email.get("only_public"):
+        args.append("--only-public")
+    if email.get("only_private"):
+        args.append("--only-private")
     target_subject = (profile.get("target_subject") or "").strip()
     if target_subject:
         args.extend(["--subject", target_subject])

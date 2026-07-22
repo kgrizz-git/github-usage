@@ -37,6 +37,22 @@ on:
         options:
           - 'false'
           - 'true'
+      only_public:
+        description: Include only public repos in repo-level sections
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      only_private:
+        description: Include only private and internal repos in repo-level sections
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
       report_email:
         description: Override the REPORT_EMAIL secret for this manual run
         required: false
@@ -77,6 +93,12 @@ jobs:
           fi
           if [ "${{ inputs.include_forecast || 'true' }}" = "true" ]; then
             args+=(--include-forecast)
+          fi
+          if [ "${{ inputs.only_public }}" = "true" ]; then
+            args+=(--only-public)
+          fi
+          if [ "${{ inputs.only_private }}" = "true" ]; then
+            args+=(--only-private)
           fi
           profile_args=(--max-repos 50 --email-format text --warn-over 25 --warn-over 80%)
           if [ ${#profile_args[@]} -gt 0 ]; then

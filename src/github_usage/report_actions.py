@@ -5,6 +5,12 @@ from __future__ import annotations
 from .billing import BillingFetchError, get_actions_from_runs, get_actions_per_repo
 from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .terminal import print_section, print_sep
+from .visibility import (
+    group_by_visibility,
+    repo_visibility,
+    visibility_group_header,
+    visibility_label,
+)
 
 
 def show_actions_summary(api, username, user_minutes, user_storage_gb_hours, sku_breakdown):
@@ -169,6 +175,7 @@ def fetch_repo_actions_table(api, repos: list[dict]) -> tuple[list[dict], dict[s
                 "avg_mb": float(avg_mb),
                 "gross": gross,
                 "sku": sku,
+                "visibility": repo_visibility(repo),
             }
         )
     return rows, errors
@@ -190,7 +197,13 @@ def fetch_actions_os_breakdown(api, repos: list[dict], *, limit: int = 10) -> di
             os_minutes = {
                 os_name: os_millis[os_name] / 60000 for os_name in ["UBUNTU", "WINDOWS", "MACOS"]
             }
-            repo_rows.append({"name": f"{owner}/{name}", "os_minutes": os_minutes})
+            repo_rows.append(
+                {
+                    "name": f"{owner}/{name}",
+                    "os_minutes": os_minutes,
+                    "visibility": repo_visibility(repo),
+                }
+            )
             for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
                 total_os[os_name] += os_millis[os_name]
     return {"repos": repo_rows, "totals": total_os, "found": found}
@@ -228,22 +241,50 @@ def render_actions_summary(actions: dict | None) -> None:
     print()
 
 
-def render_repo_actions_table(repo_actions: list[dict]) -> None:
-    """Print the full per-repository Actions table."""
-    print_section("Per-Repository Actions Breakdown")
-    print(f"  {'REPO':<45} {'MINUTES':>10} {'GB-HRS':>10} {'AVG MB':>10} {'GROSS':>10}")
-    print(f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
-    for row in repo_actions:
+def _print_repo_actions_rows(rows: list[dict], *, label: str | None = None) -> None:
+    """Print repo action rows and optional subtotal label."""
+    for row in rows:
         print(
             f"  {row['repo']:<45} {row['minutes']:>10.1f} "
             f"{row['storage_gb_hours']:>10.4f} {row['avg_mb']:>10.1f} "
             f"{fmt_price(row['gross']):>10}"
         )
+    if label:
+        total_mins = sum(r["minutes"] for r in rows)
+        total_gb = sum(r["storage_gb_hours"] for r in rows)
+        total_mb = gb_hours_to_avg_mb(total_gb)
+        total_gross = sum(r["gross"] for r in rows)
+        print(f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
+        print(
+            f"  {label:<45} {total_mins:>10.1f} {total_gb:>10.4f} "
+            f"{total_mb:>10.1f} {fmt_price(total_gross):>10}"
+        )
+
+
+def render_repo_actions_table(repo_actions: list[dict]) -> None:
+    """Print the full per-repository Actions table."""
+    print_section("Per-Repository Actions Breakdown")
+    header = f"  {'REPO':<45} {'MINUTES':>10} {'GB-HRS':>10} {'AVG MB':>10} {'GROSS':>10}"
+    divider = f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}"
+    print(header)
+    print(divider)
+
+    groups = group_by_visibility(repo_actions)
+    if len(groups) <= 1:
+        _print_repo_actions_rows(repo_actions)
+    else:
+        for visibility, rows in groups.items():
+            print(f"\n  {visibility_group_header(visibility)}")
+            print(header)
+            print(divider)
+            _print_repo_actions_rows(rows, label="SUBTOTAL")
+            print()
+
     total_mins = sum(r["minutes"] for r in repo_actions)
     total_gb = sum(r["storage_gb_hours"] for r in repo_actions)
     total_mb = gb_hours_to_avg_mb(total_gb)
     total_gross = sum(r["gross"] for r in repo_actions)
-    print(f"  {'-' * 45} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
+    print(divider)
     print(
         f"  {'TOTAL':<45} {total_mins:>10.1f} {total_gb:>10.4f} "
         f"{total_mb:>10.1f} {fmt_price(total_gross):>10}"
@@ -257,7 +298,8 @@ def render_actions_top_consumers(repo_actions: list[dict]) -> None:
     print()
     sorted_repos = sorted(repo_actions, key=lambda row: row["minutes"], reverse=True)
     for row in sorted_repos[:10]:
-        print(f"    {row['minutes']:>8.1f} min | {row['avg_mb']:>8.1f} MB | {row['repo']}")
+        label = f"{row['repo']}{visibility_label(repo_visibility(row))}"
+        print(f"    {row['minutes']:>8.1f} min | {row['avg_mb']:>8.1f} MB | {label}")
     print()
 
 
@@ -272,7 +314,8 @@ def render_actions_os_breakdown(breakdown: dict | None) -> None:
         return
     total_os = breakdown.get("totals") or {}
     for row in breakdown.get("repos", []):
-        print(f"  {row['name']}:")
+        name = f"{row['name']}{visibility_label(repo_visibility(row))}"
+        print(f"  {name}:")
         for os_name, mins in row.get("os_minutes", {}).items():
             if mins > 0:
                 print(f"    {os_name:<10} {mins:>8.1f} min")

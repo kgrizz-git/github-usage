@@ -12,6 +12,7 @@ from .report_optional import (
     get_release_asset_details,
     get_repo_consumers,
 )
+from .visibility import filter_repos_by_visibility, repo_visibility, visibility_label
 
 
 class GitHubAPIClient(Protocol):
@@ -203,8 +204,9 @@ def get_key_insights(report_data: dict) -> list[str]:
         top = consumers["by_minutes"][0]
         minutes = float(actions.get("minutes", 0.0))
         if minutes:
+            vis = visibility_label(repo_visibility(top))
             insights.append(
-                f"{top['repo']} accounts for {top['minutes'] / minutes * 100:.0f}% of Actions minutes."
+                f"{top['repo']}{vis} accounts for {top['minutes'] / minutes * 100:.0f}% of Actions minutes."
             )
     if actions and float(actions.get("storage_percent", 0.0)) < 100:
         insights.append("Actions storage is below the free-tier limit.")
@@ -291,6 +293,8 @@ def build_report_data(
     include_release_assets: bool,
     max_repos: int,
     warn_over: list[str] | str | None,
+    only_public: bool = False,
+    only_private: bool = False,
 ) -> dict:
     """Fetch and assemble all enabled billing sections into a single report dict."""
     errors = {}
@@ -299,6 +303,9 @@ def build_report_data(
     needs_repos = include_consumers or include_artifact_storage or include_release_assets
     if needs_repos:
         repos, truncated = _limited_repos(api, max_repos)
+        repos = filter_repos_by_visibility(
+            repos, only_public=only_public, only_private=only_private
+        )
     core_limit, core_remaining = _rate_limit(api)
     api_estimate = estimate_api_request_count(
         repo_count=len(repos) + (1 if truncated else 0),

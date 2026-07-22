@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from .report_forecast_data import build_report_forecast
+from .visibility import repo_visibility
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
 _MAX_SHEET_NAME = 31
@@ -169,11 +170,12 @@ def _write_monthly_costs_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
 def _write_consumers_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
     consumers = data.get("repo_consumers") or {}
     if consumers.get("by_minutes"):
-        rows = [["Repo", "Minutes", "Gross", "Storage Avg MB"]]
+        rows = [["Repo", "Visibility", "Minutes", "Gross", "Storage Avg MB"]]
         for entry in consumers["by_minutes"]:
             rows.append(
                 [
                     entry.get("repo"),
+                    repo_visibility(entry),
                     entry.get("minutes"),
                     entry.get("gross"),
                     entry.get("storage_avg_mb"),
@@ -181,11 +183,12 @@ def _write_consumers_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
             )
         write_sheet("Repos Minutes", "Top Repos by Minutes", rows)
     if consumers.get("by_cost"):
-        rows = [["Repo", "Minutes", "Gross", "Storage Avg MB"]]
+        rows = [["Repo", "Visibility", "Minutes", "Gross", "Storage Avg MB"]]
         for entry in consumers["by_cost"]:
             rows.append(
                 [
                     entry.get("repo"),
+                    repo_visibility(entry),
                     entry.get("minutes"),
                     entry.get("gross"),
                     entry.get("storage_avg_mb"),
@@ -197,18 +200,20 @@ def _write_consumers_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
 def _write_artifact_storage_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
     artifacts = data.get("artifact_storage") or {}
     if artifacts.get("top_repos"):
-        rows = [["Repo", "Artifact Bytes"]]
+        rows = [["Repo", "Visibility", "Artifact Bytes"]]
         for entry in artifacts["top_repos"]:
-            rows.append([entry.get("repo"), entry.get("artifact_bytes")])
+            rows.append([entry.get("repo"), repo_visibility(entry), entry.get("artifact_bytes")])
         write_sheet("Artifacts", "Artifact Storage", rows)
 
 
 def _write_release_assets_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
     releases = data.get("release_assets") or {}
     if releases.get("top_repos"):
-        rows = [["Repo", "Release Asset Bytes"]]
+        rows = [["Repo", "Visibility", "Release Asset Bytes"]]
         for entry in releases["top_repos"]:
-            rows.append([entry.get("repo"), entry.get("release_asset_bytes")])
+            rows.append(
+                [entry.get("repo"), repo_visibility(entry), entry.get("release_asset_bytes")]
+            )
         write_sheet("Releases", "Release Assets", rows)
 
 

@@ -5,6 +5,11 @@ from __future__ import annotations
 from ._email_report_common import _bytes_to_mb, _generated_line
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
+from .visibility import repo_visibility, visibility_label
+
+
+def _annotated_repo_name(row: dict) -> str:
+    return f"{row['repo']}{visibility_label(repo_visibility(row))}"
 
 
 def _cost_line(label: str, cost: dict[str, float]) -> str:
@@ -86,13 +91,13 @@ def _format_consumers_section(data: dict) -> list[str]:
     lines = ["Top Repositories by Actions Minutes"]
     for row in consumers.get("by_minutes", []):
         lines.append(
-            f"- {row['repo']}: {row['minutes']:,.1f} min, "
+            f"- {_annotated_repo_name(row)}: {row['minutes']:,.1f} min, "
             f"{fmt_price(row['gross'])}, {row['storage_avg_mb']:,.1f} MB avg storage"
         )
     lines.extend(["", "Top Repositories by Actions Cost"])
     for row in consumers.get("by_cost", []):
         lines.append(
-            f"- {row['repo']}: {fmt_price(row['gross'])}, "
+            f"- {_annotated_repo_name(row)}: {fmt_price(row['gross'])}, "
             f"{row['minutes']:,.1f} min, {row['storage_avg_mb']:,.1f} MB avg storage"
         )
     if consumers.get("truncated"):
@@ -107,7 +112,9 @@ def _format_artifact_storage_section(data: dict) -> list[str]:
         return []
     lines = ["Actions Artifact Storage"]
     for row in artifact_storage.get("top_repos", []):
-        lines.append(f"- {row['repo']}: {_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts")
+        lines.append(
+            f"- {_annotated_repo_name(row)}: {_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts"
+        )
     if artifact_storage.get("truncated"):
         lines.append(
             f"- Artifact scan truncated at {artifact_storage.get('max_repos')} repositories."
@@ -123,7 +130,8 @@ def _format_release_assets_section(data: dict) -> list[str]:
     lines = ["Release Asset Inventory"]
     for row in release_assets.get("top_repos", []):
         lines.append(
-            f"- {row['repo']}: {_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets"
+            f"- {_annotated_repo_name(row)}: "
+            f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets"
         )
     if release_assets.get("truncated"):
         lines.append(

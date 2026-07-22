@@ -73,6 +73,8 @@ class SetupProfilesPanel(VerticalScroll):
             yield Checkbox("Include top consumers", id="include-consumers")
             yield Checkbox("Include artifact storage", id="include-artifact")
             yield Checkbox("Include release assets", id="include-release")
+            yield Checkbox("Only public repos", id="only-public")
+            yield Checkbox("Only private repos (incl. internal)", id="only-private")
             with FormGrid():
                 yield Label("Max repos", classes="field-key")
                 yield Static(
@@ -133,6 +135,8 @@ class SetupProfilesPanel(VerticalScroll):
         self.query_one("#include-release", Checkbox).value = bool(
             email.get("include_release_assets")
         )
+        self.query_one("#only-public", Checkbox).value = bool(email.get("only_public"))
+        self.query_one("#only-private", Checkbox).value = bool(email.get("only_private"))
         self.query_one("#max-repos", Input).value = str(email.get("max_repos", 100))
         self.query_one("#target-email", Input).value = profile.get("target_email", "")
 
@@ -144,6 +148,8 @@ class SetupProfilesPanel(VerticalScroll):
             "include_consumers": self.query_one("#include-consumers", Checkbox).value,
             "include_artifact_storage": self.query_one("#include-artifact", Checkbox).value,
             "include_release_assets": self.query_one("#include-release", Checkbox).value,
+            "only_public": self.query_one("#only-public", Checkbox).value,
+            "only_private": self.query_one("#only-private", Checkbox).value,
             "max_repos_str": max_repos_str,
             "target_email": self.query_one("#target-email", Input).value.strip(),
         }
@@ -175,6 +181,16 @@ class SetupProfilesPanel(VerticalScroll):
                 return
         self.app.app_state.set_current_profile(new_name)  # type: ignore[attr-defined]
         self._coordinator.reload_form()
+
+    @on(Checkbox.Changed, "#only-public, #only-private")
+    def _on_visibility_filter_changed(self, event: Checkbox.Changed) -> None:
+        if self._coordinator.is_form_loading():
+            return
+        if event.checkbox.id == "only-public" and event.value:
+            self.query_one("#only-private", Checkbox).value = False
+        elif event.checkbox.id == "only-private" and event.value:
+            self.query_one("#only-public", Checkbox).value = False
+        self._coordinator.mark_dirty()
 
     @on(Input.Changed)
     @on(Checkbox.Changed)

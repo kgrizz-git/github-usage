@@ -34,6 +34,17 @@ def _legacy_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Bypass the local report cache and fetch fresh billing data",
     )
+    visibility = parser.add_mutually_exclusive_group()
+    visibility.add_argument(
+        "--only-public",
+        action="store_true",
+        help="Include only public repos in repo-level sections",
+    )
+    visibility.add_argument(
+        "--only-private",
+        action="store_true",
+        help="Include only private and internal repos in repo-level sections",
+    )
     return parser
 
 
@@ -151,5 +162,16 @@ def _email_parser() -> argparse.ArgumentParser:
         "--refresh",
         action="store_true",
         help="Bypass the local report cache and fetch fresh billing data",
+    )
+    visibility = parser.add_mutually_exclusive_group()
+    visibility.add_argument(
+        "--only-public",
+        action="store_true",
+        help="Include only public repos in repo-level sections",
+    )
+    visibility.add_argument(
+        "--only-private",
+        action="store_true",
+        help="Include only private and internal repos in repo-level sections",
     )
     return parser

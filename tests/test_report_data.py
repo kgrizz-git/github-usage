@@ -121,6 +121,20 @@ class ReportDataTests(unittest.TestCase):
         self.assertIn("octocat/heavy", insights[0])
         self.assertIn("60%", insights[0])
 
+    def test_get_key_insights_annotates_private_visibility(self):
+        from github_usage.report_data import get_key_insights
+
+        report = {
+            "actions": {"minutes": 100.0, "storage_percent": 100.0},
+            "repo_consumers": {
+                "by_minutes": [
+                    {"repo": "octocat/heavy", "minutes": 60.0, "visibility": "private"},
+                ]
+            },
+        }
+        insights = get_key_insights(report)
+        self.assertIn("[private]", insights[0])
+
     def test_get_key_insights_omits_share_when_actions_is_none(self):
         from github_usage.report_data import get_key_insights
 

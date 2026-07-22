@@ -6,11 +6,17 @@ from typing import Any
 
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
+from .visibility import repo_visibility, visibility_label
 
 
 def _section(title: str) -> tuple[str, str]:
     """Return a section header row for two-column tables."""
     return (f"── {title} ──", "")
+
+
+def _annotated_repo(item: dict[str, Any], *, key: str = "repo") -> str:
+    repo = str(item.get(key, "?"))
+    return f"{repo}{visibility_label(repo_visibility(item))}"
 
 
 def _format_cost_block(monthly: dict[str, Any], product: str) -> str:
@@ -71,7 +77,7 @@ def _artifact_release_storage_rows(
         )
         return rows
     for repo in repos[:limit]:
-        name = repo.get("name", "?")
+        name = _annotated_repo(repo, key="name")
         gb = float(repo.get("total_storage", 0.0))
         value = f"{gb:.2f} GB" if gb > 0 else "0"
         rows.append((name, value))
@@ -93,7 +99,7 @@ def _repo_billed_storage_rows(data: dict[str, Any], *, limit: int = 10) -> list[
         rows.append(("Note", "No per-repo billed Actions storage this period."))
         return rows
     for row in with_storage[:limit]:
-        repo = row.get("repo", "?")
+        repo = _annotated_repo(row)
         avg_mb = float(row.get("avg_mb", 0.0))
         gb_hours = float(row.get("storage_gb_hours", 0.0))
         rows.append((repo, f"{avg_mb:.1f} MB avg · {gb_hours:.4f} GB-hrs"))
@@ -262,7 +268,7 @@ def _repo_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     if by_minutes:
         rows.append(_section("Top repos by Actions minutes"))
         for item in by_minutes[:10]:
-            repo = item.get("repo", "?")
+            repo = _annotated_repo(item)
             minutes = float(item.get("minutes", 0.0))
             gross = float(item.get("gross", 0.0))
             rows.append((repo, f"{minutes:.1f} min · {fmt_price(gross)}"))
@@ -270,7 +276,7 @@ def _repo_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     if by_cost:
         rows.append(_section("Top repos by Actions cost"))
         for item in by_cost[:10]:
-            repo = item.get("repo", "?")
+            repo = _annotated_repo(item)
             gross = float(item.get("gross", 0.0))
             minutes = float(item.get("minutes", 0.0))
             rows.append((repo, f"{fmt_price(gross)} · {minutes:.1f} min"))
@@ -288,7 +294,7 @@ def _repo_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     if top_artifacts:
         rows.append(_section("Largest artifact storage"))
         for item in top_artifacts[:5]:
-            repo = item.get("repo", "?")
+            repo = _annotated_repo(item)
             gb = float(item.get("artifact_bytes", 0)) / (1024**3)
             rows.append((repo, f"{gb:.2f} GB"))
 
@@ -389,7 +395,7 @@ def legacy_report_consumer_rows(data: dict[str, Any], *, limit: int = 10) -> lis
     consumers = (data.get("repo_consumers") or {}).get("by_minutes") or []
     rows: list[tuple[str, str]] = []
     for item in consumers[:limit]:
-        repo = item.get("repo", "?")
+        repo = _annotated_repo(item)
         minutes = float(item.get("minutes", 0.0))
         rows.append((f"Repo: {repo}", f"{minutes:.1f} min"))
     return rows

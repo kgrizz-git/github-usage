@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 
 from .report_forecast_data import build_report_forecast
+from .visibility import repo_visibility
 
 
 def write(
@@ -103,6 +104,7 @@ def _write_sections(
         writer.writerow(
             [
                 entry.get("repo", ""),
+                repo_visibility(entry),
                 entry.get("minutes", ""),
                 entry.get("gross", ""),
                 entry.get("storage_avg_mb", ""),
@@ -114,6 +116,7 @@ def _write_sections(
         writer.writerow(
             [
                 entry.get("repo", ""),
+                repo_visibility(entry),
                 entry.get("minutes", ""),
                 entry.get("gross", ""),
                 entry.get("storage_avg_mb", ""),
@@ -123,12 +126,20 @@ def _write_sections(
     _write_section_header(writer, "Artifact Storage")
     artifacts = _coerce_section(data.get("artifact_storage"), {})
     for entry in artifacts.get("top_repos") or []:
-        writer.writerow([entry.get("repo", ""), entry.get("artifact_bytes", "")])
+        writer.writerow(
+            [entry.get("repo", ""), repo_visibility(entry), entry.get("artifact_bytes", "")]
+        )
 
     _write_section_header(writer, "Release Assets")
     releases = _coerce_section(data.get("release_assets"), {})
     for entry in releases.get("top_repos") or []:
-        writer.writerow([entry.get("repo", ""), entry.get("release_asset_bytes", "")])
+        writer.writerow(
+            [
+                entry.get("repo", ""),
+                repo_visibility(entry),
+                entry.get("release_asset_bytes", ""),
+            ]
+        )
 
     _write_section_header(writer, "Key Insights")
     for insight in data.get("insights") or []:

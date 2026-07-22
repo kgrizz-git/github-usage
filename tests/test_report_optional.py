@@ -68,7 +68,10 @@ class GetArtifactStorageDetailsTests(unittest.TestCase):
         result = get_artifact_storage_details(api, [_repo("octocat/repo")], max_repos=10)
         # "1024" → 1024, "abc" → skipped, 1024.7 → 1024 (truncated), None →
         # skipped, 256 → 256. Total = 1024 + 1024 + 256 = 2304.
-        self.assertEqual(result["top_repos"], [{"repo": "octocat/repo", "artifact_bytes": 2304}])
+        self.assertEqual(
+            result["top_repos"],
+            [{"repo": "octocat/repo", "artifact_bytes": 2304, "visibility": "public"}],
+        )
 
     def test_omits_repos_with_no_valid_sizes(self):
         api = FakeAPI(
@@ -109,7 +112,8 @@ class GetReleaseAssetDetailsTests(unittest.TestCase):
         # "1024" → 1024, "bad" → skipped, 2048.5 → 2048 (truncated), None →
         # skipped, 512 → 512. Total = 1024 + 2048 + 512 = 3584.
         self.assertEqual(
-            result["top_repos"], [{"repo": "octocat/repo", "release_asset_bytes": 3584}]
+            result["top_repos"],
+            [{"repo": "octocat/repo", "release_asset_bytes": 3584, "visibility": "public"}],
         )
 
     def test_omits_repos_with_no_valid_asset_sizes(self):

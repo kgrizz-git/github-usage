@@ -1,4 +1,4 @@
-> **Status:** IN PROGRESS
+> **Status:** COMPLETE
 
 > Line numbers are accurate as of 2026-07-22; relocate by anchor (function name + dict key) if they drift.
 

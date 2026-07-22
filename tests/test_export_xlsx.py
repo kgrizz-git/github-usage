@@ -119,21 +119,21 @@ class ExportXlsxTests(unittest.TestCase):
             self.assertIn(sheet, wb.sheetnames)
             ws = wb[sheet]
             rows = list(ws.iter_rows(values_only=True))
-            self.assertEqual(rows[3], ("Repo", "Minutes", "Gross", "Storage Avg MB"))
+            self.assertEqual(rows[3], ("Repo", "Visibility", "Minutes", "Gross", "Storage Avg MB"))
 
     def test_artifact_storage_sheet(self):
         wb = self._open()
         ws = wb["Artifacts"]
         rows = list(ws.iter_rows(values_only=True))
-        self.assertEqual(rows[3], ("Repo", "Artifact Bytes"))
-        self.assertEqual(rows[4], ("octocat/api", 943718400))
+        self.assertEqual(rows[3], ("Repo", "Visibility", "Artifact Bytes"))
+        self.assertEqual(rows[4], ("octocat/api", "private", 943718400))
 
     def test_release_assets_sheet(self):
         wb = self._open()
         ws = wb["Releases"]
         rows = list(ws.iter_rows(values_only=True))
-        self.assertEqual(rows[3], ("Repo", "Release Asset Bytes"))
-        self.assertEqual(rows[4], ("octocat/api", 314572800))
+        self.assertEqual(rows[3], ("Repo", "Visibility", "Release Asset Bytes"))
+        self.assertEqual(rows[4], ("octocat/api", "private", 314572800))
 
     def test_insights_sheet(self):
         wb = self._open()
