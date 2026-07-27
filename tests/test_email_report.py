@@ -493,6 +493,242 @@ class EmailReportTests(unittest.TestCase):
         self.assertIn("Day 15 of 31", html)
         self.assertIn("Actions Minutes", html)
 
+    def test_billing_context_note_in_text_email(self):
+        from github_usage.email_report_text import _format_billing_context_section
+
+        lines = _format_billing_context_section({})
+        self.assertEqual(lines[0], "Billing Note")
+        self.assertIn("free for public repositories", lines[1])
+        self.assertIn("monthly quota", lines[2])
+        self.assertIn("docs.github.com", lines[3])
+
+    def test_billing_context_note_in_html_email(self):
+        from github_usage.email_report_html import _format_html_billing_context_section
+
+        parts = _format_html_billing_context_section({})
+        self.assertIn("<h2>Billing Note</h2>", parts)
+        joined = "\n".join(parts)
+        self.assertIn("free for public repositories", joined)
+        self.assertIn("monthly quota", joined)
+        self.assertIn("docs.github.com", joined)
+
+    def test_consumers_grouped_by_visibility_text(self):
+        from github_usage.email_report_text import _format_consumers_section
+
+        data = {
+            "repo_consumers": {
+                "by_minutes": [
+                    {
+                        "repo": "org/private",
+                        "visibility": "private",
+                        "minutes": 100.0,
+                        "gross": 1.0,
+                        "storage_avg_mb": 10.0,
+                    },
+                    {
+                        "repo": "org/public",
+                        "visibility": "public",
+                        "minutes": 50.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 5.0,
+                    },
+                ],
+                "by_cost": [
+                    {
+                        "repo": "org/private",
+                        "visibility": "private",
+                        "minutes": 100.0,
+                        "gross": 1.0,
+                        "storage_avg_mb": 10.0,
+                    },
+                    {
+                        "repo": "org/public",
+                        "visibility": "public",
+                        "minutes": 50.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 5.0,
+                    },
+                ],
+            }
+        }
+        lines = _format_consumers_section(data)
+        text = "\n".join(lines)
+        self.assertIn("Private Repos:", text)
+        self.assertIn("Public Repos:", text)
+        self.assertIn("org/private [private]", text)
+        self.assertIn("org/public", text)
+        self.assertNotIn("org/public [private]", text)
+
+    def test_consumers_grouped_by_visibility_html(self):
+        from github_usage.email_report_html import _format_html_consumers_section
+
+        data = {
+            "repo_consumers": {
+                "by_minutes": [
+                    {
+                        "repo": "org/private",
+                        "visibility": "private",
+                        "minutes": 100.0,
+                        "gross": 1.0,
+                        "storage_avg_mb": 10.0,
+                    },
+                    {
+                        "repo": "org/public",
+                        "visibility": "public",
+                        "minutes": 50.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 5.0,
+                    },
+                ],
+                "by_cost": [
+                    {
+                        "repo": "org/private",
+                        "visibility": "private",
+                        "minutes": 100.0,
+                        "gross": 1.0,
+                        "storage_avg_mb": 10.0,
+                    },
+                    {
+                        "repo": "org/public",
+                        "visibility": "public",
+                        "minutes": 50.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 5.0,
+                    },
+                ],
+            }
+        }
+        parts = _format_html_consumers_section(data)
+        joined = "\n".join(parts)
+        self.assertIn("Private Repos:", joined)
+        self.assertIn("Public Repos:", joined)
+        self.assertIn("visibility-tag", joined)
+        self.assertIn("org/private", joined)
+        self.assertIn("org/public", joined)
+
+    def test_single_visibility_no_group_headers_text(self):
+        from github_usage.email_report_text import _format_consumers_section
+
+        data = {
+            "repo_consumers": {
+                "by_minutes": [
+                    {
+                        "repo": "org/pub1",
+                        "visibility": "public",
+                        "minutes": 50.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 5.0,
+                    },
+                    {
+                        "repo": "org/pub2",
+                        "visibility": "public",
+                        "minutes": 30.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 3.0,
+                    },
+                ],
+                "by_cost": [],
+            }
+        }
+        lines = _format_consumers_section(data)
+        text = "\n".join(lines)
+        self.assertNotIn("Private Repos:", text)
+        self.assertNotIn("Public Repos:", text)
+
+    def test_single_visibility_no_group_headers_html(self):
+        from github_usage.email_report_html import _format_html_consumers_section
+
+        data = {
+            "repo_consumers": {
+                "by_minutes": [
+                    {
+                        "repo": "org/pub1",
+                        "visibility": "public",
+                        "minutes": 50.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 5.0,
+                    },
+                ],
+                "by_cost": [],
+            }
+        }
+        parts = _format_html_consumers_section(data)
+        joined = "\n".join(parts)
+        self.assertNotIn("Private Repos:", joined)
+        self.assertNotIn("Public Repos:", joined)
+
+    def test_artifact_storage_grouped_by_visibility_text(self):
+        from github_usage.email_report_text import _format_artifact_storage_section
+
+        data = {
+            "artifact_storage": {
+                "top_repos": [
+                    {"repo": "org/private", "visibility": "private", "artifact_bytes": 104857600},
+                    {"repo": "org/public", "visibility": "public", "artifact_bytes": 52428800},
+                ]
+            }
+        }
+        lines = _format_artifact_storage_section(data)
+        text = "\n".join(lines)
+        self.assertIn("Private Repos:", text)
+        self.assertIn("Public Repos:", text)
+
+    def test_artifact_storage_grouped_by_visibility_html(self):
+        from github_usage.email_report_html import _format_html_artifact_storage_section
+
+        data = {
+            "artifact_storage": {
+                "top_repos": [
+                    {"repo": "org/private", "visibility": "private", "artifact_bytes": 104857600},
+                    {"repo": "org/public", "visibility": "public", "artifact_bytes": 52428800},
+                ]
+            }
+        }
+        parts = _format_html_artifact_storage_section(data)
+        joined = "\n".join(parts)
+        self.assertIn("Private Repos:", joined)
+        self.assertIn("Public Repos:", joined)
+
+    def test_release_assets_grouped_by_visibility_text(self):
+        from github_usage.email_report_text import _format_release_assets_section
+
+        data = {
+            "release_assets": {
+                "top_repos": [
+                    {
+                        "repo": "org/private",
+                        "visibility": "private",
+                        "release_asset_bytes": 104857600,
+                    },
+                    {"repo": "org/public", "visibility": "public", "release_asset_bytes": 52428800},
+                ]
+            }
+        }
+        lines = _format_release_assets_section(data)
+        text = "\n".join(lines)
+        self.assertIn("Private Repos:", text)
+        self.assertIn("Public Repos:", text)
+
+    def test_release_assets_grouped_by_visibility_html(self):
+        from github_usage.email_report_html import _format_html_release_assets_section
+
+        data = {
+            "release_assets": {
+                "top_repos": [
+                    {
+                        "repo": "org/private",
+                        "visibility": "private",
+                        "release_asset_bytes": 104857600,
+                    },
+                    {"repo": "org/public", "visibility": "public", "release_asset_bytes": 52428800},
+                ]
+            }
+        }
+        parts = _format_html_release_assets_section(data)
+        joined = "\n".join(parts)
+        self.assertIn("Private Repos:", joined)
+        self.assertIn("Public Repos:", joined)
+
 
 if __name__ == "__main__":
     unittest.main()

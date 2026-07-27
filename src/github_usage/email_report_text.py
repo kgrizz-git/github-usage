@@ -5,7 +5,12 @@ from __future__ import annotations
 from ._email_report_common import _bytes_to_mb, _generated_line
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
-from .visibility import repo_visibility, visibility_label
+from .visibility import (
+    group_by_visibility,
+    repo_visibility,
+    visibility_group_header,
+    visibility_label,
+)
 
 
 def _annotated_repo_name(row: dict) -> str:
@@ -18,6 +23,19 @@ def _cost_line(label: str, cost: dict[str, float]) -> str:
         f"discount {fmt_price(cost.get('discount', 0.0))}, "
         f"net {fmt_price(cost.get('net', 0.0))}"
     )
+
+
+_BILLING_CONTEXT_URL = "https://docs.github.com/en/billing/concepts/product-billing/github-actions"
+
+
+def _format_billing_context_section(data: dict) -> list[str]:
+    return [
+        "Billing Note",
+        "- Actions minutes and storage are free for public repositories.",
+        "- Private and internal repositories consume your plan's monthly quota.",
+        f"- See {_BILLING_CONTEXT_URL} for details.",
+        "",
+    ]
 
 
 def _format_actions_section(data: dict) -> list[str]:
@@ -88,18 +106,46 @@ def _format_consumers_section(data: dict) -> list[str]:
     consumers = data.get("repo_consumers")
     if not consumers:
         return []
-    lines = ["Top Repositories by Actions Minutes"]
-    for row in consumers.get("by_minutes", []):
-        lines.append(
-            f"- {_annotated_repo_name(row)}: {row['minutes']:,.1f} min, "
-            f"{fmt_price(row['gross'])}, {row['storage_avg_mb']:,.1f} MB avg storage"
+
+    def _grouped_list(title: str, rows: list[dict], *, value_fn) -> list[str]:
+        lines = [title]
+        groups = group_by_visibility(rows)
+        if len(groups) <= 1:
+            for row in rows:
+                lines.append(f"- {_annotated_repo_name(row)}: {value_fn(row)}")
+        else:
+            for vis, group_rows in groups.items():
+                lines.append(f"\n  {visibility_group_header(vis)}")
+                for row in group_rows:
+                    lines.append(f"  - {_annotated_repo_name(row)}: {value_fn(row)}")
+        return lines
+
+    def _minutes_value(r: dict) -> str:
+        return (
+            f"{r['minutes']:,.1f} min, "
+            f"{fmt_price(r['gross'])}, {r['storage_avg_mb']:,.1f} MB avg storage"
         )
-    lines.extend(["", "Top Repositories by Actions Cost"])
-    for row in consumers.get("by_cost", []):
-        lines.append(
-            f"- {_annotated_repo_name(row)}: {fmt_price(row['gross'])}, "
-            f"{row['minutes']:,.1f} min, {row['storage_avg_mb']:,.1f} MB avg storage"
+
+    def _cost_value(r: dict) -> str:
+        return (
+            f"{fmt_price(r['gross'])}, "
+            f"{r['minutes']:,.1f} min, {r['storage_avg_mb']:,.1f} MB avg storage"
         )
+
+    lines: list[str] = []
+    lines.extend(
+        _grouped_list(
+            "Top Repositories by Actions Minutes",
+            consumers.get("by_minutes", []),
+            value_fn=_minutes_value,
+        )
+    )
+    lines.append("")
+    lines.extend(
+        _grouped_list(
+            "Top Repositories by Actions Cost", consumers.get("by_cost", []), value_fn=_cost_value
+        )
+    )
     if consumers.get("truncated"):
         lines.append(f"- Repo list truncated at {consumers.get('max_repos')} repositories.")
     lines.append("")
@@ -110,11 +156,21 @@ def _format_artifact_storage_section(data: dict) -> list[str]:
     artifact_storage = data.get("artifact_storage")
     if not artifact_storage:
         return []
+    repos = artifact_storage.get("top_repos", [])
     lines = ["Actions Artifact Storage"]
-    for row in artifact_storage.get("top_repos", []):
-        lines.append(
-            f"- {_annotated_repo_name(row)}: {_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts"
-        )
+    groups = group_by_visibility(repos)
+    if len(groups) <= 1:
+        for row in repos:
+            lines.append(
+                f"- {_annotated_repo_name(row)}: {_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts"
+            )
+    else:
+        for vis, group_rows in groups.items():
+            lines.append(f"\n  {visibility_group_header(vis)}")
+            for row in group_rows:
+                lines.append(
+                    f"  - {_annotated_repo_name(row)}: {_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts"
+                )
     if artifact_storage.get("truncated"):
         lines.append(
             f"- Artifact scan truncated at {artifact_storage.get('max_repos')} repositories."
@@ -127,12 +183,23 @@ def _format_release_assets_section(data: dict) -> list[str]:
     release_assets = data.get("release_assets")
     if not release_assets:
         return []
+    repos = release_assets.get("top_repos", [])
     lines = ["Release Asset Inventory"]
-    for row in release_assets.get("top_repos", []):
-        lines.append(
-            f"- {_annotated_repo_name(row)}: "
-            f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets"
-        )
+    groups = group_by_visibility(repos)
+    if len(groups) <= 1:
+        for row in repos:
+            lines.append(
+                f"- {_annotated_repo_name(row)}: "
+                f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets"
+            )
+    else:
+        for vis, group_rows in groups.items():
+            lines.append(f"\n  {visibility_group_header(vis)}")
+            for row in group_rows:
+                lines.append(
+                    f"  - {_annotated_repo_name(row)}: "
+                    f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets"
+                )
     if release_assets.get("truncated"):
         lines.append(
             f"- Release asset scan truncated at {release_assets.get('max_repos')} repositories."
@@ -204,6 +271,7 @@ def _format_forecast_section(
 
 
 _SECTION_FORMATTERS = (
+    _format_billing_context_section,
     _format_actions_section,
     _format_copilot_section,
     _format_git_lfs_section,

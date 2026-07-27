@@ -45,30 +45,34 @@
     "total": {"gross": 6.1, "discount": 1.89, "net": 4.21}
   },
   "repo_consumers": {
-    "scanned_repo_count": 2,
+    "scanned_repo_count": 3,
     "max_repos": 100,
     "truncated": false,
     "by_minutes": [
-      {"repo": "octocat/api", "minutes": 900.0, "gross": 3.4, "storage_avg_mb": 180.0}
+      {"repo": "octocat/api", "visibility": "private", "minutes": 900.0, "gross": 3.4, "storage_avg_mb": 180.0},
+      {"repo": "octocat/web", "visibility": "public", "minutes": 150.0, "gross": 0.0, "storage_avg_mb": 30.0}
     ],
     "by_cost": [
-      {"repo": "octocat/api", "minutes": 900.0, "gross": 3.4, "storage_avg_mb": 180.0}
+      {"repo": "octocat/api", "visibility": "private", "minutes": 900.0, "gross": 3.4, "storage_avg_mb": 180.0},
+      {"repo": "octocat/web", "visibility": "public", "minutes": 150.0, "gross": 0.0, "storage_avg_mb": 30.0}
     ]
   },
   "artifact_storage": {
-    "scanned_repo_count": 1,
+    "scanned_repo_count": 2,
     "max_repos": 100,
     "truncated": false,
     "top_repos": [
-      {"repo": "octocat/api", "artifact_bytes": 943718400}
+      {"repo": "octocat/api", "visibility": "private", "artifact_bytes": 943718400},
+      {"repo": "octocat/web", "visibility": "public", "artifact_bytes": 104857600}
     ]
   },
   "release_assets": {
-    "scanned_repo_count": 1,
+    "scanned_repo_count": 2,
     "max_repos": 100,
     "truncated": false,
     "top_repos": [
-      {"repo": "octocat/api", "release_asset_bytes": 314572800}
+      {"repo": "octocat/api", "visibility": "private", "release_asset_bytes": 314572800},
+      {"repo": "octocat/web", "visibility": "public", "release_asset_bytes": 52428800}
     ]
   },
   "api_estimate": {

@@ -194,6 +194,8 @@ github-usage email-report \
 
 Repo-level sections annotate non-public repositories with `[private]` or `[internal]` tags. The legacy Usage Report per-repo Actions table groups rows by visibility with subtotals. `--only-public` and `--only-private` (mutually exclusive) filter which repositories are included in repo-level sections; filtering applies after the `--max-repos` limit. Set `only_public` / `only_private` in `[email_report]` in `config.toml` for scheduled runs.
 
+Visibility matters for billing: GitHub Actions minutes and storage are **free for public repositories** but consume your plan's monthly quota for private and internal repositories. See [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions) for included amounts and overage rates.
+
 Release assets are optional inventory, not a billing/quota report. The CLI asks for confirmation in interactive terminals, and CI must pass `--yes-include-release-assets`.
 
 ## Viewing Configured Runs

@@ -7,7 +7,12 @@ import html
 from ._email_report_common import _bytes_to_mb, _generated_line
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
-from .visibility import repo_visibility, visibility_label
+from .visibility import (
+    group_by_visibility,
+    repo_visibility,
+    visibility_group_header,
+    visibility_label,
+)
 
 
 def _html_repo_cell(row: dict) -> str:
@@ -26,6 +31,20 @@ def _html_cost_row(label: str, cost: dict[str, float]) -> str:
         f"<td>{fmt_price(cost.get('discount', 0.0))}</td>"
         f"<td>{fmt_price(cost.get('net', 0.0))}</td></tr>"
     )
+
+
+_BILLING_CONTEXT_URL = "https://docs.github.com/en/billing/concepts/product-billing/github-actions"
+
+
+def _format_html_billing_context_section(data: dict) -> list[str]:
+    return [
+        "<h2>Billing Note</h2>",
+        "<ul>",
+        "<li>Actions minutes and storage are free for public repositories.</li>",
+        "<li>Private and internal repositories consume your plan's monthly quota.</li>",
+        f'<li>See <a href="{_BILLING_CONTEXT_URL}">GitHub Actions billing</a> for details.</li>',
+        "</ul>",
+    ]
 
 
 def _format_html_actions_section(data: dict) -> list[str]:
@@ -109,30 +128,59 @@ def _format_html_consumers_section(data: dict) -> list[str]:
     consumers = data.get("repo_consumers")
     if not consumers:
         return []
-    parts = [
-        "<h2>Top Repositories by Actions Minutes</h2>",
-        "<table>",
-        "<tr><th>Repo</th><th>Minutes</th><th>Gross</th><th>Storage</th></tr>",
-    ]
-    for row in consumers.get("by_minutes", []):
-        parts.append(
+
+    def _grouped_table(title: str, rows: list[dict], *, headers: list[str], value_fn) -> list[str]:
+        parts = [f"<h2>{html.escape(title)}</h2>"]
+        groups = group_by_visibility(rows)
+        if len(groups) <= 1:
+            parts.append("<table>")
+            parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
+            for row in rows:
+                parts.append(value_fn(row))
+            parts.append("</table>")
+        else:
+            for vis, group_rows in groups.items():
+                parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
+                parts.append("<table>")
+                parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
+                for row in group_rows:
+                    parts.append(value_fn(row))
+                parts.append("</table>")
+        return parts
+
+    def _minutes_row(row: dict) -> str:
+        return (
             f"<tr><td>{_html_repo_cell(row)}</td>"
             f"<td>{row['minutes']:,.1f} min</td>"
             f"<td>{fmt_price(row['gross'])}</td>"
             f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
         )
-    parts.append("</table>")
-    parts.append("<h2>Top Repositories by Actions Cost</h2>")
-    parts.append("<table>")
-    parts.append("<tr><th>Repo</th><th>Gross</th><th>Minutes</th><th>Storage</th></tr>")
-    for row in consumers.get("by_cost", []):
-        parts.append(
+
+    def _cost_row(row: dict) -> str:
+        return (
             f"<tr><td>{_html_repo_cell(row)}</td>"
             f"<td>{fmt_price(row['gross'])}</td>"
             f"<td>{row['minutes']:,.1f} min</td>"
             f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
         )
-    parts.append("</table>")
+
+    parts: list[str] = []
+    parts.extend(
+        _grouped_table(
+            "Top Repositories by Actions Minutes",
+            consumers.get("by_minutes", []),
+            headers=["Repo", "Minutes", "Gross", "Storage"],
+            value_fn=_minutes_row,
+        )
+    )
+    parts.extend(
+        _grouped_table(
+            "Top Repositories by Actions Cost",
+            consumers.get("by_cost", []),
+            headers=["Repo", "Gross", "Minutes", "Storage"],
+            value_fn=_cost_row,
+        )
+    )
     if consumers.get("truncated"):
         parts.append(
             f"<p><em>Repo list truncated at {consumers.get('max_repos')} repositories.</em></p>"
@@ -144,16 +192,27 @@ def _format_html_artifact_storage_section(data: dict) -> list[str]:
     artifact_storage = data.get("artifact_storage")
     if not artifact_storage:
         return []
-    parts = [
-        "<h2>Actions Artifact Storage</h2>",
-        "<ul>",
-    ]
-    for row in artifact_storage.get("top_repos", []):
-        parts.append(
-            f"<li>{_html_repo_cell(row)}: "
-            f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
-        )
-    parts.append("</ul>")
+    repos = artifact_storage.get("top_repos", [])
+    parts = ["<h2>Actions Artifact Storage</h2>"]
+    groups = group_by_visibility(repos)
+    if len(groups) <= 1:
+        parts.append("<ul>")
+        for row in repos:
+            parts.append(
+                f"<li>{_html_repo_cell(row)}: "
+                f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
+            )
+        parts.append("</ul>")
+    else:
+        for vis, group_rows in groups.items():
+            parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
+            parts.append("<ul>")
+            for row in group_rows:
+                parts.append(
+                    f"<li>{_html_repo_cell(row)}: "
+                    f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
+                )
+            parts.append("</ul>")
     if artifact_storage.get("truncated"):
         parts.append(
             f"<p><em>Artifact scan truncated at "
@@ -166,16 +225,27 @@ def _format_html_release_assets_section(data: dict) -> list[str]:
     release_assets = data.get("release_assets")
     if not release_assets:
         return []
-    parts = [
-        "<h2>Release Asset Inventory</h2>",
-        "<ul>",
-    ]
-    for row in release_assets.get("top_repos", []):
-        parts.append(
-            f"<li>{_html_repo_cell(row)}: "
-            f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets</li>"
-        )
-    parts.append("</ul>")
+    repos = release_assets.get("top_repos", [])
+    parts = ["<h2>Release Asset Inventory</h2>"]
+    groups = group_by_visibility(repos)
+    if len(groups) <= 1:
+        parts.append("<ul>")
+        for row in repos:
+            parts.append(
+                f"<li>{_html_repo_cell(row)}: "
+                f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets</li>"
+            )
+        parts.append("</ul>")
+    else:
+        for vis, group_rows in groups.items():
+            parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
+            parts.append("<ul>")
+            for row in group_rows:
+                parts.append(
+                    f"<li>{_html_repo_cell(row)}: "
+                    f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets</li>"
+                )
+            parts.append("</ul>")
     if release_assets.get("truncated"):
         parts.append(
             f"<p><em>Release asset scan truncated at "
@@ -261,6 +331,7 @@ def _format_html_forecast_section(
 
 
 _SECTION_HTML_FORMATTERS = (
+    _format_html_billing_context_section,
     _format_html_actions_section,
     _format_html_copilot_section,
     _format_html_git_lfs_section,
