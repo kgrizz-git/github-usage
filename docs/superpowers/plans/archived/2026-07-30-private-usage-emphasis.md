@@ -1,4 +1,4 @@
-> **Status:** IN PROGRESS (Phases 1–5 largely complete; Phase 6 exports / Phase 7 TUI / README polish remaining)
+> **Status:** COMPLETE
 
 > Line numbers are accurate as of 2026-07-30; relocate by anchor (function name + dict key) if they drift.
 >
@@ -9,7 +9,9 @@
 > - **Done:** 2026-07-31 — Phase 2a–2d/2g (+ partial 8a/8b): `storage.py` adds artifact expiry/retention rollups + `artifact_storage_gb`/`release_storage_gb`; `storage_summary` + `sources` on legacy report; `report_storage.py` (`render_artifact_storage_section`, `build_storage_summary`); sources footer in `legacy_terminal`.
 > - **Done:** 2026-07-31 — Phase 4a/4b (`report_actions_limits.py`: Usage by Visibility + private Limits Summary + larger-runner `*`); 4c/4d (`report_summary_insights.py`: private utilization bars, visibility subsection, private recommendations, larger-runner/expiry findings); 4f forecast feeds private minutes/storage + public extras.
 > - **Done:** 2026-07-31 — Phase 5a/5b/5c (+ email sources): email text/HTML prepend private-vs-public summary when `by_visibility` present; warnings use `private_minutes_percent`; insights prepend private-quota message; Sources footer on email bodies; `build_report_data` attaches `sources`.
-> - **Remaining:** Phase 6 exports; Phase 7 TUI rows; Phase 8c/8d README polish; Phase 9 confirmation; Phase 11 README detail; full `scripts/check` / smoke / docs-check.
+> - **Done:** 2026-07-31 — Phase 6 exports + Phase 7 TUI + Phase 10d/10c export+TUI tests: `export_visibility.py` helpers; CSV visibility/storage/sources sections; XLSX Private Usage / Storage Analysis / Sources sheets; PDF Private Usage Framing + Sources (ASCII-safe larger-runner note); JSON preserves split keys; TUI private-first minutes/storage + public detail row + artifact expiry annotations. Phase 9 confirmed (no new CLI/config).
+> - **Done:** 2026-07-31 — Phase 11a README private-first / artifact / larger-runner / Sources notes; changelog Unreleased entry extended for exports/TUI.
+> - **Done:** 2026-07-31 — Plan marked COMPLETE after `scripts/check` (646 tests) + `scripts/docs-check`.
 
 # Private Usage Emphasis & Runner-SKU Classification
 

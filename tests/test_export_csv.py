@@ -19,6 +19,7 @@ CSV_SECTIONS = [
     "Release Assets",
     "Key Insights",
     "Unavailable Data",
+    "Sources",
 ]
 
 
@@ -52,8 +53,8 @@ class ExportCsvTests(unittest.TestCase):
             ["sku", "minutes", "storage_gb_hours", "gross", "discount", "net"],
         )
         data_rows = {r[0] for r in sub[header_idx + 2 :] if r}
-        self.assertIn("enterprise", data_rows)
-        self.assertIn("free", data_rows)
+        self.assertIn("actions_linux", data_rows)
+        self.assertIn("actions_macos", data_rows)
 
     def test_writes_copilot_by_model(self):
         rows = self._rows()
@@ -174,6 +175,70 @@ class ExportCsvTests(unittest.TestCase):
         # minutes must be in position 1, cost in position 2 — regardless of insertion order
         self.assertEqual(sku_b_row[1], "1")
         self.assertEqual(sku_b_row[2], "99")
+
+    def test_visibility_section_when_split_present(self) -> None:
+        self.data["actions"]["private_minutes"] = 900.0
+        self.data["actions"]["private_minutes_percent"] = 45.0
+        self.data["actions"]["public_minutes"] = 350.0
+        self.data["actions"]["unattributed_minutes"] = 0.0
+        self.data["actions"]["private_storage_avg_mb"] = 180.0
+        self.data["actions"]["public_storage_avg_mb"] = 40.4
+        self.data["actions"]["private_storage_gb_hours"] = 100.0
+        self.data["actions"]["public_storage_gb_hours"] = 50.0
+        self.data["actions"]["unattributed_storage_gb_hours"] = 0.0
+        rows = self._rows()
+        self.assertIn(["### Actions Usage by Visibility ###"], rows)
+        idx = rows.index(["### Actions Usage by Visibility ###"])
+        keys = {r[0] for r in rows[idx + 1 :] if r and not r[0].startswith("###")}
+        self.assertIn("private_minutes", keys)
+        self.assertIn("public_minutes", keys)
+
+    def test_larger_runner_sku_marked(self) -> None:
+        self.data["actions"]["sku_breakdown"] = {
+            "linux_4_core": {
+                "minutes": 10.0,
+                "storage_gb_hours": 0.0,
+                "gross": 1.0,
+                "discount": 0.0,
+                "net": 1.0,
+                "unitType": "minutes",
+            }
+        }
+        rows = self._rows()
+        flat = [item for row in rows for item in row]
+        self.assertIn("linux_4_core *", flat)
+        self.assertTrue(any("larger runner" in str(item).lower() for item in flat))
+
+    def test_storage_analysis_section(self) -> None:
+        self.data["storage_analysis"] = {
+            "repos": [
+                {
+                    "name": "octocat/api",
+                    "visibility": "private",
+                    "artifact_storage_gb": 0.5,
+                    "release_storage_gb": 0.1,
+                    "total_storage": 0.6,
+                    "artifact_count": 3,
+                    "expired_count": 1,
+                    "expiring_soon_count": 1,
+                    "earliest_expiry": "2026-08-01T00:00:00Z",
+                    "retention_days": 90,
+                }
+            ]
+        }
+        rows = self._rows()
+        self.assertIn(["### Storage Analysis ###"], rows)
+        idx = rows.index(["### Storage Analysis ###"])
+        self.assertEqual(rows[idx + 1][0], "repo")
+        self.assertEqual(rows[idx + 2][0], "octocat/api")
+        self.assertEqual(rows[idx + 2][6], "1")  # expired_count
+
+    def test_sources_section_present(self) -> None:
+        rows = self._rows()
+        self.assertIn(["### Sources ###"], rows)
+        idx = rows.index(["### Sources ###"])
+        keys = {r[0] for r in rows[idx + 1 :] if r}
+        self.assertIn("actions_billing", keys)
 
 
 if __name__ == "__main__":

@@ -17,14 +17,14 @@
     "storage_limit_mb": 500,
     "storage_percent": 44.1,
     "sku_breakdown": {
-      "enterprise": {
+      "actions_linux": {
         "minutes": 800.0,
         "storage_gb_hours": 100.0,
         "gross": 3.0,
         "discount": 0.5,
         "net": 2.5
       },
-      "free": {
+      "actions_macos": {
         "minutes": 450.0,
         "storage_gb_hours": 50.0,
         "gross": 0.0,

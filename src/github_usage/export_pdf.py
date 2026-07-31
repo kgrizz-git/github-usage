@@ -16,7 +16,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .export_visibility import (
+    annotate_sku_name,
+    sources_rows,
+    storage_summary_label_values,
+    visibility_summary_label_values,
+)
 from .report_forecast_data import build_report_forecast
+from .usage_split import classify_actions_sku
 from .visibility import repo_visibility, visibility_label
 
 _MAX_SECTION_ROWS = 30
@@ -88,29 +95,41 @@ def _write_actions_page(add_section: AddSectionFn, data: dict) -> None:
         return
     minutes = actions.get("minutes")
     storage = actions.get("storage_avg_mb")
-    add_section(
-        "Actions",
-        [
+    rows: list[tuple[str, str]] = [
+        (
+            "Minutes",
             (
-                "Minutes",
-                (
-                    f"{_fmt_num(minutes)} / {_fmt_num(actions.get('minutes_limit'))} "
-                    f"({_fmt_num(actions.get('minutes_percent'))}%)"
-                    if minutes is not None
-                    else "N/A"
-                ),
+                f"{_fmt_num(minutes)} / {_fmt_num(actions.get('minutes_limit'))} "
+                f"({_fmt_num(actions.get('minutes_percent'))}%)"
+                if minutes is not None
+                else "N/A"
             ),
+        ),
+        (
+            "Storage",
             (
-                "Storage",
-                (
-                    f"{_fmt_num(storage)} MB / {_fmt_num(actions.get('storage_limit_mb'))} MB "
-                    f"({_fmt_num(actions.get('storage_percent'))}%)"
-                    if storage is not None
-                    else "N/A"
-                ),
+                f"{_fmt_num(storage)} MB / {_fmt_num(actions.get('storage_limit_mb'))} MB "
+                f"({_fmt_num(actions.get('storage_percent'))}%)"
+                if storage is not None
+                else "N/A"
             ),
-        ],
-    )
+        ),
+    ]
+    rows.extend(visibility_summary_label_values(actions))
+    rows.extend(storage_summary_label_values(data.get("storage_summary")))
+    sku = actions.get("sku_breakdown") or {}
+    for sku_name, item in sku.items():
+        if not isinstance(item, dict):
+            continue
+        label = annotate_sku_name(str(sku_name), item)
+        qty = item.get("grossQuantity", item.get("minutes", ""))
+        rows.append((f"SKU {label}", _fmt_num(qty)))
+    if any(
+        classify_actions_sku(str(s), i if isinstance(i, dict) else None) == "larger"
+        for s, i in sku.items()
+    ):
+        rows.append(("Note", "* = larger runner - always billed, not free-tier"))
+    add_section("Actions", rows)
 
 
 def _write_copilot_page(add_section: AddSectionFn, data: dict) -> None:
@@ -167,6 +186,18 @@ def _annotated_repo_label(entry: dict) -> str:
 
 def _write_consumers_page(add_section: AddSectionFn, data: dict) -> None:
     consumers = data.get("repo_consumers") or {}
+    actions = data.get("actions") or {}
+    framing = visibility_summary_label_values(actions)
+    framing.extend(storage_summary_label_values(data.get("storage_summary")))
+    if framing:
+        framing.insert(
+            0,
+            (
+                "Note",
+                "Free-tier limits apply to private repos only; public standard runners are free.",
+            ),
+        )
+        add_section("Private Usage Framing", framing)
     by_minutes = consumers.get("by_minutes") or []
     if by_minutes:
         rows = [
@@ -180,6 +211,13 @@ def _write_consumers_page(add_section: AddSectionFn, data: dict) -> None:
             (_annotated_repo_label(entry), f"${_fmt_num(entry.get('gross'))}") for entry in by_cost
         ]
         add_section("Top Repos by Cost", rows)
+
+
+def _write_sources_page(add_section: AddSectionFn, data: dict) -> None:
+    sources = data.get("sources")
+    rows = sources_rows(sources if isinstance(sources, dict) else None)
+    if rows:
+        add_section("Sources", [(key, url) for key, url in rows])
 
 
 def _write_artifact_storage_page(add_section: AddSectionFn, data: dict) -> None:
@@ -263,6 +301,7 @@ _SECTION_PAGES = (
     _write_release_assets_page,
     _write_insights_page,
     _write_errors_page,
+    _write_sources_page,
 )
 
 

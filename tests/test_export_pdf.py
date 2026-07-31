@@ -49,6 +49,7 @@ PDF_SECTIONS = [
     "Release Assets",
     "Key Insights",
     "Unavailable Data",
+    "Sources",
     "Usage Forecast",
 ]
 
@@ -97,8 +98,8 @@ class ExportPdfTests(unittest.TestCase):
         self.assertIn("Actions Minutes", text)
 
     def test_pages_count_with_all_sections(self):
-        # Cover page + 11 sections = 12 pages
-        self.assertEqual(_page_count(self._save()), 12)
+        # Cover page + 12 sections (incl. Sources) = 13 pages
+        self.assertEqual(_page_count(self._save()), 13)
 
     def test_empty_sections_reduce_page_count(self):
         self.data["artifact_storage"] = None
@@ -106,8 +107,8 @@ class ExportPdfTests(unittest.TestCase):
         self.data["errors"] = None
         self.data["insights"] = []
         self.data["repo_consumers"] = None
-        # Cover + Actions + Copilot + Git LFS + Monthly Costs + Forecast = 6
-        self.assertEqual(_page_count(self._save()), 6)
+        # Cover + Actions + Copilot + Git LFS + Monthly Costs + Sources + Forecast = 7
+        self.assertEqual(_page_count(self._save()), 7)
 
     @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
     def test_truncates_large_sections(self):
@@ -175,6 +176,39 @@ class ExportPdfTests(unittest.TestCase):
         ):
             export_report.export(self.data, "pdf", output_path="/tmp/_should_not_write.pdf")
         self.assertIn("fpdf2", str(ctx.exception))
+
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_sources_page_present(self) -> None:
+        text = _extract_text(self._save())
+        self.assertIn("Sources", text)
+        self.assertIn("actions_billing", text)
+
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_private_usage_framing_when_split_present(self) -> None:
+        self.data["actions"]["private_minutes"] = 900.0
+        self.data["actions"]["private_minutes_percent"] = 45.0
+        self.data["actions"]["public_minutes"] = 350.0
+        self.data["actions"]["unattributed_minutes"] = 0.0
+        self.data["actions"]["private_storage_avg_mb"] = 180.0
+        self.data["actions"]["public_storage_avg_mb"] = 40.4
+        self.data["actions"]["private_storage_gb_hours"] = 100.0
+        self.data["actions"]["public_storage_gb_hours"] = 50.0
+        self.data["actions"]["unattributed_storage_gb_hours"] = 0.0
+        text = _extract_text(self._save())
+        self.assertIn("Private Usage Framing", text)
+        self.assertIn("private_minutes", text)
+
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_larger_runner_note_ascii_safe(self) -> None:
+        self.data["actions"]["sku_breakdown"] = {
+            "linux_4_core": {
+                "minutes": 10.0,
+                "unitType": "minutes",
+            }
+        }
+        text = _extract_text(self._save())
+        self.assertIn("linux_4_core *", text)
+        self.assertIn("larger runner", text.lower())
 
 
 if __name__ == "__main__":

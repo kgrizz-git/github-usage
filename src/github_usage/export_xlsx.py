@@ -15,6 +15,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .export_visibility import (
+    annotated_sku_breakdown,
+    per_visibility_sku_rows,
+    sources_rows,
+    storage_analysis_export_rows,
+    visibility_summary_rows,
+)
 from .report_forecast_data import build_report_forecast
 from .visibility import repo_visibility
 
@@ -99,7 +106,7 @@ def _write_actions_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
             ],
         ],
     )
-    sku = actions.get("sku_breakdown") or {}
+    sku = annotated_sku_breakdown(actions.get("sku_breakdown") or {})
     if sku:
         sku_rows = [["SKU", "Minutes", "Storage GB-Hrs", "Gross", "Discount", "Net"]]
         for sku_name, sku_data in sku.items():
@@ -113,7 +120,50 @@ def _write_actions_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
                     sku_data.get("net"),
                 ]
             )
+        if any(str(name).endswith(" *") for name in sku):
+            sku_rows.append(
+                [
+                    "*",
+                    "Larger runner - always billed",
+                    "",
+                    "",
+                    "",
+                    "",
+                ]
+            )
         write_sheet("SKU Breakdown", "Actions SKU Breakdown", sku_rows)
+
+
+def _write_private_usage_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
+    actions = data.get("actions") or {}
+    vis_rows = visibility_summary_rows(actions)
+    if not vis_rows:
+        return
+    rows = [["Metric", "Value"], *vis_rows]
+    summary = data.get("storage_summary") or {}
+    if summary:
+        rows.append([])
+        rows.append(["Storage Summary", ""])
+        for key, value in summary.items():
+            rows.append([key, value])
+    sku_rows = per_visibility_sku_rows(actions)
+    if sku_rows:
+        rows.append([])
+        rows.extend(sku_rows)
+    write_sheet("Private Usage", "Private vs Public Actions", rows)
+
+
+def _write_storage_analysis_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
+    rows = storage_analysis_export_rows(data.get("storage_analysis"))
+    if rows:
+        write_sheet("Storage Analysis", "Artifact Storage Analysis", rows)
+
+
+def _write_sources_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
+    sources = data.get("sources")
+    rows = sources_rows(sources if isinstance(sources, dict) else None)
+    if rows:
+        write_sheet("Sources", "Documentation Sources", [["Key", "URL"], *rows])
 
 
 def _write_copilot_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
@@ -254,14 +304,17 @@ def _write_forecast_sheet(
 _SECTION_WRITERS = (
     _write_metadata_sheet,
     _write_actions_sheet,
+    _write_private_usage_sheet,
     _write_copilot_sheet,
     _write_git_lfs_sheet,
     _write_monthly_costs_sheet,
     _write_consumers_sheet,
     _write_artifact_storage_sheet,
+    _write_storage_analysis_sheet,
     _write_release_assets_sheet,
     _write_insights_sheet,
     _write_errors_sheet,
+    _write_sources_sheet,
 )
 
 

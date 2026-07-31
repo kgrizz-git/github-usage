@@ -97,6 +97,38 @@ class ExportJsonTests(unittest.TestCase):
             self._roundtrip()
         self.assertEqual(set(self.data.keys()), original_keys)
 
+    def test_preserves_visibility_and_storage_keys(self) -> None:
+        self.data["actions"]["private_minutes"] = 900.0
+        self.data["actions"]["public_minutes"] = 350.0
+        self.data["actions"]["larger_runner_skus"] = ["linux_4_core"]
+        self.data["repo_consumers"]["by_visibility"] = {
+            "private": {"minutes": 900.0},
+            "public": {"minutes": 350.0},
+        }
+        self.data["storage_summary"] = {
+            "private_gb_hours": 100.0,
+            "allowance_gb_hours": 360.0,
+        }
+        self.data["storage_analysis"] = {
+            "repos": [
+                {
+                    "name": "octocat/api",
+                    "artifact_count": 2,
+                    "expiring_soon_count": 1,
+                    "retention_days": 90,
+                }
+            ]
+        }
+        self.data["sources"] = {"actions_billing": "https://example.test/actions"}
+        result = self._roundtrip()
+        self.assertEqual(result["actions"]["private_minutes"], 900.0)
+        self.assertEqual(result["actions"]["public_minutes"], 350.0)
+        self.assertEqual(result["actions"]["larger_runner_skus"], ["linux_4_core"])
+        self.assertEqual(result["repo_consumers"]["by_visibility"]["private"]["minutes"], 900.0)
+        self.assertEqual(result["storage_summary"]["allowance_gb_hours"], 360.0)
+        self.assertEqual(result["storage_analysis"]["repos"][0]["retention_days"], 90)
+        self.assertEqual(result["sources"]["actions_billing"], "https://example.test/actions")
+
 
 if __name__ == "__main__":
     unittest.main()

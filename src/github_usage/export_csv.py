@@ -18,6 +18,12 @@ from __future__ import annotations
 
 import csv
 
+from .export_visibility import (
+    annotated_sku_breakdown,
+    sources_rows,
+    storage_analysis_export_rows,
+    visibility_summary_rows,
+)
 from .report_forecast_data import build_report_forecast
 from .visibility import repo_visibility
 
@@ -70,9 +76,30 @@ def _write_sections(
     _write_section_header(writer, "Actions Usage")
     actions = _coerce_section(data.get("actions"), {})
     for key, value in actions.items():
-        if key == "sku_breakdown":
-            _write_nested(writer, "sku_breakdown", "sku", value)
-        else:
+        if key in {"sku_breakdown", "skus"}:
+            continue
+        writer.writerow([key, value])
+    sku = annotated_sku_breakdown(actions.get("sku_breakdown") or {})
+    if sku:
+        _write_nested(writer, "sku_breakdown", "sku", sku)
+        if any(str(name).endswith(" *") for name in sku):
+            writer.writerow(
+                [
+                    "*",
+                    "GitHub-hosted larger runner - always billed, not covered by free tier",
+                ]
+            )
+
+    vis_rows = visibility_summary_rows(actions)
+    if vis_rows:
+        _write_section_header(writer, "Actions Usage by Visibility")
+        for row in vis_rows:
+            writer.writerow(row)
+
+    storage_summary = _coerce_section(data.get("storage_summary"), {})
+    if storage_summary:
+        _write_section_header(writer, "Storage Summary")
+        for key, value in storage_summary.items():
             writer.writerow([key, value])
 
     _write_section_header(writer, "Copilot Usage")
@@ -130,6 +157,12 @@ def _write_sections(
             [entry.get("repo", ""), repo_visibility(entry), entry.get("artifact_bytes", "")]
         )
 
+    analysis_rows = storage_analysis_export_rows(data.get("storage_analysis"))
+    if analysis_rows:
+        _write_section_header(writer, "Storage Analysis")
+        for row in analysis_rows:
+            writer.writerow(row)
+
     _write_section_header(writer, "Release Assets")
     releases = _coerce_section(data.get("release_assets"), {})
     for entry in releases.get("top_repos") or []:
@@ -148,6 +181,13 @@ def _write_sections(
     _write_section_header(writer, "Unavailable Data")
     for error_key, error_msg in (data.get("errors") or {}).items():
         writer.writerow([error_key, error_msg])
+
+    sources = data.get("sources")
+    source_rows = sources_rows(sources if isinstance(sources, dict) else None)
+    if source_rows:
+        _write_section_header(writer, "Sources")
+        for row in source_rows:
+            writer.writerow(row)
 
 
 def _write_forecast_section(
