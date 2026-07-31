@@ -45,7 +45,7 @@ def _attach_forecast_extras(forecast: dict, actions: dict, *, ref: date) -> None
         forecast["private_gb_hours_projected"] = projected_gb
         forecast["flat_equivalent_mb"] = flat_equivalent_gb_hours(projected_gb, dim) * 1024.0
     if actions.get("filtered") and float(actions.get("private_minutes") or 0.0) <= 0:
-        forecast["scanned_private_only"] = True
+        forecast["filtered_empty_private"] = True
 
 
 def build_report_forecast(

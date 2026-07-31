@@ -47,8 +47,8 @@ def render_forecast(
             f"limit {_limit(metric['limit']):>8}  "
             f"run-out {_run_out(metric['run_out_day']):>8}"
         )
-    if forecast.get("scanned_private_only"):
-        print("  (scanned-private repos only — may understate private quota pressure)")
-    elif forecast.get("public_minutes"):
+    if forecast.get("filtered_empty_private"):
+        print("  (filtered scan with no private minutes — private free-tier projection suppressed)")
+    if forecast.get("public_minutes"):
         print(f"  {'Public (free)':18} current {float(forecast['public_minutes']):>10,.1f} min")
     print()

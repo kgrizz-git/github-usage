@@ -1,0 +1,5 @@
+# CodeRabbit configuration — https://docs.coderabbit.ai/configuration/auto-review
+# Automatic PR reviews are off; request one with `@coderabbitai review` on a PR.
+reviews:
+  auto_review:
+    enabled: false

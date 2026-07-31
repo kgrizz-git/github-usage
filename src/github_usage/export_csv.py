@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 
 from .export_visibility import (
+    VISIBILITY_SPLIT_KEYS,
     annotated_sku_breakdown,
     sources_rows,
     storage_analysis_export_rows,
@@ -76,7 +77,7 @@ def _write_sections(
     _write_section_header(writer, "Actions Usage")
     actions = _coerce_section(data.get("actions"), {})
     for key, value in actions.items():
-        if key in {"sku_breakdown", "skus"}:
+        if key in {"sku_breakdown", "skus"} | VISIBILITY_SPLIT_KEYS:
             continue
         writer.writerow([key, value])
     sku = annotated_sku_breakdown(actions.get("sku_breakdown") or {})

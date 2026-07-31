@@ -167,7 +167,9 @@ def _consumer_findings(
     sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True) if repo_data else []
     sorted_by_cost = sorted(repo_data, key=lambda x: x[4], reverse=True) if repo_data else []
     sorted_by_storage = sorted(
-        storage_analysis.get("repos", []), key=lambda x: x["total_storage"], reverse=True
+        (storage_analysis or {}).get("repos", []),
+        key=lambda x: x["total_storage"],
+        reverse=True,
     )
     if sorted_repos:
         top_repo = sorted_repos[0]
@@ -282,9 +284,11 @@ def _concentration_recommendation(repo_data, basis_minutes, visibility_by_repo) 
     ]
 
 
-def _release_asset_recommendation(storage_analysis: dict) -> list[str]:
+def _release_asset_recommendation(storage_analysis: dict | None) -> list[str]:
     sorted_by_storage = sorted(
-        storage_analysis.get("repos", []), key=lambda x: x["total_storage"], reverse=True
+        (storage_analysis or {}).get("repos", []),
+        key=lambda x: x["total_storage"],
+        reverse=True,
     )
     if not sorted_by_storage:
         return []

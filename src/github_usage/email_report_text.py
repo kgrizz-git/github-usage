@@ -112,11 +112,12 @@ def _visibility_usage_summary_lines(consumers: dict) -> list[str]:
     priv_min = float(priv.get("minutes", 0.0) or 0.0)
     pub_min = float(pub.get("minutes", 0.0) or 0.0)
     priv_mb = float(priv.get("storage_avg_mb", 0.0) or 0.0)
+    pub_mb = float(pub.get("storage_avg_mb", 0.0) or 0.0)
     pct = (priv_min / 2000.0 * 100.0) if priv_min else 0.0
     return [
         "Private vs public Actions (scanned repos)",
         f"- Private repos:  {priv_min:,.1f} min / 2,000 free ({pct:.0f}%) · {priv_mb:,.1f} MB avg storage",
-        f"- Public repos:   {pub_min:,.1f} min (free)",
+        f"- Public repos:   {pub_min:,.1f} min (free) · {pub_mb:,.1f} MB avg storage (free)",
         "- Artifacts:      retention defaults to 90 days; artifacts auto-expire.",
         "",
     ]

@@ -13,6 +13,28 @@ def has_visibility_split(actions: dict | None) -> bool:
     return bool(actions) and "private_minutes" in (actions or {})
 
 
+# Keys written by ``attach_actions_visibility_split`` — reserved for the
+# dedicated visibility export section (not the flat Actions dump).
+VISIBILITY_SPLIT_KEYS = frozenset(
+    {
+        "private_minutes",
+        "public_minutes",
+        "unattributed_minutes",
+        "private_minutes_percent",
+        "private_storage_gb_hours",
+        "public_storage_gb_hours",
+        "unattributed_storage_gb_hours",
+        "private_storage_avg_mb",
+        "public_storage_avg_mb",
+        "larger_runner_skus",
+        "internal_repo_count",
+        "reconciled",
+        "filtered",
+        "skus",
+    }
+)
+
+
 def annotate_sku_name(sku: str, item: dict | None = None) -> str:
     """Append `` *`` for larger-runner compute SKUs."""
     if classify_actions_sku(str(sku), item if isinstance(item, dict) else None) == "larger":

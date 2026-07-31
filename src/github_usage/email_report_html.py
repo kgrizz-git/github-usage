@@ -150,12 +150,14 @@ def _html_private_public_summary(by_vis: dict) -> list[str]:
     priv_min = float(priv.get("minutes", 0.0) or 0.0)
     pub_min = float(pub.get("minutes", 0.0) or 0.0)
     priv_mb = float(priv.get("storage_avg_mb", 0.0) or 0.0)
+    pub_mb = float(pub.get("storage_avg_mb", 0.0) or 0.0)
     pct = (priv_min / 2000.0 * 100.0) if priv_min else 0.0
     return [
         "<h2>Private vs public Actions</h2>",
         '<p class="visibility-tag">'
         f"Private: {priv_min:,.1f} min / 2,000 free ({pct:.0f}%) · "
-        f"{priv_mb:,.1f} MB avg · Public: {pub_min:,.1f} min (free)"
+        f"{priv_mb:,.1f} MB avg · Public: {pub_min:,.1f} min (free) · "
+        f"{pub_mb:,.1f} MB avg (free)"
         "</p>",
         '<p class="visibility-tag">Retention: 90 days default; artifacts auto-expire.</p>',
     ]
