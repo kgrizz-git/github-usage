@@ -23,6 +23,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **GitHub Actions `setup-python` v7:** Bump `actions/setup-python` from v6 to v7 in CI, security, email-report, and the email-report template (folds in Dependabot #7; no workflow input changes — this repo does not use the removed `pip-install` input).
 - **CodeRabbit auto-review disabled** via `.coderabbit.yaml` (`reviews.auto_review.enabled: false`). Request a review manually with `@coderabbitai review` on a PR.
 - **TUI default theme:** Textual TUI now uses the built-in **monokai** theme by default.
 - **TUI keyboard scrolling:** **j**/**k** scroll by line, **PgUp**/**PgDn** by page, **Ctrl+Home**/**Ctrl+End** jump to top/bottom of the active panel (works without mouse).
