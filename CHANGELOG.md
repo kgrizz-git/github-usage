@@ -36,6 +36,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **Email send confirmation omits recipient:** Success log is now `Email report sent.` (no address), so public GitHub Actions logs do not expose `REPORT_EMAIL` / `--to`.
 - **PR check noise for private-usage work:** Sources footer moved to `report_sources.py` with public doc URL literals; float zero-checks use `<= 0` for Sonar; CodeQL Sources-footer alerts dismissed as false positives. Split high-complexity private-usage renderers into smaller helpers. CSV flat Actions dump skips visibility-split keys; email visibility summaries include public storage; forecast filtered-scan flag renamed `filtered_empty_private` with public minutes still shown; `storage_analysis` None-guarded in summary insights.
 - **`usage_split` accuracy:** Same-SKU quantities across repos are summed (not overwritten); `private_storage_avg_mb` uses `gb_hours_to_avg_mb`; larger-runner detection passes the item dict so storage SKUs are not misclassified; `internal_repo_count` tracked for billing annotations; `load_cached_report` rejects non-current `CACHE_VERSION` wrappers.
 - **CodeQL clear-text-logging false positives:** Renamed `CI_SECRETS` → `CI_ACTIONS_ENTRIES` in `setup_ci.py` (prints only Actions secret *names*/descriptions, never values). Open `py/clear-text-logging-sensitive-data` alerts on intentional billing report output dismissed as false positives; secret scanning push protection enabled on the public repo.
