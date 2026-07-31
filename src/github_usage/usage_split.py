@@ -10,7 +10,7 @@ the plan's Resolved Decisions).
 
 from __future__ import annotations
 
-from .report_helpers import sanitize_item_amounts
+from .report_helpers import gb_hours_to_avg_mb, sanitize_item_amounts
 from .visibility import repo_visibility
 
 STANDARD_RUNNER_SKUS = frozenset(
@@ -99,6 +99,19 @@ def classify_actions_sku(sku: str, item: dict | None = None) -> str:
     return "standard" if is_standard_runner_sku(sku) else "larger"
 
 
+def _merge_sku_item(existing: dict | None, new_item: dict) -> dict:
+    """Sum quantity/amount fields when the same SKU appears across repos."""
+    sanitized = sanitize_item_amounts(new_item)
+    if not existing:
+        return sanitized
+    merged = dict(existing)
+    for key in ("grossQuantity", "grossAmount", "discountAmount", "netAmount"):
+        merged[key] = float(merged.get(key, 0.0) or 0.0) + float(sanitized.get(key, 0.0) or 0.0)
+    if not merged.get("unitType"):
+        merged["unitType"] = sanitized.get("unitType", "")
+    return merged
+
+
 def split_rows_by_visibility(
     rows: list[dict],
     *,
@@ -110,10 +123,14 @@ def split_rows_by_visibility(
     ``{visibility: {minutes, <storage_key>, skus: {...}}}``.
 
     Visibility resolution delegates to ``visibility.repo_visibility(row)``;
-    ``"internal"`` folds into ``"private"`` for billing purposes. Skips SKU
-    aggregation when ``sku_key`` is ``None``.
+    ``"internal"`` folds into ``"private"`` for billing purposes (with
+    ``internal_repo_count`` on the private bucket). Skips SKU aggregation when
+    ``sku_key`` is ``None``. Same-SKU quantities across repos are summed.
     """
-    out: dict[str, dict] = {"private": {"minutes": 0.0}, "public": {"minutes": 0.0}}
+    out: dict[str, dict] = {
+        "private": {"minutes": 0.0, "internal_repo_count": 0},
+        "public": {"minutes": 0.0},
+    }
     if storage_key is not None:
         out["private"][storage_key] = 0.0
         out["public"][storage_key] = 0.0
@@ -122,30 +139,34 @@ def split_rows_by_visibility(
         out["public"]["skus"] = {}
 
     for row in rows or []:
-        vis = repo_visibility(row)
-        if vis == "internal":
-            vis = "private"
+        raw_vis = repo_visibility(row)
+        vis = "private" if raw_vis == "internal" else raw_vis
         if vis not in out:
             out[vis] = {"minutes": 0.0}
             if storage_key is not None:
                 out[vis][storage_key] = 0.0
             if sku_key is not None:
                 out[vis]["skus"] = {}
+        if raw_vis == "internal":
+            out["private"]["internal_repo_count"] = (
+                int(out["private"].get("internal_repo_count", 0) or 0) + 1
+            )
         out[vis]["minutes"] += float(row.get(minutes_key, 0.0) or 0.0)
         if storage_key is not None:
             out[vis][storage_key] += float(row.get(storage_key, 0.0) or 0.0)
         if sku_key is not None:
             skus = row.get(sku_key) or {}
+            bucket = out[vis]["skus"]
             for sku, item in skus.items():
-                out[vis]["skus"][sku] = sanitize_item_amounts(item)
+                bucket[sku] = _merge_sku_item(bucket.get(sku), item)
     return out
 
 
 def _larger_runner_skus(split: dict[str, dict]) -> list[str]:
     seen: set[str] = set()
     for vis in ("private", "public"):
-        for sku in split.get(vis, {}).get("skus") or {}:
-            if classify_actions_sku(sku) == "larger":
+        for sku, item in (split.get(vis, {}).get("skus") or {}).items():
+            if classify_actions_sku(sku, item if isinstance(item, dict) else None) == "larger":
                 seen.add(sku)
     return sorted(seen)
 
@@ -156,7 +177,6 @@ def finalize_actions_split(
     account_minutes: float,
     account_storage_gb_hours: float,
     private_minutes_limit: float = _PRIVATE_MINUTES_LIMIT,
-    storage_limit_gb: float = _PRIVATE_STORAGE_LIMIT_GB,
     filtered: bool = False,
 ) -> dict:
     """Return the split augmented with ``unattributed`` (account minus scanned
@@ -164,6 +184,7 @@ def finalize_actions_split(
 
     Account totals are authoritative; ``unattributed`` absorbs the remainder.
     A negative remainder is clamped to 0 and ``reconciled`` is set false.
+    Storage avg-MB values use :func:`gb_hours_to_avg_mb` (not raw GB-hrs).
     """
     priv = split.get("private", {"minutes": 0.0})
     pub = split.get("public", {"minutes": 0.0})
@@ -180,9 +201,6 @@ def finalize_actions_split(
     unattributed_storage = max(0.0, account_storage_gb_hours - scanned_storage)
     reconciled_storage = scanned_storage <= account_storage_gb_hours
 
-    private_storage_avg_mb = private_storage  # GB-hrs over a full month ~ avg MB scaling
-    public_storage_avg_mb = public_storage
-
     pct = (private_minutes / private_minutes_limit * 100.0) if private_minutes_limit else 0.0
 
     return {
@@ -193,8 +211,9 @@ def finalize_actions_split(
         "private_storage_gb_hours": private_storage,
         "public_storage_gb_hours": public_storage,
         "unattributed_storage_gb_hours": unattributed_storage,
-        "private_storage_avg_mb": private_storage_avg_mb,
-        "public_storage_avg_mb": public_storage_avg_mb,
+        "private_storage_avg_mb": gb_hours_to_avg_mb(private_storage),
+        "public_storage_avg_mb": gb_hours_to_avg_mb(public_storage),
+        "internal_repo_count": int(priv.get("internal_repo_count", 0) or 0),
         "larger_runner_skus": _larger_runner_skus(split),
         "filtered": filtered,
         "reconciled": reconciled and reconciled_storage,

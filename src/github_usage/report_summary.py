@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from .billing import get_premium_request_usage
-from .report_helpers import fmt_price, gb_hours_to_avg_mb
+from .report_actions_limits import _print_usage_by_visibility
+from .report_helpers import fmt_price
+from .report_summary_insights import (
+    _print_impactful_findings,
+    _print_recommendations,
+    _print_utilization,
+)
 from .terminal import print_section
 from .visibility import repo_visibility, visibility_label
 
@@ -115,11 +121,15 @@ def render_final_summary_from_data(data: dict) -> None:
         (actions_net or 0) + (copilot_summary["total_net"] if copilot_summary else 0) + lfs_net
     )
     _print_cost_overview(total_gross, total_discount, total_net)
+    if "private_minutes" in actions:
+        print("  1.5 PRIVATE vs PUBLIC ACTIONS")
+        print(f"  {'─' * 55}")
+        _print_usage_by_visibility(actions)
     _print_top_consumers(
         user_minutes, actions_gross, repo_data, premium_by_model, lfs_summary, visibility_by_repo
     )
     _print_storage_breakdown(storage_analysis)
-    _print_utilization(user_minutes, user_storage_gb_hours)
+    _print_utilization(user_minutes, user_storage_gb_hours, actions=actions)
     _print_impactful_findings(
         user_minutes,
         actions_gross,
@@ -130,6 +140,7 @@ def render_final_summary_from_data(data: dict) -> None:
         premium_by_model,
         storage_analysis,
         visibility_by_repo,
+        actions=actions,
     )
     _print_recommendations(
         user_minutes,
@@ -138,6 +149,7 @@ def render_final_summary_from_data(data: dict) -> None:
         lfs_summary,
         storage_analysis,
         visibility_by_repo,
+        actions=actions,
     )
 
 
@@ -253,162 +265,3 @@ def _print_storage_breakdown(storage_analysis):
         print()
     else:
         print("    No storage data available from repositories.\n")
-
-
-def _print_utilization(user_minutes, user_storage_gb_hours):
-    print("  4. RESOURCE UTILIZATION vs LIMITS")
-    print(f"  {'─' * 55}")
-
-    # Actions minutes
-    free_min_limit = 2000
-    min_pct = min(100, ((user_minutes or 0) / free_min_limit * 100) if (user_minutes or 0) else 0)
-    bar_len = 40
-    min_filled = int(min_pct / 100 * bar_len)
-    print(
-        f"\n    Actions Minutes:     {(user_minutes or 0):>8.1f} / {free_min_limit} min ({min_pct:.1f}% of free tier)"
-    )
-    print(f"    {'█' * min_filled}{'░' * (bar_len - min_filled)}")
-    if min_pct > 80:
-        print("    ⚠ HIGH USAGE — approaching free tier limit!")
-    elif min_pct > 50:
-        print("    → Moderate usage — on track to use half your free allowance")
-    print()
-
-    # Actions storage
-    free_storage_mb = 500
-    avg_storage_mb = gb_hours_to_avg_mb(user_storage_gb_hours) if user_storage_gb_hours else 0
-    storage_pct = min(100, (avg_storage_mb / free_storage_mb * 100) if free_storage_mb > 0 else 0)
-    storage_filled = int(storage_pct / 100 * bar_len)
-    print(
-        f"    Actions Storage:     {avg_storage_mb:>8.1f} / {free_storage_mb} MB ({storage_pct:.1f}% of free tier)"
-    )
-    print(f"    {'█' * storage_filled}{'░' * (bar_len - storage_filled)}")
-    if storage_pct > 80:
-        print("    ⚠ HIGH USAGE — approaching free tier limit!")
-    elif storage_pct > 50:
-        print("    → Moderate usage — on track to use half your free allowance")
-    print()
-
-
-def _print_impactful_findings(
-    user_minutes,
-    actions_gross,
-    total_gross,
-    total_discount,
-    total_net,
-    repo_data,
-    premium_by_model,
-    storage_analysis,
-    visibility_by_repo=None,
-):
-    print("  5. TOP 3 MOST IMPACTFUL FINDINGS")
-    print(f"  {'─' * 55}")
-
-    findings = []
-    sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True) if repo_data else []
-    sorted_by_cost = sorted(repo_data, key=lambda x: x[4], reverse=True) if repo_data else []
-    sorted_by_storage = sorted(
-        storage_analysis.get("repos", []), key=lambda x: x["total_storage"], reverse=True
-    )
-
-    if sorted_repos:
-        top_repo = sorted_repos[0]
-        pct_of_total = top_repo[1] / user_minutes * 100 if user_minutes else 0
-        findings.append(
-            f"Biggest Actions consumer: {_repo_label(top_repo[0], visibility_by_repo)} at {top_repo[1]:.0f} min ({pct_of_total:.1f}% of total)"
-        )
-
-    if sorted_by_cost:
-        top_cost = sorted_by_cost[0]
-        pct_cost = top_cost[4] / actions_gross * 100 if actions_gross else 0
-        findings.append(
-            f"Highest Actions cost: {_repo_label(top_cost[0], visibility_by_repo)} at {fmt_price(top_cost[4])} ({pct_cost:.1f}% of total)"
-        )
-
-    if sorted_by_storage:
-        top_st = sorted_by_storage[0]
-        total_gb = top_st["total_storage"]
-        size_str = f"{total_gb:.2f} GB" if total_gb >= 1 else f"{total_gb * 1024:.0f} MB"
-        st_label = f"{top_st['name']}{visibility_label(repo_visibility(top_st))}"
-        findings.append(f"Biggest storage consumer: {st_label} ({size_str})")
-
-    if premium_by_model:
-        top_model = max(premium_by_model.items(), key=lambda x: x[1]["total_requests"])
-        findings.append(
-            f"Most-used Copilot model: {top_model[0]} with {top_model[1]['total_requests']:.0f} requests"
-        )
-
-    if (total_discount or 0) > 0 and (total_gross or 0) > 0:
-        findings.append(
-            f"Monthly savings from discounts: {fmt_price(total_discount or 0)} ({(total_discount or 0) / (total_gross or 0) * 100:.1f}% off gross)"
-        )
-
-    if (total_net or 0) > 0 and (user_minutes or 0) > 0:
-        cost_per_min = (total_net or 0) / (user_minutes or 0)
-        findings.append(
-            f"Effective cost per Actions minute: {fmt_price(cost_per_min)} (all products averaged)"
-        )
-
-    for i, finding in enumerate(findings[:3], 1):
-        print(f"\n    {i}. {finding}")
-    print()
-
-
-def _print_recommendations(
-    user_minutes,
-    repo_data,
-    premium_by_model,
-    lfs_summary,
-    storage_analysis,
-    visibility_by_repo=None,
-):
-    print("  6. QUICK RECOMMENDATIONS")
-    print(f"  {'─' * 55}")
-    recs = []
-
-    free_min_limit = 2000
-    min_pct = ((user_minutes or 0) / free_min_limit * 100) if (user_minutes or 0) else 0
-    if min_pct > 80:
-        recs.append(
-            "Upgrade from free tier or optimize Actions workflows — you're near your minute limit."
-        )
-
-    sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True) if repo_data else []
-    if sorted_repos and len(sorted_repos) > 1 and (user_minutes or 0) > 0:
-        top2_sum = sorted_repos[0][1] + sorted_repos[1][1]
-        if top2_sum / (user_minutes or 0) * 100 > 70:
-            recs.append(
-                f"Top 2 repos consume {top2_sum / (user_minutes or 0) * 100:.0f}% of Actions — consider self-hosted runners to save."
-            )
-
-    if premium_by_model:
-        models = list(premium_by_model.keys())
-        if len(models) > 2:
-            recs.append(
-                f"Using {len(models)} Copilot models — consolidate to reduce cost complexity."
-            )
-
-    if lfs_summary and (lfs_summary.get("total_gross", 0) or 0) > 0:
-        recs.append("Review Git LFS usage — large binaries add up quickly at ~$1/GB.")
-
-    sorted_by_storage = sorted(
-        storage_analysis.get("repos", []), key=lambda x: x["total_storage"], reverse=True
-    )
-    if sorted_by_storage:
-        top_st = sorted_by_storage[0]
-        items = top_st.get("items", [])
-        release_assets = [a for a in items if a["type"] == "Release Asset"]
-        if release_assets:
-            total_release_size = sum(a["storage"] for a in release_assets)
-            if total_release_size > 0.1:  # 100MB in GB
-                st_label = f"{top_st['name']}{visibility_label(repo_visibility(top_st))}"
-                recs.append(
-                    f"Release assets in {st_label} use {total_release_size:.2f} GB — consider using GitHub Pages or external storage for large binaries."
-                )
-
-    if not recs:
-        recs.append("Usage is well within free tiers — no immediate action needed.")
-        recs.append("Consider enabling cost alerts in GitHub billing settings.")
-    for i, rec in enumerate(recs, 1):
-        print(f"\n    {i}. {rec}")
-    print()

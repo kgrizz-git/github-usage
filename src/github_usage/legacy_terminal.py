@@ -18,6 +18,7 @@ from .report_products import (
     render_gitlfs_summary,
     render_monthly_costs,
 )
+from .report_storage import render_artifact_storage_section
 from .report_summary import render_final_summary_from_data
 
 
@@ -44,6 +45,13 @@ def render_legacy_report(
         _print_section_error("Actions", errors, "actions")
     else:
         render_actions_summary(data.get("actions"))
+
+    render_artifact_storage_section(
+        data.get("storage_analysis"),
+        data.get("actions"),
+        data.get("repo_actions") or [],
+        reference_date=reference_date,
+    )
 
     render_repo_actions_table(data.get("repo_actions") or [])
     render_actions_top_consumers(data.get("repo_actions") or [])
@@ -74,6 +82,21 @@ def render_legacy_report(
             reference_date=reference_date,
         )
     render_what_else(str(data.get("username", "?")))
+
+    sources = data.get("sources") or {}
+    if sources:
+        print()
+        print("Sources:")
+        print(
+            "  · Actions billing & free tier (private 2,000 min / 500 MB; "
+            "public standard runners free; larger runners always billed):"
+        )
+        print(f"    {sources.get('actions_billing', '')}")
+        print(f"  · Runner pricing & larger-runner SKUs: {sources.get('runner_pricing', '')}")
+        print(
+            f"  · Release assets (separate, ≤2 GiB/file, no quota): "
+            f"{sources.get('releases_storage', '')}"
+        )
 
     print("=" * 70)
     print("  End of Report v3")

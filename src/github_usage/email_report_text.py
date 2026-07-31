@@ -102,6 +102,26 @@ def _format_monthly_costs_section(data: dict) -> list[str]:
     return lines
 
 
+def _visibility_usage_summary_lines(consumers: dict) -> list[str]:
+    """Private/public totals block prepended above grouped consumer lists."""
+    by_vis = consumers.get("by_visibility")
+    if not by_vis:
+        return []
+    priv = by_vis.get("private") or {}
+    pub = by_vis.get("public") or {}
+    priv_min = float(priv.get("minutes", 0.0) or 0.0)
+    pub_min = float(pub.get("minutes", 0.0) or 0.0)
+    priv_mb = float(priv.get("storage_avg_mb", 0.0) or 0.0)
+    pct = (priv_min / 2000.0 * 100.0) if priv_min else 0.0
+    return [
+        "Private vs public Actions (scanned repos)",
+        f"- Private repos:  {priv_min:,.1f} min / 2,000 free ({pct:.0f}%) · {priv_mb:,.1f} MB avg storage",
+        f"- Public repos:   {pub_min:,.1f} min (free)",
+        "- Artifacts:      retention defaults to 90 days; artifacts auto-expire.",
+        "",
+    ]
+
+
 def _format_consumers_section(data: dict) -> list[str]:
     consumers = data.get("repo_consumers")
     if not consumers:
@@ -133,6 +153,7 @@ def _format_consumers_section(data: dict) -> list[str]:
         )
 
     lines: list[str] = []
+    lines.extend(_visibility_usage_summary_lines(consumers))
     lines.extend(
         _grouped_list(
             "Top Repositories by Actions Minutes",
@@ -321,5 +342,17 @@ def format_report_email(
     notes = estimate.get("notes") or []
     if notes:
         lines.extend(["REST API Quota Notes", *[f"- {note}" for note in notes], ""])
+
+    sources = data.get("sources") or {}
+    if sources:
+        lines.extend(
+            [
+                "Sources",
+                f"- Actions billing: {sources.get('actions_billing', '')}",
+                f"- Runner pricing: {sources.get('runner_pricing', '')}",
+                f"- Release assets: {sources.get('releases_storage', '')}",
+                "",
+            ]
+        )
 
     return "\n".join(lines).rstrip() + "\n"

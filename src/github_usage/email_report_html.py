@@ -165,6 +165,24 @@ def _format_html_consumers_section(data: dict) -> list[str]:
         )
 
     parts: list[str] = []
+    by_vis = consumers.get("by_visibility")
+    if by_vis:
+        priv = by_vis.get("private") or {}
+        pub = by_vis.get("public") or {}
+        priv_min = float(priv.get("minutes", 0.0) or 0.0)
+        pub_min = float(pub.get("minutes", 0.0) or 0.0)
+        priv_mb = float(priv.get("storage_avg_mb", 0.0) or 0.0)
+        pct = (priv_min / 2000.0 * 100.0) if priv_min else 0.0
+        parts.extend(
+            [
+                "<h2>Private vs public Actions</h2>",
+                '<p class="visibility-tag">'
+                f"Private: {priv_min:,.1f} min / 2,000 free ({pct:.0f}%) · "
+                f"{priv_mb:,.1f} MB avg · Public: {pub_min:,.1f} min (free)"
+                "</p>",
+                '<p class="visibility-tag">Retention: 90 days default; artifacts auto-expire.</p>',
+            ]
+        )
     parts.extend(
         _grouped_table(
             "Top Repositories by Actions Minutes",
@@ -412,6 +430,22 @@ def format_html_report(
         parts.append("<ul>")
         for note in notes:
             parts.append(f"<li>{html.escape(note)}</li>")
+        parts.append("</ul>")
+
+    sources = data.get("sources") or {}
+    if sources:
+        parts.append('<h2>Sources</h2><ul class="visibility-tag">')
+        for key, label in (
+            ("actions_billing", "Actions billing"),
+            ("runner_pricing", "Runner pricing"),
+            ("releases_storage", "Release assets"),
+        ):
+            url = sources.get(key)
+            if url:
+                parts.append(
+                    f"<li>{html.escape(label)}: "
+                    f'<a href="{html.escape(str(url))}">{html.escape(str(url))}</a></li>'
+                )
         parts.append("</ul>")
 
     parts.append(_HTML_DOCUMENT_TAIL)

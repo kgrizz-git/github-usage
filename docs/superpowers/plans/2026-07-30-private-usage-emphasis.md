@@ -1,6 +1,15 @@
-> **Status:** IN PROGRESS
+> **Status:** IN PROGRESS (Phases 1–5 largely complete; Phase 6 exports / Phase 7 TUI / README polish remaining)
 
 > Line numbers are accurate as of 2026-07-30; relocate by anchor (function name + dict key) if they drift.
+>
+> **Implementation log:**
+> - **Done:** 2026-07-30 — Phase 1 complete. `src/github_usage/usage_split.py` created with runner-SKU classification, visibility split, finalize/unattributed, storage allowance helpers, `REPORT_SOURCES`, `attach_actions_visibility_split`. `tests/test_usage_split.py`. Committed `6af1e0d`. Deviation: std SKU check compares raw lowercased form against `STANDARD_RUNNER_SKUS`; `normalize_sku` for alias display only. Module grew past the ~150-line target (helpers justified).
+> - **Done:** 2026-07-31 — Phase 1/3 audit fixes: SKU quantities **summed** across repos; `private_storage_avg_mb` via `gb_hours_to_avg_mb`; `_larger_runner_skus` passes item dict; `internal_repo_count`; `load_cached_report` rejects stale `CACHE_VERSION`; fragile empty-repos test replaced.
+> - **Done:** 2026-07-31 — Phase 3 complete. 3a `by_visibility` on `get_repo_consumers`; 3b `attach_actions_visibility_split` in `build_legacy_report_data`; 3d `CACHE_VERSION=2` + load-time version check. Builder tests pass.
+> - **Done:** 2026-07-31 — Phase 2a–2d/2g (+ partial 8a/8b): `storage.py` adds artifact expiry/retention rollups + `artifact_storage_gb`/`release_storage_gb`; `storage_summary` + `sources` on legacy report; `report_storage.py` (`render_artifact_storage_section`, `build_storage_summary`); sources footer in `legacy_terminal`.
+> - **Done:** 2026-07-31 — Phase 4a/4b (`report_actions_limits.py`: Usage by Visibility + private Limits Summary + larger-runner `*`); 4c/4d (`report_summary_insights.py`: private utilization bars, visibility subsection, private recommendations, larger-runner/expiry findings); 4f forecast feeds private minutes/storage + public extras.
+> - **Done:** 2026-07-31 — Phase 5a/5b/5c (+ email sources): email text/HTML prepend private-vs-public summary when `by_visibility` present; warnings use `private_minutes_percent`; insights prepend private-quota message; Sources footer on email bodies; `build_report_data` attaches `sources`.
+> - **Remaining:** Phase 6 exports; Phase 7 TUI rows; Phase 8c/8d README polish; Phase 9 confirmation; Phase 11 README detail; full `scripts/check` / smoke / docs-check.
 
 # Private Usage Emphasis & Runner-SKU Classification
 
@@ -37,7 +46,7 @@ Compute a **private / public / unattributed** split of Actions minutes, storage,
 
 ---
 
-## Phase 1 — New module `src/github_usage/usage_split.py`
+## Phase 1 — New module `src/github_usage/usage_split.py`  · **Done** 2026-07-30 (commit 6af1e0d)
 
 Small, pure, dependency-light module (target: under ~150 lines). Imports only `report_helpers` helpers if needed.
 
@@ -115,7 +124,7 @@ def finalize_actions_split(
 
 ---
 
-## Phase 2 — Artifact storage & retention coverage
+## Phase 2 — Artifact storage & retention coverage  · **Done** 2026-07-31 (2a–2d/2g; 2e covered via Phase 4 limits/utilization; 2f email/exports deferred to Phases 5–6)
 
 ### 2a. Storage framing (constants + helpers)
 
@@ -221,7 +230,7 @@ Per-repo rows merge `storage_analysis` (current MB, counts, expiry) with `repo_a
 
 ---
 
-## Phase 3 — Data wiring
+## Phase 3 — Data wiring  · **Done** 2026-07-31 (3a/3b/3d; 3c N/A as planned)
 
 ### 3a. Email path: `get_repo_consumers()` (`report_optional.py:22`)
 
@@ -258,7 +267,7 @@ The report dict shape changes. Bump `CACHE_VERSION` (`report_cache.py:27`) from 
 
 ---
 
-## Phase 4 — Terminal rendering (legacy report)
+## Phase 4 — Terminal rendering (legacy report)  · **Mostly done** 2026-07-31 (4a/4b/4c/4d/4f; 4e N/A)
 
 ### 4a. `render_actions_summary()` (`report_actions.py:212`) and legacy `show_actions_summary()` (`report_actions.py:16`)
 

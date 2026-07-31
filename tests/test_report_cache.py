@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from github_usage.report_cache import (
+    CACHE_VERSION,
     cache_entry_path,
     email_cache_params,
     is_cache_fresh,
@@ -120,6 +121,41 @@ class ReportCacheTests(unittest.TestCase):
             loaded, _username, hit = load_cached_report(
                 paths,
                 kind="email",
+                token=token,
+                params=params,
+                max_age_seconds=3600,
+            )
+            self.assertFalse(hit.from_cache)
+            self.assertIsNone(loaded)
+
+    def test_stale_cache_version_is_miss(self) -> None:
+        """v1 (or any non-current) wrappers must not load after CACHE_VERSION bump."""
+        import json
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            paths = _paths(root)
+            token = "fake-token"
+            params = legacy_cache_params(max_repos=100)
+            path = cache_entry_path(paths, kind="legacy", token=token, params=params)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(
+                    {
+                        "version": CACHE_VERSION - 1,
+                        "kind": "legacy",
+                        "username": "octocat",
+                        "params": params,
+                        "cached_at": datetime.now(tz=UTC).isoformat().replace("+00:00", "Z"),
+                        "data": {"actions": {"minutes": 99.0}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            loaded, _username, hit = load_cached_report(
+                paths,
+                kind="legacy",
                 token=token,
                 params=params,
                 max_age_seconds=3600,

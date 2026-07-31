@@ -12,6 +12,7 @@ from .report_optional import (
     get_release_asset_details,
     get_repo_consumers,
 )
+from .usage_split import REPORT_SOURCES
 from .visibility import filter_repos_by_visibility, repo_visibility, visibility_label
 
 
@@ -162,7 +163,10 @@ def _single_warning_state(report_data: dict, warn_over: str) -> list[str]:
         actions = report_data.get("actions")
         if not actions:
             return ["Percentage warning threshold skipped: Actions data not included in report."]
-        usage = float(actions.get("minutes_percent", 0.0))
+        if actions.get("private_minutes_percent") is not None:
+            usage = float(actions.get("private_minutes_percent") or 0.0)
+        else:
+            usage = float(actions.get("minutes_percent") or 0.0)
         if usage > threshold:
             return [f"Actions minutes usage is {usage:.1f}%, above the {threshold:.1f}% threshold."]
         return []
@@ -199,6 +203,12 @@ def get_key_insights(report_data: dict) -> list[str]:
     """Return up to three plain-English insight strings derived from report_data."""
     insights = []
     actions = report_data.get("actions")
+    if actions and actions.get("private_minutes_percent") is not None:
+        pct = float(actions.get("private_minutes_percent") or 0.0)
+        if pct >= 100:
+            insights.append(
+                f"Private repos used {pct:.0f}% of the 2,000 free Actions minutes this month."
+            )
     consumers = report_data.get("repo_consumers")
     if actions and consumers and consumers.get("by_minutes"):
         top = consumers["by_minutes"][0]
@@ -356,4 +366,5 @@ def build_report_data(
 
     report["insights"] = get_key_insights(report)
     report["warnings"] = get_warning_state(report, warn_over)
+    report["sources"] = dict(REPORT_SOURCES)
     return report

@@ -106,31 +106,68 @@ class SplitRowsByVisibilityTests(unittest.TestCase):
                 "private",
                 minutes=100.0,
                 gb_hours=1.0,
-                sku={"actions_linux": {"unitType": "minutes"}},
+                sku={"actions_linux": {"unitType": "minutes", "grossQuantity": 100.0}},
             ),
             self._row(
                 "b",
                 "internal",
                 minutes=50.0,
                 gb_hours=2.0,
-                sku={"actions_macos": {"unitType": "minutes"}},
+                sku={"actions_macos": {"unitType": "minutes", "grossQuantity": 50.0}},
             ),
             self._row(
                 "c",
                 "public",
                 minutes=200.0,
                 gb_hours=3.0,
-                sku={"linux_4_core": {"unitType": "minutes"}},
+                sku={"linux_4_core": {"unitType": "minutes", "grossQuantity": 200.0}},
             ),
         ]
         out = split_rows_by_visibility(rows)
         # internal folds into private (decisions #1)
         self.assertEqual(out["private"]["minutes"], 150.0)
         self.assertEqual(out["private"]["storage_gb_hours"], 3.0)
+        self.assertEqual(out["private"]["internal_repo_count"], 1)
         self.assertEqual(out["public"]["minutes"], 200.0)
         self.assertEqual(out["public"]["storage_gb_hours"], 3.0)
         self.assertIn("actions_linux", out["private"]["skus"])
         self.assertIn("linux_4_core", out["public"]["skus"])
+
+    def test_sums_same_sku_across_repos(self) -> None:
+        """Same SKU on two private repos must sum quantities, not overwrite."""
+        rows = [
+            self._row(
+                "a",
+                "private",
+                minutes=10.0,
+                sku={
+                    "actions_linux": {
+                        "unitType": "minutes",
+                        "grossQuantity": 10.0,
+                        "grossAmount": 1.0,
+                        "netAmount": 1.0,
+                    }
+                },
+            ),
+            self._row(
+                "b",
+                "private",
+                minutes=25.0,
+                sku={
+                    "actions_linux": {
+                        "unitType": "minutes",
+                        "grossQuantity": 25.0,
+                        "grossAmount": 2.5,
+                        "netAmount": 2.5,
+                    }
+                },
+            ),
+        ]
+        out = split_rows_by_visibility(rows)
+        linux = out["private"]["skus"]["actions_linux"]
+        self.assertEqual(linux["grossQuantity"], 35.0)
+        self.assertEqual(linux["grossAmount"], 3.5)
+        self.assertEqual(linux["netAmount"], 3.5)
 
     def test_no_sku_key(self) -> None:
         rows = [self._row("a", "private", minutes=10.0), self._row("b", "public", minutes=20.0)]
@@ -190,6 +227,49 @@ class FinalizeActionsSplitTests(unittest.TestCase):
         out = finalize_actions_split(split, account_minutes=10.0, account_storage_gb_hours=0.0)
         self.assertIn("linux_4_core", out["larger_runner_skus"])
         self.assertIn("linux_4_core_arm", out["larger_runner_skus"])
+
+    def test_storage_sku_not_flagged_as_larger_runner(self) -> None:
+        """gigabyte-hours items must not appear in larger_runner_skus."""
+        split = {
+            "private": {
+                "minutes": 0.0,
+                "storage_gb_hours": 5.0,
+                "skus": {
+                    "actions_storage": {"unitType": "gigabyte-hours", "grossQuantity": 5.0},
+                    "linux_4_core": {"unitType": "minutes", "grossQuantity": 1.0},
+                },
+            },
+            "public": {"minutes": 0.0, "storage_gb_hours": 0.0, "skus": {}},
+        }
+        out = finalize_actions_split(split, account_minutes=1.0, account_storage_gb_hours=5.0)
+        self.assertEqual(out["larger_runner_skus"], ["linux_4_core"])
+        self.assertNotIn("actions_storage", out["larger_runner_skus"])
+
+    def test_storage_avg_mb_uses_gb_hours_conversion(self) -> None:
+        from github_usage.report_helpers import gb_hours_to_avg_mb
+
+        split = {
+            "private": {"minutes": 0.0, "storage_gb_hours": 360.0, "skus": {}},
+            "public": {"minutes": 0.0, "storage_gb_hours": 72.0, "skus": {}},
+        }
+        out = finalize_actions_split(split, account_minutes=0.0, account_storage_gb_hours=432.0)
+        self.assertAlmostEqual(out["private_storage_avg_mb"], gb_hours_to_avg_mb(360.0))
+        self.assertAlmostEqual(out["public_storage_avg_mb"], gb_hours_to_avg_mb(72.0))
+        # Must not treat GB-hrs as if they were already MB.
+        self.assertNotEqual(out["private_storage_avg_mb"], 360.0)
+
+    def test_internal_repo_count_passed_through(self) -> None:
+        split = {
+            "private": {
+                "minutes": 10.0,
+                "storage_gb_hours": 0.0,
+                "skus": {},
+                "internal_repo_count": 2,
+            },
+            "public": {"minutes": 0.0, "storage_gb_hours": 0.0, "skus": {}},
+        }
+        out = finalize_actions_split(split, account_minutes=10.0, account_storage_gb_hours=0.0)
+        self.assertEqual(out["internal_repo_count"], 2)
 
     def test_filtered_flag(self) -> None:
         split = {

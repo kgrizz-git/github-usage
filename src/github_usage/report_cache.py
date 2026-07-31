@@ -24,7 +24,7 @@ from .export_json import _DatetimeEncoder
 from .setup_config import SetupPaths
 
 DEFAULT_CACHE_MAX_AGE_SECONDS = 3600
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 
 def cache_disabled() -> bool:
@@ -188,6 +188,11 @@ def load_cached_report(
     try:
         wrapper = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        return None, None, miss
+
+    # Shape changes bump CACHE_VERSION; reject older wrappers so stale
+    # snapshots (missing visibility-split keys, etc.) are never reused.
+    if wrapper.get("version") != CACHE_VERSION:
         return None, None, miss
 
     cached_at = str(wrapper.get("cached_at", ""))
