@@ -26,7 +26,7 @@ def _print_utilization(user_minutes, user_storage_gb_hours, *, actions: dict | N
         actions.get("private_minutes", user_minutes) if has_split else (user_minutes or 0)
     )
     public_min = float(actions.get("public_minutes", 0.0) or 0.0)
-    skip_quota = filtered and has_split and private_min == 0.0
+    skip_quota = filtered and has_split and private_min <= 0
 
     free_min_limit = 2000
     bar_len = 40
@@ -197,7 +197,7 @@ def _print_recommendations(
     private_min = (
         float(actions.get("private_minutes") or 0.0) if has_split else float(user_minutes or 0)
     )
-    skip_private_quota = filtered and has_split and private_min == 0.0
+    skip_private_quota = filtered and has_split and private_min <= 0
 
     free_min_limit = 2000
     if not skip_private_quota and has_split and private_min > free_min_limit:
@@ -222,8 +222,12 @@ def _print_recommendations(
     if sorted_repos and len(sorted_repos) > 1 and basis_minutes > 0:
         top2_sum = sorted_repos[0][1] + sorted_repos[1][1]
         if top2_sum / basis_minutes * 100 > 70:
+            top_labels = ", ".join(
+                _repo_label(str(row[0]), visibility_by_repo) for row in sorted_repos[:2]
+            )
             recs.append(
-                f"Top 2 repos consume {top2_sum / basis_minutes * 100:.0f}% of Actions — "
+                f"Top 2 repos ({top_labels}) consume "
+                f"{top2_sum / basis_minutes * 100:.0f}% of Actions — "
                 "consider self-hosted runners to save."
             )
 

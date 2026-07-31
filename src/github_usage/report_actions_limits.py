@@ -112,7 +112,7 @@ def render_limits_summary(actions: dict | None, *, reference_date=None) -> None:
     print_section(title)
 
     # Suppress quota math for --only-public (filtered + no private minutes).
-    skip_quota = filtered and has_split and private_min == 0.0
+    skip_quota = filtered and has_split and private_min <= 0
 
     if skip_quota:
         print("  Actions Minutes (private repos only):")

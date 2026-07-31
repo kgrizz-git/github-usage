@@ -39,7 +39,7 @@ def build_report_forecast(
         storage_avg_mb = float(actions.get("storage_avg_mb") or 0.0)
     # Under --only-public (filtered + no private), do not project against the
     # free-tier limit — a partial empty private slice is not quota pressure.
-    if actions.get("filtered") and float(actions.get("private_minutes") or 0.0) == 0.0:
+    if actions.get("filtered") and float(actions.get("private_minutes") or 0.0) <= 0:
         minutes = 0.0
         storage_avg_mb = 0.0
     minutes_limit = float(actions.get("minutes_limit") or 2000)
@@ -73,6 +73,6 @@ def build_report_forecast(
         projected_gb = private_gb * ratio
         forecast["private_gb_hours_projected"] = projected_gb
         forecast["flat_equivalent_mb"] = flat_equivalent_gb_hours(projected_gb, dim) * 1024.0
-    if actions.get("filtered") and float(actions.get("private_minutes") or 0.0) == 0.0:
+    if actions.get("filtered") and float(actions.get("private_minutes") or 0.0) <= 0:
         forecast["scanned_private_only"] = True
     return forecast
