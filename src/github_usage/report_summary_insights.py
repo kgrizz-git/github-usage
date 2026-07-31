@@ -194,6 +194,74 @@ def _consumer_findings(
     return findings
 
 
+def _larger_runner_findings(actions: dict) -> list[str]:
+    larger = list(actions.get("larger_runner_skus") or [])
+    if not larger:
+        return []
+    return [
+        "Larger-runner SKU(s) detected: "
+        + ", ".join(larger)
+        + " — always billed regardless of repo visibility."
+    ]
+
+
+def _copilot_model_findings(premium_by_model) -> list[str]:
+    if not premium_by_model:
+        return []
+    top_model = max(premium_by_model.items(), key=lambda x: x[1]["total_requests"])
+    return [
+        f"Most-used Copilot model: {top_model[0]} with "
+        f"{top_model[1]['total_requests']:.0f} requests"
+    ]
+
+
+def _discount_savings_findings(total_discount, total_gross) -> list[str]:
+    discount = total_discount or 0
+    gross = total_gross or 0
+    if discount <= 0 or gross <= 0:
+        return []
+    return [
+        f"Monthly savings from discounts: {fmt_price(discount)} "
+        f"({discount / gross * 100:.1f}% off gross)"
+    ]
+
+
+def _cost_per_minute_findings(total_net, user_minutes) -> list[str]:
+    net = total_net or 0
+    minutes = user_minutes or 0
+    if net <= 0 or minutes <= 0:
+        return []
+    return [
+        f"Effective cost per Actions minute: {fmt_price(net / minutes)} (all products averaged)"
+    ]
+
+
+def _collect_impactful_findings(
+    user_minutes,
+    actions_gross,
+    total_gross,
+    total_discount,
+    total_net,
+    repo_data,
+    premium_by_model,
+    storage_analysis,
+    visibility_by_repo,
+    actions: dict,
+) -> list[str]:
+    findings: list[str] = []
+    findings.extend(_larger_runner_findings(actions))
+    findings.extend(_artifact_expiry_findings(storage_analysis))
+    findings.extend(
+        _consumer_findings(
+            user_minutes, actions_gross, repo_data, storage_analysis, visibility_by_repo
+        )
+    )
+    findings.extend(_copilot_model_findings(premium_by_model))
+    findings.extend(_discount_savings_findings(total_discount, total_gross))
+    findings.extend(_cost_per_minute_findings(total_net, user_minutes))
+    return findings
+
+
 def _print_impactful_findings(
     user_minutes,
     actions_gross,
@@ -209,37 +277,18 @@ def _print_impactful_findings(
 ):
     print("  5. TOP 3 MOST IMPACTFUL FINDINGS")
     print(f"  {'─' * 55}")
-    findings: list[str] = []
-    actions = actions or {}
-    larger = list(actions.get("larger_runner_skus") or [])
-    if larger:
-        findings.append(
-            "Larger-runner SKU(s) detected: "
-            + ", ".join(larger)
-            + " — always billed regardless of repo visibility."
-        )
-    findings.extend(_artifact_expiry_findings(storage_analysis))
-    findings.extend(
-        _consumer_findings(
-            user_minutes, actions_gross, repo_data, storage_analysis, visibility_by_repo
-        )
+    findings = _collect_impactful_findings(
+        user_minutes,
+        actions_gross,
+        total_gross,
+        total_discount,
+        total_net,
+        repo_data,
+        premium_by_model,
+        storage_analysis,
+        visibility_by_repo,
+        actions or {},
     )
-    if premium_by_model:
-        top_model = max(premium_by_model.items(), key=lambda x: x[1]["total_requests"])
-        findings.append(
-            f"Most-used Copilot model: {top_model[0]} with "
-            f"{top_model[1]['total_requests']:.0f} requests"
-        )
-    if (total_discount or 0) > 0 and (total_gross or 0) > 0:
-        findings.append(
-            f"Monthly savings from discounts: {fmt_price(total_discount or 0)} "
-            f"({(total_discount or 0) / (total_gross or 0) * 100:.1f}% off gross)"
-        )
-    if (total_net or 0) > 0 and (user_minutes or 0) > 0:
-        cost_per_min = (total_net or 0) / (user_minutes or 0)
-        findings.append(
-            f"Effective cost per Actions minute: {fmt_price(cost_per_min)} (all products averaged)"
-        )
     for i, finding in enumerate(findings[:3], 1):
         print(f"\n    {i}. {finding}")
     print()
@@ -307,6 +356,73 @@ def _release_asset_recommendation(storage_analysis: dict | None) -> list[str]:
     ]
 
 
+def _private_storage_recommendation(
+    actions: dict, *, has_split: bool, skip_private_quota: bool
+) -> list[str]:
+    if not has_split or skip_private_quota:
+        return []
+    private_gb = float(actions.get("private_storage_gb_hours", 0.0) or 0.0)
+    allowance = storage_allowance_gb_hours(days_in_month())
+    if not allowance or private_gb <= 0.8 * allowance:
+        return []
+    return [
+        "Private artifact accrual is over 80% of the monthly GB-hrs allowance — "
+        "clean up artifacts or reduce retention (Settings → Actions → General)."
+    ]
+
+
+def _copilot_consolidate_recommendation(premium_by_model) -> list[str]:
+    if not premium_by_model or len(premium_by_model) <= 2:
+        return []
+    return [
+        f"Using {len(premium_by_model)} Copilot models — consolidate to reduce cost complexity."
+    ]
+
+
+def _lfs_recommendation(lfs_summary) -> list[str]:
+    if not lfs_summary or (lfs_summary.get("total_gross", 0) or 0) <= 0:
+        return []
+    return ["Review Git LFS usage — large binaries add up quickly at ~$1/GB."]
+
+
+def _default_recommendations() -> list[str]:
+    return [
+        "Usage is well within free tiers — no immediate action needed.",
+        "Consider enabling cost alerts in GitHub billing settings.",
+    ]
+
+
+def _collect_recommendations(
+    user_minutes,
+    repo_data,
+    premium_by_model,
+    lfs_summary,
+    storage_analysis,
+    visibility_by_repo,
+    actions: dict,
+) -> list[str]:
+    has_split = "private_minutes" in actions
+    filtered = bool(actions.get("filtered"))
+    private_min = (
+        float(actions.get("private_minutes") or 0.0) if has_split else float(user_minutes or 0)
+    )
+    skip_private_quota = filtered and has_split and private_min <= 0
+    recs = _minute_recommendations(
+        private_min=private_min, has_split=has_split, skip_private_quota=skip_private_quota
+    )
+    basis_minutes = private_min if has_split and not skip_private_quota else (user_minutes or 0)
+    recs.extend(_concentration_recommendation(repo_data, basis_minutes, visibility_by_repo))
+    recs.extend(
+        _private_storage_recommendation(
+            actions, has_split=has_split, skip_private_quota=skip_private_quota
+        )
+    )
+    recs.extend(_copilot_consolidate_recommendation(premium_by_model))
+    recs.extend(_lfs_recommendation(lfs_summary))
+    recs.extend(_release_asset_recommendation(storage_analysis))
+    return recs or _default_recommendations()
+
+
 def _print_recommendations(
     user_minutes,
     repo_data,
@@ -319,36 +435,15 @@ def _print_recommendations(
 ):
     print("  6. QUICK RECOMMENDATIONS")
     print(f"  {'─' * 55}")
-    actions = actions or {}
-    has_split = "private_minutes" in actions
-    filtered = bool(actions.get("filtered"))
-    private_min = (
-        float(actions.get("private_minutes") or 0.0) if has_split else float(user_minutes or 0)
+    recs = _collect_recommendations(
+        user_minutes,
+        repo_data,
+        premium_by_model,
+        lfs_summary,
+        storage_analysis,
+        visibility_by_repo,
+        actions or {},
     )
-    skip_private_quota = filtered and has_split and private_min <= 0
-    recs = _minute_recommendations(
-        private_min=private_min, has_split=has_split, skip_private_quota=skip_private_quota
-    )
-    basis_minutes = private_min if has_split and not skip_private_quota else (user_minutes or 0)
-    recs.extend(_concentration_recommendation(repo_data, basis_minutes, visibility_by_repo))
-    if has_split and not skip_private_quota:
-        private_gb = float(actions.get("private_storage_gb_hours", 0.0) or 0.0)
-        allowance = storage_allowance_gb_hours(days_in_month())
-        if allowance and private_gb > 0.8 * allowance:
-            recs.append(
-                "Private artifact accrual is over 80% of the monthly GB-hrs allowance — "
-                "clean up artifacts or reduce retention (Settings → Actions → General)."
-            )
-    if premium_by_model and len(premium_by_model) > 2:
-        recs.append(
-            f"Using {len(premium_by_model)} Copilot models — consolidate to reduce cost complexity."
-        )
-    if lfs_summary and (lfs_summary.get("total_gross", 0) or 0) > 0:
-        recs.append("Review Git LFS usage — large binaries add up quickly at ~$1/GB.")
-    recs.extend(_release_asset_recommendation(storage_analysis))
-    if not recs:
-        recs.append("Usage is well within free tiers — no immediate action needed.")
-        recs.append("Consider enabling cost alerts in GitHub billing settings.")
     for i, rec in enumerate(recs, 1):
         print(f"\n    {i}. {rec}")
     print()

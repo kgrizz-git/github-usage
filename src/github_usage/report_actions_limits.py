@@ -124,21 +124,43 @@ def _print_minutes_limits(
     print()
 
 
-def _print_storage_limits(
-    actions: dict, *, has_split: bool, skip_quota: bool, reference_date=None
+def _print_unsplit_storage_limits(actions: dict) -> None:
+    storage_gb_hours = float(actions.get("storage_gb_hours", 0) or 0)
+    avg_storage_mb = gb_hours_to_avg_mb(storage_gb_hours) if storage_gb_hours else 0
+    storage_remaining = max(0, _PRIVATE_STORAGE_LIMIT_MB - avg_storage_mb)
+    storage_pct = (
+        (avg_storage_mb / _PRIVATE_STORAGE_LIMIT_MB * 100) if _PRIVATE_STORAGE_LIMIT_MB else 0
+    )
+    print("  Actions Storage (avg):")
+    print(f"    Used:         {avg_storage_mb:>8.1f} / {_PRIVATE_STORAGE_LIMIT_MB} MB")
+    print(f"    Remaining:    {storage_remaining:>8.1f} MB ({storage_pct:.1f}% used)")
+    print()
+
+
+def _print_split_storage_quota_lines(
+    *,
+    skip_quota: bool,
+    private_avg: float,
+    private_gb: float,
+    allowance: float,
+    flat_mb: float,
 ) -> None:
-    if not has_split:
-        storage_gb_hours = float(actions.get("storage_gb_hours", 0) or 0)
-        avg_storage_mb = gb_hours_to_avg_mb(storage_gb_hours) if storage_gb_hours else 0
-        storage_remaining = max(0, _PRIVATE_STORAGE_LIMIT_MB - avg_storage_mb)
-        storage_pct = (
-            (avg_storage_mb / _PRIVATE_STORAGE_LIMIT_MB * 100) if _PRIVATE_STORAGE_LIMIT_MB else 0
-        )
-        print("  Actions Storage (avg):")
-        print(f"    Used:         {avg_storage_mb:>8.1f} / {_PRIVATE_STORAGE_LIMIT_MB} MB")
-        print(f"    Remaining:    {storage_remaining:>8.1f} MB ({storage_pct:.1f}% used)")
-        print()
+    if skip_quota:
+        print("    (No private repos in this scan — quota math suppressed.)")
         return
+    storage_pct = (private_avg / _PRIVATE_STORAGE_LIMIT_MB * 100) if private_avg else 0
+    gb_pct = (private_gb / allowance * 100) if allowance else 0
+    print(
+        f"    Used:         {private_avg:>8.1f} / {_PRIVATE_STORAGE_LIMIT_MB} MB "
+        f"({storage_pct:.1f}% used)"
+    )
+    print(
+        f"    Accrued:      {private_gb:>8.1f} / {allowance:.0f} GB-hrs "
+        f"({gb_pct:.1f}%)  ≈ {flat_mb:.0f} MB flat all month"
+    )
+
+
+def _print_split_storage_limits(actions: dict, *, skip_quota: bool, reference_date=None) -> None:
     private_avg = float(actions.get("private_storage_avg_mb", 0.0) or 0.0)
     public_avg = float(actions.get("public_storage_avg_mb", 0.0) or 0.0)
     private_gb = float(actions.get("private_storage_gb_hours", 0.0) or 0.0)
@@ -146,23 +168,26 @@ def _print_storage_limits(
     dim = days_in_month(reference_date)
     allowance = storage_allowance_gb_hours(dim)
     flat_mb = flat_equivalent_gb_hours(private_gb, dim) * 1024.0
-    storage_pct = (private_avg / _PRIVATE_STORAGE_LIMIT_MB * 100) if private_avg else 0
-    gb_pct = (private_gb / allowance * 100) if allowance else 0
     print("  Actions Storage (avg, private repos only):")
-    if skip_quota:
-        print("    (No private repos in this scan — quota math suppressed.)")
-    else:
-        print(
-            f"    Used:         {private_avg:>8.1f} / {_PRIVATE_STORAGE_LIMIT_MB} MB "
-            f"({storage_pct:.1f}% used)"
-        )
-        print(
-            f"    Accrued:      {private_gb:>8.1f} / {allowance:.0f} GB-hrs "
-            f"({gb_pct:.1f}%)  ≈ {flat_mb:.0f} MB flat all month"
-        )
+    _print_split_storage_quota_lines(
+        skip_quota=skip_quota,
+        private_avg=private_avg,
+        private_gb=private_gb,
+        allowance=allowance,
+        flat_mb=flat_mb,
+    )
     if public_avg or public_gb:
         print(f"    Public repos: {public_avg:>8.1f} MB / {public_gb:.1f} GB-hrs (free)")
     print()
+
+
+def _print_storage_limits(
+    actions: dict, *, has_split: bool, skip_quota: bool, reference_date=None
+) -> None:
+    if not has_split:
+        _print_unsplit_storage_limits(actions)
+        return
+    _print_split_storage_limits(actions, skip_quota=skip_quota, reference_date=reference_date)
 
 
 def render_limits_summary(actions: dict | None, *, reference_date=None) -> None:

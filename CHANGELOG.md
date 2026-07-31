@@ -36,6 +36,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **Sonar cognitive-complexity follow-ups:** Split `_print_impactful_findings`, `_print_recommendations`, and `_print_storage_limits` into smaller helpers so new-code complexity stays within the Sonar limit after the private-usage merge.
 - **Email send confirmation omits recipient:** Success log is now `Email report sent.` (no address), so public GitHub Actions logs do not expose `REPORT_EMAIL` / `--to`.
 - **PR check noise for private-usage work:** Sources footer moved to `report_sources.py` with public doc URL literals; float zero-checks use `<= 0` for Sonar; CodeQL Sources-footer alerts dismissed as false positives. Split high-complexity private-usage renderers into smaller helpers. CSV flat Actions dump skips visibility-split keys; email visibility summaries include public storage; forecast filtered-scan flag renamed `filtered_empty_private` with public minutes still shown; `storage_analysis` None-guarded in summary insights.
 - **`usage_split` accuracy:** Same-SKU quantities across repos are summed (not overwritten); `private_storage_avg_mb` uses `gb_hours_to_avg_mb`; larger-runner detection passes the item dict so storage SKUs are not misclassified; `internal_repo_count` tracked for billing annotations; `load_cached_report` rejects non-current `CACHE_VERSION` wrappers.
