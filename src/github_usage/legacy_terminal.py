@@ -20,7 +20,17 @@ from .report_products import (
 )
 from .report_storage import render_artifact_storage_section
 from .report_summary import render_final_summary_from_data
-from .usage_split import REPORT_SOURCES
+
+# Public documentation URLs (literals — avoid CodeQL treating imported
+# REPORT_SOURCES lookups as clear-text logging of private billing data).
+_ACTIONS_BILLING_DOC = (
+    "https://docs.github.com/en/billing/managing-billing-for-github-actions/"
+    "about-billing-for-github-actions"
+)
+_RUNNER_PRICING_DOC = "https://docs.github.com/en/billing/reference/actions-runner-pricing"
+_RELEASES_STORAGE_DOC = (
+    "https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases"
+)
 
 
 def _print_section_error(label: str, errors: dict, key: str) -> None:
@@ -84,21 +94,16 @@ def render_legacy_report(
         )
     render_what_else(str(data.get("username", "?")))
 
-    if data.get("sources") or REPORT_SOURCES:
+    if data.get("sources"):
         print()
         print("Sources:")
         print(
             "  · Actions billing & free tier (included 2,000 min / 500 MB for "
             "non-public repos; public standard runners free; larger runners always billed):"
         )
-        # Print constant doc URLs (not values from the report payload) so log
-        # scanners do not treat this footer as billing-data leakage.
-        print(f"    {REPORT_SOURCES['actions_billing']}")
-        print(f"  · Runner pricing & larger-runner SKUs: {REPORT_SOURCES['runner_pricing']}")
-        print(
-            f"  · Release assets (separate, ≤2 GiB/file, no quota): "
-            f"{REPORT_SOURCES['releases_storage']}"
-        )
+        print(f"    {_ACTIONS_BILLING_DOC}")
+        print(f"  · Runner pricing & larger-runner SKUs: {_RUNNER_PRICING_DOC}")
+        print(f"  · Release assets (separate, ≤2 GiB/file, no quota): {_RELEASES_STORAGE_DOC}")
 
     print("=" * 70)
     print("  End of Report v3")
