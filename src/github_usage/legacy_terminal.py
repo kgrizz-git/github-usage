@@ -18,6 +18,8 @@ from .report_products import (
     render_gitlfs_summary,
     render_monthly_costs,
 )
+from .report_sources import print_report_sources_footer
+from .report_storage import render_artifact_storage_section
 from .report_summary import render_final_summary_from_data
 
 
@@ -44,6 +46,13 @@ def render_legacy_report(
         _print_section_error("Actions", errors, "actions")
     else:
         render_actions_summary(data.get("actions"))
+
+    render_artifact_storage_section(
+        data.get("storage_analysis"),
+        data.get("actions"),
+        data.get("repo_actions") or [],
+        reference_date=reference_date,
+    )
 
     render_repo_actions_table(data.get("repo_actions") or [])
     render_actions_top_consumers(data.get("repo_actions") or [])
@@ -74,6 +83,9 @@ def render_legacy_report(
             reference_date=reference_date,
         )
     render_what_else(str(data.get("username", "?")))
+
+    if data.get("sources"):
+        print_report_sources_footer()
 
     print("=" * 70)
     print("  End of Report v3")

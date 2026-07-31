@@ -18,6 +18,7 @@ XLSX_SECTIONS = [
     "Releases",
     "Insights",
     "Errors",
+    "Sources",
     "Forecast",
 ]
 
@@ -80,8 +81,8 @@ class ExportXlsxTests(unittest.TestCase):
         header = rows[3]
         self.assertEqual(header, ("SKU", "Minutes", "Storage GB-Hrs", "Gross", "Discount", "Net"))
         skus = {r[0] for r in rows[4:] if r[0]}  # type: ignore[has-type]
-        self.assertIn("enterprise", skus)
-        self.assertIn("free", skus)
+        self.assertIn("actions_linux", skus)
+        self.assertIn("actions_macos", skus)
 
     def test_copilot_sheet(self):
         wb = self._open()
@@ -259,6 +260,52 @@ class ExportXlsxTests(unittest.TestCase):
         ):
             export_report.export(self.data, "xlsx", output_path="/tmp/_should_not_write.xlsx")
         self.assertIn("openpyxl", str(ctx.exception))
+
+    def test_private_usage_sheet_when_split_present(self) -> None:
+        self.data["actions"]["private_minutes"] = 900.0
+        self.data["actions"]["private_minutes_percent"] = 45.0
+        self.data["actions"]["public_minutes"] = 350.0
+        self.data["actions"]["unattributed_minutes"] = 0.0
+        self.data["actions"]["private_storage_avg_mb"] = 180.0
+        self.data["actions"]["public_storage_avg_mb"] = 40.4
+        self.data["actions"]["private_storage_gb_hours"] = 100.0
+        self.data["actions"]["public_storage_gb_hours"] = 50.0
+        self.data["actions"]["unattributed_storage_gb_hours"] = 0.0
+        self.data["storage_summary"] = {
+            "private_gb_hours": 100.0,
+            "public_gb_hours": 50.0,
+            "allowance_gb_hours": 360.0,
+        }
+        wb = self._open()
+        self.assertIn("Private Usage", wb.sheetnames)
+        rows = list(wb["Private Usage"].iter_rows(values_only=True))
+        flat = {str(r[0]) for r in rows if r and r[0]}
+        self.assertIn("private_minutes", flat)
+        self.assertIn("Storage Summary", flat)
+
+    def test_sources_sheet_present(self) -> None:
+        wb = self._open()
+        self.assertIn("Sources", wb.sheetnames)
+        rows = list(wb["Sources"].iter_rows(values_only=True))
+        keys = {str(r[0]) for r in rows if r and r[0]}
+        self.assertIn("actions_billing", keys)
+
+    def test_larger_runner_sku_marked(self) -> None:
+        self.data["actions"]["sku_breakdown"] = {
+            "linux_4_core": {
+                "minutes": 10.0,
+                "storage_gb_hours": 0.0,
+                "gross": 1.0,
+                "discount": 0.0,
+                "net": 1.0,
+                "unitType": "minutes",
+            }
+        }
+        wb = self._open()
+        rows = list(wb["SKU Breakdown"].iter_rows(values_only=True))
+        skus = {str(r[0]) for r in rows if r and r[0]}
+        self.assertIn("linux_4_core *", skus)
+        self.assertIn("*", skus)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .billing import BillingFetchError, get_actions_from_runs, get_actions_per_repo
+from .report_actions_limits import render_actions_summary, render_limits_summary
 from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .terminal import print_section, print_sep
 from .visibility import (
@@ -11,6 +12,10 @@ from .visibility import (
     visibility_group_header,
     visibility_label,
 )
+
+# Re-export for callers that import summary/limits from this module.
+__all_reexports = (render_actions_summary, render_limits_summary)
+del __all_reexports
 
 
 def show_actions_summary(api, username, user_minutes, user_storage_gb_hours, sku_breakdown):
@@ -209,38 +214,6 @@ def fetch_actions_os_breakdown(api, repos: list[dict], *, limit: int = 10) -> di
     return {"repos": repo_rows, "totals": total_os, "found": found}
 
 
-def render_actions_summary(actions: dict | None) -> None:
-    """Print Actions summary from a pre-fetched ``actions`` section dict."""
-    if not actions:
-        print_section("GitHub Actions Usage")
-        print("  (Actions data unavailable.)")
-        print()
-        return
-    user_minutes = actions.get("minutes", 0)
-    storage_gb_hours = actions.get("storage_gb_hours", 0)
-    sku_breakdown = actions.get("sku_breakdown") or {}
-    print_section("GitHub Actions Usage")
-    print("  Summary:")
-    print(f"    Compute Minutes:    {user_minutes:>10.1f} min")
-    print(f"    Storage (GB-hrs):   {storage_gb_hours:>10.4f} GB-hrs")
-    print(f"    Avg Storage (MB):   {gb_hours_to_avg_mb(storage_gb_hours):>10.1f} MB")
-    print()
-    print("  Per-SKU Breakdown:")
-    print(f"    {'SKU':<30} {'QTY':>10} {'UNIT':<18} {'GROSS':>10} {'DISCOUNT':>10} {'NET':>10}")
-    print(f"    {'-' * 30} {'-' * 10} {'-' * 18} {'-' * 10} {'-' * 10} {'-' * 10}")
-    for sku, item in sku_breakdown.items():
-        qty = item.get("grossQuantity", 0)
-        unit = item.get("unitType", "")
-        gross = item.get("grossAmount", 0)
-        discount = item.get("discountAmount", 0)
-        net = item.get("netAmount", 0)
-        print(
-            f"    {sku:<30} {qty:>10.4f} {unit:<18} {fmt_price(gross):>10} "
-            f"{fmt_price(discount):>10} {fmt_price(net):>10}"
-        )
-    print()
-
-
 def _print_repo_actions_rows(rows: list[dict], *, label: str | None = None) -> None:
     """Print repo action rows and optional subtotal label."""
     for row in rows:
@@ -325,31 +298,4 @@ def render_actions_os_breakdown(breakdown: dict | None) -> None:
         mins = total_os.get(os_name, 0) / 60000
         if mins > 0:
             print(f"    {os_name:<10} {mins:>8.1f} min")
-    print()
-
-
-def render_limits_summary(actions: dict | None) -> None:
-    """Print free-tier limits from a pre-fetched ``actions`` section dict."""
-    user_minutes = (actions or {}).get("minutes", 0) or 0
-    storage_gb_hours = (actions or {}).get("storage_gb_hours", 0) or 0
-    print_section("Limits Summary")
-    min_limit = 2000
-    min_remaining = max(0, min_limit - user_minutes) if user_minutes else min_limit
-    min_pct = (user_minutes / min_limit * 100) if user_minutes and min_limit else 0
-    avg_storage_mb = gb_hours_to_avg_mb(storage_gb_hours) if storage_gb_hours else 0
-    storage_limit = 500
-    storage_remaining = max(0, storage_limit - avg_storage_mb)
-    storage_pct = (avg_storage_mb / storage_limit * 100) if storage_limit else 0
-    print("  Actions Minutes:")
-    print(f"    Used:         {user_minutes:>8.1f} / {min_limit} min")
-    print(f"    Remaining:    {min_remaining:>8.1f} min ({min_pct:.1f}% used)")
-    print()
-    print("  Actions Storage (avg):")
-    print(f"    Used:         {avg_storage_mb:>8.1f} / {storage_limit} MB")
-    print(f"    Remaining:    {storage_remaining:>8.1f} MB ({storage_pct:.1f}% used)")
-    print()
-    print("  Copilot Pro:")
-    print("    Includes: Copilot Chat, Copilot Agent, Code Review, etc.")
-    print("    Premium requests are billed at $0.04/request after included allowance.")
-    print("    (Check your plan details for exact premium request limits)")
     print()

@@ -72,3 +72,31 @@ class SendEmailTests(unittest.TestCase):
         send_email.assert_called_once()
         self.assertEqual(send_email.call_args[0][2], "env@example.com")
         self.assertEqual(send_email.call_args[0][3], "Default Subject")
+
+    def test_success_message_omits_recipient(self) -> None:
+        printed: list[str] = []
+        with (
+            mock.patch("github_usage.cli_email_report.email_report.send_email"),
+            mock.patch.dict(
+                os.environ,
+                {
+                    "RESEND_API_KEY": "re_key",
+                    "RESEND_FROM": "from@example.com",
+                    "REPORT_EMAIL": "secret-recipient@example.com",
+                },
+                clear=True,
+            ),
+            mock.patch(
+                "builtins.print", side_effect=lambda *a, **k: printed.append(" ".join(map(str, a)))
+            ),
+        ):
+            _send_email(
+                self._args(),
+                "body",
+                None,
+                "octocat",
+                "2026-06-27T00:00:00Z",
+                recipient="secret-recipient@example.com",
+            )
+        self.assertEqual(printed, ["Email report sent."])
+        self.assertTrue(all("@" not in line for line in printed))

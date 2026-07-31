@@ -25,13 +25,18 @@ def _format_cost_block(monthly: dict[str, Any], product: str) -> str:
 
 
 def _format_actions_minutes(data: dict[str, Any]) -> str:
-    """Actions compute minutes from ``actions.minutes``."""
+    """Actions compute minutes — private-first when the visibility split exists."""
     errors = data.get("errors") or {}
     actions = data.get("actions")
     if actions is None:
         if errors.get("actions"):
             return f"n/a ({errors['actions']})"
         return "n/a"
+    if "private_minutes" in actions:
+        private = float(actions.get("private_minutes") or 0.0)
+        public = float(actions.get("public_minutes") or 0.0)
+        pct = float(actions.get("private_minutes_percent") or 0.0)
+        return f"Private {private:.1f} / 2,000 min ({pct:.1f}%) · public {public:.1f} min (free)"
     minutes = float(actions.get("minutes", 0.0))
     limit = float(actions.get("minutes_limit", 2000))
     pct = float(actions.get("minutes_percent", 0.0))
@@ -39,12 +44,20 @@ def _format_actions_minutes(data: dict[str, Any]) -> str:
 
 
 def _format_actions_storage(data: dict[str, Any]) -> tuple[str, str]:
-    """Billed Actions storage (GB-hrs and average MB)."""
+    """Billed Actions storage (GB-hrs and average MB), private-first when split."""
     errors = data.get("errors") or {}
     actions = data.get("actions")
     if actions is None:
         msg = f"n/a ({errors['actions']})" if errors.get("actions") else "n/a"
         return msg, msg
+    if "private_storage_avg_mb" in actions:
+        priv_mb = float(actions.get("private_storage_avg_mb") or 0.0)
+        pub_mb = float(actions.get("public_storage_avg_mb") or 0.0)
+        priv_gb = float(actions.get("private_storage_gb_hours") or 0.0)
+        pub_gb = float(actions.get("public_storage_gb_hours") or 0.0)
+        avg_line = f"Private {priv_mb:.1f} / 500 MB · public {pub_mb:.1f} MB (free)"
+        gb_line = f"Private {priv_gb:.4f} GB-hrs · public {pub_gb:.4f} GB-hrs (free)"
+        return avg_line, gb_line
     gb_hours = float(actions.get("storage_gb_hours", 0.0))
     avg_mb = float(actions.get("storage_avg_mb", 0.0))
     limit_mb = float(actions.get("storage_limit_mb", 500))
@@ -52,6 +65,26 @@ def _format_actions_storage(data: dict[str, Any]) -> tuple[str, str]:
     avg_line = f"{avg_mb:.1f} / {limit_mb:.0f} MB ({pct:.1f}%)"
     gb_line = f"{gb_hours:.4f} GB-hrs"
     return avg_line, gb_line
+
+
+def _format_repo_storage_value(repo: dict[str, Any]) -> str:
+    """Human-readable artifact/release/expiry line for one storage-analysis repo."""
+    art_gb = float(repo.get("artifact_storage_gb", repo.get("total_storage", 0.0)) or 0.0)
+    rel_gb = float(repo.get("release_storage_gb", 0.0) or 0.0)
+    count = int(repo.get("artifact_count", 0) or 0)
+    soon = int(repo.get("expiring_soon_count", 0) or 0)
+    expired = int(repo.get("expired_count", 0) or 0)
+    parts = [f"{art_gb:.2f} GB artifacts"]
+    if rel_gb:
+        parts.append(f"{rel_gb:.2f} GB releases (free)")
+    if count:
+        expiry = f"{count} artifacts"
+        if soon:
+            expiry += f" · {soon} expire ≤7d"
+        if expired:
+            expiry += f" · {expired} expired"
+        parts.append(expiry)
+    return " · ".join(parts)
 
 
 def _artifact_release_storage_rows(
@@ -77,10 +110,7 @@ def _artifact_release_storage_rows(
         )
         return rows
     for repo in repos[:limit]:
-        name = _annotated_repo(repo, key="name")
-        gb = float(repo.get("total_storage", 0.0))
-        value = f"{gb:.2f} GB" if gb > 0 else "0"
-        rows.append((name, value))
+        rows.append((_annotated_repo(repo, key="name"), _format_repo_storage_value(repo)))
     if len(repos) > limit:
         rows.append((f"… +{len(repos) - limit} more repos", ""))
     return rows
@@ -243,6 +273,10 @@ def _actions_usage_rows(
     """Actions usage and forecast rows for the detail table."""
     rows = [_section("Actions usage")]
     rows.append(("Compute minutes", _format_actions_minutes(data)))
+    actions = data.get("actions") or {}
+    public_minutes = float(actions.get("public_minutes") or 0.0)
+    if public_minutes > 0:
+        rows.append(("Public Actions minutes", f"{public_minutes:,.1f} (free)"))
     avg_storage, gb_hours = _format_actions_storage(data)
     rows.append(("Storage (avg MB, billed)", avg_storage))
     rows.append(("Storage (GB-hrs, billed)", gb_hours))

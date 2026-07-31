@@ -207,6 +207,42 @@ class GetRepoConsumersTests(unittest.TestCase):
         self.assertEqual(result["by_minutes"][0]["gross"], 0.0)
         self.assertEqual(result["errors"], {})
 
+    def test_by_visibility_split_present_and_aggregates(self):
+        """Phase 3a: get_repo_consumers adds a by_visibility aggregate."""
+        repos = [
+            {**_repo("octocat/private1", name="private1"), "visibility": "private"},
+            {**_repo("octocat/public1", name="public1"), "visibility": "public"},
+            {**_repo("octocat/internal1", name="internal1"), "visibility": "internal"},
+        ]
+        with mock.patch(
+            "github_usage.report_optional.get_actions_per_repo",
+            return_value=(10.0, 0.0, {"sku": {"grossAmount": 1.0}}),
+        ):
+            result = get_repo_consumers(mock.Mock(), repos, limit=10, max_repos=10)
+        by_vis = result["by_visibility"]
+        self.assertIn("private", by_vis)
+        self.assertIn("public", by_vis)
+        # internal folds into private (decision #1)
+        self.assertEqual(by_vis["private"]["minutes"], 20.0)
+        self.assertEqual(by_vis["public"]["minutes"], 10.0)
+        # email path uses storage_avg_mb, no SKU detail
+        self.assertEqual(by_vis["private"]["storage_avg_mb"], 0.0)
+        self.assertNotIn("skus", by_vis["private"])
+
+    def test_by_visibility_empty_repos_still_present(self):
+        """Empty input still returns by_visibility buckets (zeros), not an absent key."""
+        result = get_repo_consumers(mock.Mock(), [], limit=5, max_repos=10)
+        self.assertIn("by_visibility", result)
+        self.assertEqual(result["by_visibility"]["private"]["minutes"], 0.0)
+        self.assertEqual(result["by_visibility"]["public"]["minutes"], 0.0)
+
+
+class CacheVersionTests(unittest.TestCase):
+    def test_cache_version_is_2(self):
+        from github_usage.report_cache import CACHE_VERSION
+
+        self.assertEqual(CACHE_VERSION, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

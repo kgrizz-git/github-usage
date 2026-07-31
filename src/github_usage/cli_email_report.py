@@ -123,7 +123,8 @@ def _send_email(
         timeout=args.timeout,
         max_retries=args.max_retries,
     )
-    print(f"Email report sent to {resolved_recipient}.")
+    # Do not print the recipient: Actions logs on a public repo are world-readable.
+    print("Email report sent.")
 
 
 def _export_report(

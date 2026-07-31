@@ -134,6 +134,183 @@ class LegacyReportDataTests(unittest.TestCase):
         ):
             self.assertIn(key, data)
 
+    def test_build_legacy_report_data_attaches_visibility_split(self) -> None:
+        """Phase 3b: attach_actions_visibility_split populates split keys on actions."""
+        repos = [
+            {**_repo("private1"), "visibility": "private"},
+            {**_repo("public1"), "visibility": "public"},
+        ]
+        actions_summary = {
+            "usageItems": [
+                {
+                    "sku": "actions_linux",
+                    "unitType": "minutes",
+                    "grossQuantity": 3000.0,
+                    "grossAmount": 0.0,
+                },
+                {
+                    "sku": "actions_artifact",
+                    "unitType": "gigabyte-hours",
+                    "grossQuantity": 100.0,
+                    "grossAmount": 0.0,
+                },
+            ]
+        }
+        private_summary = {
+            "usageItems": [
+                {
+                    "sku": "actions_linux",
+                    "unitType": "minutes",
+                    "grossQuantity": 1000.0,
+                    "grossAmount": 0.0,
+                },
+                {
+                    "sku": "actions_artifact",
+                    "unitType": "gigabyte-hours",
+                    "grossQuantity": 60.0,
+                    "grossAmount": 0.0,
+                },
+            ]
+        }
+        public_summary = {
+            "usageItems": [
+                {
+                    "sku": "actions_linux",
+                    "unitType": "minutes",
+                    "grossQuantity": 2000.0,
+                    "grossAmount": 0.0,
+                },
+                {
+                    "sku": "actions_artifact",
+                    "unitType": "gigabyte-hours",
+                    "grossQuantity": 40.0,
+                    "grossAmount": 0.0,
+                },
+            ]
+        }
+        api = FakeAPI(
+            request_responses={
+                ("GET", "/user", ()): {"login": "octocat", "type": "User", "plan": {}},
+                ("GET", "/rate_limit", ()): {
+                    "resources": {"core": {"limit": 5000, "remaining": 5000}}
+                },
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Actions"),),
+                ): actions_summary,
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Copilot"),),
+                ): {"usageItems": []},
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "git_lfs"),),
+                ): {"usageItems": []},
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Actions"), ("repository", "octocat/private1")),
+                ): private_summary,
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Actions"), ("repository", "octocat/public1")),
+                ): public_summary,
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/premium_request/usage",
+                    (("product", "copilot"),),
+                ): {"usageItems": []},
+                ("GET", "/users/octocat/settings/billing/usage", ()): {"usageItems": []},
+            },
+            pages_responses={"/user/repos": repos},
+        )
+        data = build_legacy_report_data(
+            api,
+            "octocat",
+            max_repos=100,
+            account={"login": "octocat", "type": "User", "plan": {}},
+            rate_limits={"resources": {"core": {"limit": 5000, "remaining": 5000}}},
+        )
+        actions = data["actions"]
+        self.assertEqual(actions["minutes"], 3000.0)
+        self.assertEqual(actions["private_minutes"], 1000.0)
+        self.assertEqual(actions["public_minutes"], 2000.0)
+        self.assertEqual(actions["unattributed_minutes"], 0.0)
+        self.assertEqual(actions["private_minutes_percent"], 50.0)
+        self.assertFalse(actions["filtered"])
+        self.assertIn("storage_summary", data)
+        self.assertEqual(
+            data["storage_summary"]["private_gb_hours"], actions["private_storage_gb_hours"]
+        )
+        self.assertIn("sources", data)
+        self.assertIn("actions_billing", data["sources"])
+
+    def test_attach_actions_visibility_split_skips_when_actions_missing(self) -> None:
+        """When the actions fetch errors, actions stays None and no split keys are added."""
+        from unittest import mock
+
+        repos = [_repo("a")]
+        api = FakeAPI(
+            request_responses={
+                ("GET", "/user", ()): {"login": "octocat", "type": "User", "plan": {}},
+                ("GET", "/rate_limit", ()): {
+                    "resources": {"core": {"limit": 5000, "remaining": 5000}}
+                },
+                # Per-repo billing summary succeeds with zero usage so repo_actions is non-empty
+                # but the account-level actions fetch will be mocked to raise below.
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Actions"), ("repository", "octocat/a")),
+                ): {"usageItems": []},
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/premium_request/usage",
+                    (("product", "copilot"),),
+                ): {"usageItems": []},
+                ("GET", "/users/octocat/settings/billing/usage", ()): {"usageItems": []},
+            },
+            pages_responses={"/user/repos": repos},
+        )
+        with (
+            mock.patch(
+                "github_usage.legacy_report_data.get_actions_usage",
+                side_effect=RuntimeError("actions fetch failed"),
+            ),
+            mock.patch("github_usage.legacy_report_data.get_copilot_usage", return_value={}),
+            mock.patch("github_usage.legacy_report_data.get_gitlfs_usage", return_value={}),
+            mock.patch(
+                "github_usage.legacy_report_data.get_monthly_costs",
+                return_value={
+                    "actions": ({"gross": 0.0, "discount": 0.0, "net": 0.0}),
+                    "copilot": ({"gross": 0.0, "discount": 0.0, "net": 0.0}),
+                    "git_lfs": ({"gross": 0.0, "discount": 0.0, "net": 0.0}),
+                    "total": ({"gross": 0.0, "discount": 0.0, "net": 0.0}),
+                },
+            ),
+            mock.patch(
+                "github_usage.legacy_report_data.get_premium_request_usage",
+                return_value={"usageItems": []},
+            ),
+            mock.patch(
+                "github_usage.legacy_report_data.get_billing_summary",
+                return_value={"usageItems": []},
+            ),
+        ):
+            data = build_legacy_report_data(
+                api,
+                "octocat",
+                max_repos=100,
+                account={"login": "octocat", "type": "User", "plan": {}},
+                rate_limits={"resources": {"core": {"limit": 5000, "remaining": 5000}}},
+            )
+        self.assertIsNone(data["actions"])
+        self.assertIn("actions", data["errors"])
+
     def test_per_repo_billing_error_does_not_abort(self) -> None:
         repos = [_repo("ok"), _repo("bad")]
 

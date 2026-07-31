@@ -28,7 +28,9 @@ from .report_data import (
     get_warning_state,
 )
 from .report_products import fetch_billing_history
+from .report_storage import build_storage_summary
 from .storage import get_storage_analysis
+from .usage_split import REPORT_SOURCES, attach_actions_visibility_split
 from .visibility import filter_repos_by_visibility, repo_visibility
 
 LEGACY_DEFAULT_MAX_REPOS = 100
@@ -301,6 +303,14 @@ def build_legacy_report_data(
             report[key] = getter()
         except RuntimeError as exc:
             errors[key] = str(exc)
+
+    attach_actions_visibility_split(
+        report, repo_actions, only_public=only_public, only_private=only_private
+    )
+    storage_summary = build_storage_summary(report.get("actions"))
+    if storage_summary is not None:
+        report["storage_summary"] = storage_summary
+    report["sources"] = dict(REPORT_SOURCES)
 
     try:
         report["monthly_costs"] = get_monthly_costs(api, username)

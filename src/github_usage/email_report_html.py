@@ -124,61 +124,85 @@ def _format_html_monthly_costs_section(data: dict) -> list[str]:
     ]
 
 
+def _html_grouped_table(title: str, rows: list[dict], *, headers: list[str], value_fn) -> list[str]:
+    parts = [f"<h2>{html.escape(title)}</h2>"]
+    groups = group_by_visibility(rows)
+    if len(groups) <= 1:
+        parts.append("<table>")
+        parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
+        for row in rows:
+            parts.append(value_fn(row))
+        parts.append("</table>")
+        return parts
+    for vis, group_rows in groups.items():
+        parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
+        parts.append("<table>")
+        parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
+        for row in group_rows:
+            parts.append(value_fn(row))
+        parts.append("</table>")
+    return parts
+
+
+def _html_private_public_summary(by_vis: dict) -> list[str]:
+    priv = by_vis.get("private") or {}
+    pub = by_vis.get("public") or {}
+    priv_min = float(priv.get("minutes", 0.0) or 0.0)
+    pub_min = float(pub.get("minutes", 0.0) or 0.0)
+    priv_mb = float(priv.get("storage_avg_mb", 0.0) or 0.0)
+    pub_mb = float(pub.get("storage_avg_mb", 0.0) or 0.0)
+    pct = (priv_min / 2000.0 * 100.0) if priv_min else 0.0
+    return [
+        "<h2>Private vs public Actions</h2>",
+        '<p class="visibility-tag">'
+        f"Private: {priv_min:,.1f} min / 2,000 free ({pct:.0f}%) · "
+        f"{priv_mb:,.1f} MB avg · Public: {pub_min:,.1f} min (free) · "
+        f"{pub_mb:,.1f} MB avg (free)"
+        "</p>",
+        '<p class="visibility-tag">Retention: 90 days default; artifacts auto-expire.</p>',
+    ]
+
+
+def _html_minutes_row(row: dict) -> str:
+    return (
+        f"<tr><td>{_html_repo_cell(row)}</td>"
+        f"<td>{row['minutes']:,.1f} min</td>"
+        f"<td>{fmt_price(row['gross'])}</td>"
+        f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
+    )
+
+
+def _html_cost_consumer_row(row: dict) -> str:
+    return (
+        f"<tr><td>{_html_repo_cell(row)}</td>"
+        f"<td>{fmt_price(row['gross'])}</td>"
+        f"<td>{row['minutes']:,.1f} min</td>"
+        f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
+    )
+
+
 def _format_html_consumers_section(data: dict) -> list[str]:
     consumers = data.get("repo_consumers")
     if not consumers:
         return []
-
-    def _grouped_table(title: str, rows: list[dict], *, headers: list[str], value_fn) -> list[str]:
-        parts = [f"<h2>{html.escape(title)}</h2>"]
-        groups = group_by_visibility(rows)
-        if len(groups) <= 1:
-            parts.append("<table>")
-            parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
-            for row in rows:
-                parts.append(value_fn(row))
-            parts.append("</table>")
-        else:
-            for vis, group_rows in groups.items():
-                parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
-                parts.append("<table>")
-                parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
-                for row in group_rows:
-                    parts.append(value_fn(row))
-                parts.append("</table>")
-        return parts
-
-    def _minutes_row(row: dict) -> str:
-        return (
-            f"<tr><td>{_html_repo_cell(row)}</td>"
-            f"<td>{row['minutes']:,.1f} min</td>"
-            f"<td>{fmt_price(row['gross'])}</td>"
-            f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
-        )
-
-    def _cost_row(row: dict) -> str:
-        return (
-            f"<tr><td>{_html_repo_cell(row)}</td>"
-            f"<td>{fmt_price(row['gross'])}</td>"
-            f"<td>{row['minutes']:,.1f} min</td>"
-            f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
-        )
-
     parts: list[str] = []
+    by_vis = consumers.get("by_visibility")
+    if by_vis:
+        parts.extend(_html_private_public_summary(by_vis))
     parts.extend(
-        _grouped_table(
+        _html_grouped_table(
             "Top Repositories by Actions Minutes",
             consumers.get("by_minutes", []),
             headers=["Repo", "Minutes", "Gross", "Storage"],
-            value_fn=_minutes_row,
+            value_fn=_html_minutes_row,
         )
     )
     parts.extend(
-        _grouped_table(
+        _html_grouped_table(
             "Top Repositories by Actions Cost",
             consumers.get("by_cost", []),
             headers=["Repo", "Gross", "Minutes", "Storage"],
-            value_fn=_cost_row,
+            value_fn=_html_cost_consumer_row,
         )
     )
     if consumers.get("truncated"):
@@ -371,6 +395,47 @@ _HTML_DOCUMENT_HEAD = (
 _HTML_DOCUMENT_TAIL = "</body>\n</html>\n"
 
 
+def _html_warning_block(warnings: list) -> list[str]:
+    if not warnings:
+        return []
+    parts = ['<div class="warning"><strong>Warnings</strong><ul>']
+    for warning in warnings:
+        parts.append(f"<li>{html.escape(warning)}</li>")
+    parts.append("</ul></div>")
+    return parts
+
+
+def _html_api_notes_block(estimate: dict) -> list[str]:
+    notes = estimate.get("notes") or []
+    if not notes:
+        return []
+    parts = ["<h2>REST API Quota Notes</h2>", "<ul>"]
+    for note in notes:
+        parts.append(f"<li>{html.escape(note)}</li>")
+    parts.append("</ul>")
+    return parts
+
+
+def _html_sources_block(sources: dict) -> list[str]:
+    if not sources:
+        return []
+    parts = ['<h2>Sources</h2><ul class="visibility-tag">']
+    for key, label in (
+        ("actions_billing", "Actions billing"),
+        ("runner_pricing", "Runner pricing"),
+        ("releases_storage", "Release assets"),
+    ):
+        url = sources.get(key)
+        if not url:
+            continue
+        parts.append(
+            f"<li>{html.escape(label)}: "
+            f'<a href="{html.escape(str(url))}">{html.escape(str(url))}</a></li>'
+        )
+    parts.append("</ul>")
+    return parts
+
+
 def format_html_report(
     data: dict,
     *,
@@ -384,14 +449,7 @@ def format_html_report(
     parts.append(f"<h1>GitHub Usage Report for {username}</h1>")
     parts.append(f'<p class="meta">{html.escape(_generated_line(data.get("generated_at")))}</p>')
     parts.append('<p class="meta">Period: current month</p>')
-
-    warnings = data.get("warnings") or []
-    if warnings:
-        parts.append('<div class="warning"><strong>Warnings</strong><ul>')
-        for warning in warnings:
-            parts.append(f"<li>{html.escape(warning)}</li>")
-        parts.append("</ul></div>")
-
+    parts.extend(_html_warning_block(data.get("warnings") or []))
     for formatter in _SECTION_HTML_FORMATTERS:
         if formatter is _format_html_forecast_section:
             parts.extend(
@@ -404,15 +462,7 @@ def format_html_report(
             )
         else:
             parts.extend(formatter(data))
-
-    estimate = data.get("api_estimate") or {}
-    notes = estimate.get("notes") or []
-    if notes:
-        parts.append("<h2>REST API Quota Notes</h2>")
-        parts.append("<ul>")
-        for note in notes:
-            parts.append(f"<li>{html.escape(note)}</li>")
-        parts.append("</ul>")
-
+    parts.extend(_html_api_notes_block(data.get("api_estimate") or {}))
+    parts.extend(_html_sources_block(data.get("sources") or {}))
     parts.append(_HTML_DOCUMENT_TAIL)
     return "".join(parts)
