@@ -89,8 +89,9 @@ def _repo_retention_days(artifact_items: list[dict]) -> int | None:
         return None
     newest = max(
         candidates,
-        key=lambda item: _parse_iso_datetime(item.get("created_at"))
-        or datetime.min.replace(tzinfo=UTC),
+        key=lambda item: (
+            _parse_iso_datetime(item.get("created_at")) or datetime.min.replace(tzinfo=UTC)
+        ),
     )
     return _retention_days(newest.get("created_at"), newest.get("expires_at"))
 
@@ -121,6 +122,68 @@ def _rollup_artifacts(artifact_items: list[dict]) -> dict:
     }
 
 
+def _collect_repo_artifacts(api, owner: str, name: str, *, today: date) -> tuple[list[dict], float]:
+    """Fetch artifact items and total GB for one repo."""
+    try:
+        artifacts = api.get_all_pages(
+            f"/repos/{owner}/{name}/actions/artifacts",
+            {"per_page": 100},
+        )
+    except RuntimeError:
+        artifacts = []
+    items: list[dict] = []
+    total_gb = 0.0
+    for art in artifacts or []:
+        item = _artifact_item(art, today=today)
+        items.append(item)
+        total_gb += float(item["storage"])
+    return items, total_gb
+
+
+def _collect_repo_releases(api, owner: str, name: str) -> tuple[list[dict], float]:
+    """Fetch release-asset items and total GB for one repo."""
+    try:
+        releases = api.get_all_pages(
+            f"/repos/{owner}/{name}/releases",
+            {"per_page": 100},
+        )
+    except RuntimeError:
+        releases = []
+    items: list[dict] = []
+    total_gb = 0.0
+    for rel in releases or []:
+        for asset in rel.get("assets", []) or []:
+            item = _release_item(asset)
+            items.append(item)
+            total_gb += float(item["storage"])
+    return items, total_gb
+
+
+def _analyze_one_repo(api, repo: dict, *, today: date) -> dict | None:
+    """Build one storage-analysis repo entry, or ``None`` when empty/invalid."""
+    owner = (repo.get("owner") or {}).get("login")
+    name = repo.get("name")
+    if not owner or not name:
+        return None
+    full = repo.get("full_name") or f"{owner}/{name}"
+    artifact_items, artifact_storage_gb = _collect_repo_artifacts(api, owner, name, today=today)
+    release_items, release_storage_gb = _collect_repo_releases(api, owner, name)
+    items = [*artifact_items, *release_items]
+    total_storage = artifact_storage_gb + release_storage_gb
+    if total_storage <= 0 and not items:
+        return None
+    entry = {
+        "name": full,
+        "total_storage": total_storage,
+        "artifact_storage_gb": artifact_storage_gb,
+        "release_storage_gb": release_storage_gb,
+        "items": items,
+        "visibility": repo_visibility(repo),
+    }
+    entry.update(_rollup_artifacts(artifact_items))
+    return entry
+
+
 def get_storage_analysis(api, repos, *, reference_date: date | None = None):
     """Analyze storage per repo: artifacts, releases, LFS.
 
@@ -132,55 +195,9 @@ def get_storage_analysis(api, repos, *, reference_date: date | None = None):
     repo_storage = []
     for repo in repos:
         try:
-            owner = (repo.get("owner") or {}).get("login")
-            name = repo.get("name")
-            if not owner or not name:
-                continue
-            full = repo.get("full_name") or f"{owner}/{name}"
-            items: list[dict] = []
-            artifact_storage_gb = 0.0
-            release_storage_gb = 0.0
-
-            try:
-                artifacts = api.get_all_pages(
-                    f"/repos/{owner}/{name}/actions/artifacts",
-                    {"per_page": 100},
-                )
-            except RuntimeError:
-                artifacts = []
-            artifact_items = []
-            for art in artifacts or []:
-                item = _artifact_item(art, today=today)
-                artifact_items.append(item)
-                items.append(item)
-                artifact_storage_gb += float(item["storage"])
-
-            try:
-                releases = api.get_all_pages(
-                    f"/repos/{owner}/{name}/releases",
-                    {"per_page": 100},
-                )
-            except RuntimeError:
-                releases = []
-            for rel in releases or []:
-                for asset in rel.get("assets", []) or []:
-                    item = _release_item(asset)
-                    items.append(item)
-                    release_storage_gb += float(item["storage"])
-
-            total_storage = artifact_storage_gb + release_storage_gb
-            if total_storage > 0 or items:
-                entry = {
-                    "name": full,
-                    "total_storage": total_storage,
-                    "artifact_storage_gb": artifact_storage_gb,
-                    "release_storage_gb": release_storage_gb,
-                    "items": items,
-                    "visibility": repo_visibility(repo),
-                }
-                entry.update(_rollup_artifacts(artifact_items))
-                repo_storage.append(entry)
+            entry = _analyze_one_repo(api, repo, today=today)
         except (KeyError, RuntimeError):
             continue
-
+        if entry is not None:
+            repo_storage.append(entry)
     return {"repos": repo_storage}

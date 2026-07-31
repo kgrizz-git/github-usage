@@ -67,6 +67,26 @@ def _format_actions_storage(data: dict[str, Any]) -> tuple[str, str]:
     return avg_line, gb_line
 
 
+def _format_repo_storage_value(repo: dict[str, Any]) -> str:
+    """Human-readable artifact/release/expiry line for one storage-analysis repo."""
+    art_gb = float(repo.get("artifact_storage_gb", repo.get("total_storage", 0.0)) or 0.0)
+    rel_gb = float(repo.get("release_storage_gb", 0.0) or 0.0)
+    count = int(repo.get("artifact_count", 0) or 0)
+    soon = int(repo.get("expiring_soon_count", 0) or 0)
+    expired = int(repo.get("expired_count", 0) or 0)
+    parts = [f"{art_gb:.2f} GB artifacts"]
+    if rel_gb:
+        parts.append(f"{rel_gb:.2f} GB releases (free)")
+    if count:
+        expiry = f"{count} artifacts"
+        if soon:
+            expiry += f" · {soon} expire ≤7d"
+        if expired:
+            expiry += f" · {expired} expired"
+        parts.append(expiry)
+    return " · ".join(parts)
+
+
 def _artifact_release_storage_rows(
     data: dict[str, Any], *, limit: int = 10
 ) -> list[tuple[str, str]]:
@@ -90,23 +110,7 @@ def _artifact_release_storage_rows(
         )
         return rows
     for repo in repos[:limit]:
-        name = _annotated_repo(repo, key="name")
-        art_gb = float(repo.get("artifact_storage_gb", repo.get("total_storage", 0.0)) or 0.0)
-        rel_gb = float(repo.get("release_storage_gb", 0.0) or 0.0)
-        count = int(repo.get("artifact_count", 0) or 0)
-        soon = int(repo.get("expiring_soon_count", 0) or 0)
-        expired = int(repo.get("expired_count", 0) or 0)
-        parts = [f"{art_gb:.2f} GB artifacts"]
-        if rel_gb:
-            parts.append(f"{rel_gb:.2f} GB releases (free)")
-        if count:
-            expiry = f"{count} artifacts"
-            if soon:
-                expiry += f" · {soon} expire ≤7d"
-            if expired:
-                expiry += f" · {expired} expired"
-            parts.append(expiry)
-        rows.append((name, " · ".join(parts)))
+        rows.append((_annotated_repo(repo, key="name"), _format_repo_storage_value(repo)))
     if len(repos) > limit:
         rows.append((f"… +{len(repos) - limit} more repos", ""))
     return rows

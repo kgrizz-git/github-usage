@@ -112,6 +112,57 @@ def _merge_sku_item(existing: dict | None, new_item: dict) -> dict:
     return merged
 
 
+def _empty_visibility_buckets(*, storage_key: str | None, sku_key: str | None) -> dict[str, dict]:
+    out: dict[str, dict] = {
+        "private": {"minutes": 0.0, "internal_repo_count": 0},
+        "public": {"minutes": 0.0},
+    }
+    if storage_key is not None:
+        out["private"][storage_key] = 0.0
+        out["public"][storage_key] = 0.0
+    if sku_key is not None:
+        out["private"]["skus"] = {}
+        out["public"]["skus"] = {}
+    return out
+
+
+def _ensure_visibility_bucket(
+    out: dict[str, dict],
+    vis: str,
+    *,
+    storage_key: str | None,
+    sku_key: str | None,
+) -> dict:
+    if vis in out:
+        return out[vis]
+    bucket: dict = {"minutes": 0.0}
+    if storage_key is not None:
+        bucket[storage_key] = 0.0
+    if sku_key is not None:
+        bucket["skus"] = {}
+    out[vis] = bucket
+    return bucket
+
+
+def _accumulate_row_into_bucket(
+    bucket: dict,
+    row: dict,
+    *,
+    minutes_key: str,
+    storage_key: str | None,
+    sku_key: str | None,
+) -> None:
+    bucket["minutes"] += float(row.get(minutes_key, 0.0) or 0.0)
+    if storage_key is not None:
+        bucket[storage_key] += float(row.get(storage_key, 0.0) or 0.0)
+    if sku_key is None:
+        return
+    skus = row.get(sku_key) or {}
+    sku_bucket = bucket["skus"]
+    for sku, item in skus.items():
+        sku_bucket[sku] = _merge_sku_item(sku_bucket.get(sku), item)
+
+
 def split_rows_by_visibility(
     rows: list[dict],
     *,
@@ -127,38 +178,22 @@ def split_rows_by_visibility(
     ``internal_repo_count`` on the private bucket). Skips SKU aggregation when
     ``sku_key`` is ``None``. Same-SKU quantities across repos are summed.
     """
-    out: dict[str, dict] = {
-        "private": {"minutes": 0.0, "internal_repo_count": 0},
-        "public": {"minutes": 0.0},
-    }
-    if storage_key is not None:
-        out["private"][storage_key] = 0.0
-        out["public"][storage_key] = 0.0
-    if sku_key is not None:
-        out["private"]["skus"] = {}
-        out["public"]["skus"] = {}
-
+    out = _empty_visibility_buckets(storage_key=storage_key, sku_key=sku_key)
     for row in rows or []:
         raw_vis = repo_visibility(row)
         vis = "private" if raw_vis == "internal" else raw_vis
-        if vis not in out:
-            out[vis] = {"minutes": 0.0}
-            if storage_key is not None:
-                out[vis][storage_key] = 0.0
-            if sku_key is not None:
-                out[vis]["skus"] = {}
+        bucket = _ensure_visibility_bucket(out, vis, storage_key=storage_key, sku_key=sku_key)
         if raw_vis == "internal":
             out["private"]["internal_repo_count"] = (
                 int(out["private"].get("internal_repo_count", 0) or 0) + 1
             )
-        out[vis]["minutes"] += float(row.get(minutes_key, 0.0) or 0.0)
-        if storage_key is not None:
-            out[vis][storage_key] += float(row.get(storage_key, 0.0) or 0.0)
-        if sku_key is not None:
-            skus = row.get(sku_key) or {}
-            bucket = out[vis]["skus"]
-            for sku, item in skus.items():
-                bucket[sku] = _merge_sku_item(bucket.get(sku), item)
+        _accumulate_row_into_bucket(
+            bucket,
+            row,
+            minutes_key=minutes_key,
+            storage_key=storage_key,
+            sku_key=sku_key,
+        )
     return out
 
 

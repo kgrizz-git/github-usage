@@ -95,6 +95,76 @@ def render_actions_summary(actions: dict | None) -> None:
     print()
 
 
+def _print_minutes_limits(
+    *,
+    has_split: bool,
+    skip_quota: bool,
+    private_min: float,
+    public_min: float,
+    unattr_min: float,
+) -> None:
+    if skip_quota:
+        print("  Actions Minutes (private repos only):")
+        print("    (No private repos in this scan — quota math suppressed.)")
+        if public_min:
+            print(f"    Public repos:  {public_min:>8.1f} min (free — no quota impact)")
+        print()
+        return
+    min_limit = _PRIVATE_MINUTES_LIMIT
+    min_remaining = max(0, min_limit - private_min)
+    min_pct = (private_min / min_limit * 100) if min_limit else 0
+    label = "Actions Minutes (private repos only):" if has_split else "Actions Minutes:"
+    print(f"  {label}")
+    print(f"    Used:         {private_min:>8.1f} / {min_limit} min ({min_pct:.1f}% used)")
+    print(f"    Remaining:    {min_remaining:>8.1f} min")
+    if has_split and public_min:
+        print(f"    Public repos:  {public_min:>8.1f} min (free — no quota impact)")
+    if has_split and unattr_min:
+        print(f"    Unattributed:  {unattr_min:>8.1f} min (best-effort attribution)")
+    print()
+
+
+def _print_storage_limits(
+    actions: dict, *, has_split: bool, skip_quota: bool, reference_date=None
+) -> None:
+    if not has_split:
+        storage_gb_hours = float(actions.get("storage_gb_hours", 0) or 0)
+        avg_storage_mb = gb_hours_to_avg_mb(storage_gb_hours) if storage_gb_hours else 0
+        storage_remaining = max(0, _PRIVATE_STORAGE_LIMIT_MB - avg_storage_mb)
+        storage_pct = (
+            (avg_storage_mb / _PRIVATE_STORAGE_LIMIT_MB * 100) if _PRIVATE_STORAGE_LIMIT_MB else 0
+        )
+        print("  Actions Storage (avg):")
+        print(f"    Used:         {avg_storage_mb:>8.1f} / {_PRIVATE_STORAGE_LIMIT_MB} MB")
+        print(f"    Remaining:    {storage_remaining:>8.1f} MB ({storage_pct:.1f}% used)")
+        print()
+        return
+    private_avg = float(actions.get("private_storage_avg_mb", 0.0) or 0.0)
+    public_avg = float(actions.get("public_storage_avg_mb", 0.0) or 0.0)
+    private_gb = float(actions.get("private_storage_gb_hours", 0.0) or 0.0)
+    public_gb = float(actions.get("public_storage_gb_hours", 0.0) or 0.0)
+    dim = days_in_month(reference_date)
+    allowance = storage_allowance_gb_hours(dim)
+    flat_mb = flat_equivalent_gb_hours(private_gb, dim) * 1024.0
+    storage_pct = (private_avg / _PRIVATE_STORAGE_LIMIT_MB * 100) if private_avg else 0
+    gb_pct = (private_gb / allowance * 100) if allowance else 0
+    print("  Actions Storage (avg, private repos only):")
+    if skip_quota:
+        print("    (No private repos in this scan — quota math suppressed.)")
+    else:
+        print(
+            f"    Used:         {private_avg:>8.1f} / {_PRIVATE_STORAGE_LIMIT_MB} MB "
+            f"({storage_pct:.1f}% used)"
+        )
+        print(
+            f"    Accrued:      {private_gb:>8.1f} / {allowance:.0f} GB-hrs "
+            f"({gb_pct:.1f}%)  ≈ {flat_mb:.0f} MB flat all month"
+        )
+    if public_avg or public_gb:
+        print(f"    Public repos: {public_avg:>8.1f} MB / {public_gb:.1f} GB-hrs (free)")
+    print()
+
+
 def render_limits_summary(actions: dict | None, *, reference_date=None) -> None:
     """Print free-tier limits from a pre-fetched ``actions`` section dict.
 
@@ -107,70 +177,19 @@ def render_limits_summary(actions: dict | None, *, reference_date=None) -> None:
     private_min = float(actions.get("private_minutes", actions.get("minutes", 0.0)) or 0.0)
     public_min = float(actions.get("public_minutes", 0.0) or 0.0)
     unattr_min = float(actions.get("unattributed_minutes", 0.0) or 0.0)
-
     title = "Limits Summary (scanned repos)" if filtered else "Limits Summary"
     print_section(title)
-
-    # Suppress quota math for --only-public (filtered + no private minutes).
     skip_quota = filtered and has_split and private_min <= 0
-
-    if skip_quota:
-        print("  Actions Minutes (private repos only):")
-        print("    (No private repos in this scan — quota math suppressed.)")
-        if public_min:
-            print(f"    Public repos:  {public_min:>8.1f} min (free — no quota impact)")
-        print()
-    else:
-        min_limit = _PRIVATE_MINUTES_LIMIT
-        min_remaining = max(0, min_limit - private_min)
-        min_pct = (private_min / min_limit * 100) if min_limit else 0
-        label = "Actions Minutes (private repos only):" if has_split else "Actions Minutes:"
-        print(f"  {label}")
-        print(f"    Used:         {private_min:>8.1f} / {min_limit} min ({min_pct:.1f}% used)")
-        print(f"    Remaining:    {min_remaining:>8.1f} min")
-        if has_split and public_min:
-            print(f"    Public repos:  {public_min:>8.1f} min (free — no quota impact)")
-        if has_split and unattr_min:
-            print(f"    Unattributed:  {unattr_min:>8.1f} min (best-effort attribution)")
-        print()
-
-    if has_split:
-        private_avg = float(actions.get("private_storage_avg_mb", 0.0) or 0.0)
-        public_avg = float(actions.get("public_storage_avg_mb", 0.0) or 0.0)
-        private_gb = float(actions.get("private_storage_gb_hours", 0.0) or 0.0)
-        public_gb = float(actions.get("public_storage_gb_hours", 0.0) or 0.0)
-        dim = days_in_month(reference_date)
-        allowance = storage_allowance_gb_hours(dim)
-        flat_mb = flat_equivalent_gb_hours(private_gb, dim) * 1024.0
-        storage_pct = (private_avg / _PRIVATE_STORAGE_LIMIT_MB * 100) if private_avg else 0
-        gb_pct = (private_gb / allowance * 100) if allowance else 0
-        print("  Actions Storage (avg, private repos only):")
-        if skip_quota:
-            print("    (No private repos in this scan — quota math suppressed.)")
-        else:
-            print(
-                f"    Used:         {private_avg:>8.1f} / {_PRIVATE_STORAGE_LIMIT_MB} MB "
-                f"({storage_pct:.1f}% used)"
-            )
-            print(
-                f"    Accrued:      {private_gb:>8.1f} / {allowance:.0f} GB-hrs "
-                f"({gb_pct:.1f}%)  ≈ {flat_mb:.0f} MB flat all month"
-            )
-        if public_avg or public_gb:
-            print(f"    Public repos: {public_avg:>8.1f} MB / {public_gb:.1f} GB-hrs (free)")
-        print()
-    else:
-        storage_gb_hours = float(actions.get("storage_gb_hours", 0) or 0)
-        avg_storage_mb = gb_hours_to_avg_mb(storage_gb_hours) if storage_gb_hours else 0
-        storage_remaining = max(0, _PRIVATE_STORAGE_LIMIT_MB - avg_storage_mb)
-        storage_pct = (
-            (avg_storage_mb / _PRIVATE_STORAGE_LIMIT_MB * 100) if _PRIVATE_STORAGE_LIMIT_MB else 0
-        )
-        print("  Actions Storage (avg):")
-        print(f"    Used:         {avg_storage_mb:>8.1f} / {_PRIVATE_STORAGE_LIMIT_MB} MB")
-        print(f"    Remaining:    {storage_remaining:>8.1f} MB ({storage_pct:.1f}% used)")
-        print()
-
+    _print_minutes_limits(
+        has_split=has_split,
+        skip_quota=skip_quota,
+        private_min=private_min,
+        public_min=public_min,
+        unattr_min=unattr_min,
+    )
+    _print_storage_limits(
+        actions, has_split=has_split, skip_quota=skip_quota, reference_date=reference_date
+    )
     print("  Copilot Pro:")
     print("    Includes: Copilot Chat, Copilot Agent, Code Review, etc.")
     print("    Premium requests are billed at $0.04/request after included allowance.")
