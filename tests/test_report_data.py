@@ -67,8 +67,8 @@ class ReportDataTests(unittest.TestCase):
         )
 
         self.assertEqual(estimate["repos_considered"], 25)
-        self.assertEqual(estimate["estimated_incremental_requests"], 75)
-        self.assertEqual(estimate["estimated_percent_of_remaining"], 75.0)
+        self.assertEqual(estimate["estimated_incremental_requests"], 85)
+        self.assertEqual(estimate["estimated_percent_of_remaining"], 85.0)
 
     def test_get_warning_state_handles_missing_monthly_costs(self):
         from github_usage.report_data import get_warning_state

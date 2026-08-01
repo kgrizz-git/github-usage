@@ -437,13 +437,13 @@ Out of scope for this plan’s COMPLETE criteria. Tracked under **Actions / Loca
 5. ~~Phase 4 + 6d~~ **Done 2026-08-01**
 6. ~~Phase 5 + TUI tests~~ **Done 2026-08-01**
 7. ~~Phase 7 + seed Phase 8 items onto `TO_DO.md`~~ **Done 2026-08-01**
-8. ~~`scripts/check`, `scripts/smoke`, `scripts/docs-check` → mark COMPLETE and archive~~ **Done 2026-08-01**
+8. ~~`scripts/check`, `scripts/smoke`, `scripts/docs-check` → mark COMPLETE and archive~~ **Done 2026-08-01** — `scripts/smoke` and `scripts/docs-check` pass; `scripts/check` had estimate assertion mismatch (75 vs 85, fixed 2026-08-01) and pre-existing forecast export/email failures on main (not introduced by this plan).
 
 ---
 
 ## Verification
 
-- `scripts/check` — lint, types, tests, sizes (watch HTML/insights/TUI/`report_actions.py` line budgets; new `report_workflow_minutes.py` stays small).
+- `scripts/check` — lint, types, tests, sizes (watch HTML/insights/TUI/`report_actions.py` line budgets; new `report_workflow_minutes.py` stays small). Estimate test updated 75→85 (Phase 4 workflow quota +10); remaining failures are forecast export/email sections (pre-existing on main).
 - `scripts/smoke` — CLI entrypoints unchanged (no deep-analysis flags in this plan).
 - `scripts/docs-check` — README + changelog.
 - `./start.sh report` — private minutes top list (led by `WeekendDigestFreeAPIs` ~1,126 min, then `SpotiBye`, `PSDCalcRework`, `Notes_and_Ideas`, `SpotiByeMatcher`); summary private minutes + storage lists; overall lists still render; "Minutes by Workflow — Top Private Repo" with estimate caveat for `WeekendDigestFreeAPIs` (est total expected well below billed — do not expect parity). Artifact scan should populate. OS-from-runs section behavior deferred to honesty plan (may still be empty until that ships).
