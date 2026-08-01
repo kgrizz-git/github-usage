@@ -346,6 +346,41 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("Top 10 Private Repos by Storage (scan)", output)
         self.assertIn("octocat/priv [private]", output)
 
+    def test_print_storage_breakdown_private_scan_tie_breaks_on_repo_name(self):
+        from github_usage.report_summary import _print_storage_breakdown
+
+        storage_analysis = {
+            "repos": [
+                {
+                    "name": "octocat/pub",
+                    "total_storage": 5.0,
+                    "visibility": "public",
+                    "items": [],
+                },
+                {
+                    "name": "octocat/z-priv",
+                    "total_storage": 2.0,
+                    "visibility": "private",
+                    "items": [],
+                },
+                {
+                    "name": "octocat/a-priv",
+                    "total_storage": 2.0,
+                    "visibility": "private",
+                    "items": [],
+                },
+            ]
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_storage_breakdown(storage_analysis)
+        output = stdout.getvalue()
+        private_section = output.split("Top 10 Private Repos by Storage (scan)", 1)[1]
+        self.assertLess(
+            private_section.index("octocat/a-priv"),
+            private_section.index("octocat/z-priv"),
+        )
+
     def test_print_storage_breakdown_skips_private_when_redundant(self):
         from github_usage.report_summary import _print_storage_breakdown
 

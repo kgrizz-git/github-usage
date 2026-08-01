@@ -309,8 +309,7 @@ def _print_storage_breakdown(storage_analysis):
                 for r in storage_analysis.get("repos", [])
                 if repo_visibility(r) in ("private", "internal")
             ),
-            key=lambda x: x["total_storage"],
-            reverse=True,
+            key=lambda x: (-x["total_storage"], x["name"]),
         )[:10]
         if private_top and not private_list_is_redundant(sorted_by_storage[:10], private_top):
             print("    Top 10 Private Repos by Storage (scan)")
