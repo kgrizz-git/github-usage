@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .billing import BillingFetchError, get_actions_from_runs, get_actions_per_repo
+from .repo_consumers import private_list_is_redundant
 from .report_actions_limits import render_actions_summary, render_limits_summary
 from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .terminal import print_section, print_sep
@@ -76,13 +77,16 @@ def show_actions_per_repo(api, repos):
     return repo_data
 
 
-def show_actions_top_consumers(repo_data):
+def show_actions_top_consumers(repo_data, visibility_by_repo=None):
     """Print the top 10 repositories ranked by Actions minutes consumed."""
     print_sep("Top 10 Repos by Actions Minutes")
     print()
     sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True)
     for full, minutes, _, avg_mb, _gross, _ in sorted_repos[:10]:
-        print(f"    {minutes:>8.1f} min | {avg_mb:>8.1f} MB | {full}")
+        label = full
+        if visibility_by_repo is not None:
+            label = f"{full}{visibility_label(visibility_by_repo.get(full, 'public'))}"
+        print(f"    {minutes:>8.1f} min | {avg_mb:>8.1f} MB | {label}")
     print()
 
 
@@ -270,10 +274,22 @@ def render_actions_top_consumers(repo_actions: list[dict]) -> None:
     print_sep("Top 10 Repos by Actions Minutes")
     print()
     sorted_repos = sorted(repo_actions, key=lambda row: row["minutes"], reverse=True)
-    for row in sorted_repos[:10]:
+    combined_top = sorted_repos[:10]
+    for row in combined_top:
         label = f"{row['repo']}{visibility_label(repo_visibility(row))}"
         print(f"    {row['minutes']:>8.1f} min | {row['avg_mb']:>8.1f} MB | {label}")
     print()
+
+    private_top = sorted(
+        (row for row in repo_actions if repo_visibility(row) in ("private", "internal")),
+        key=lambda row: (-row["minutes"], row["repo"]),
+    )[:10]
+    if private_top and not private_list_is_redundant(combined_top, private_top):
+        print_sep("Top 10 Private Repos by Actions Minutes")
+        print()
+        for row in private_top:
+            print(f"    {row['minutes']:>8.1f} min | {row['avg_mb']:>8.1f} MB | {row['repo']}")
+        print()
 
 
 def render_actions_os_breakdown(breakdown: dict | None) -> None:

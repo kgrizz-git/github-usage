@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .billing import get_premium_request_usage
+from .repo_consumers import private_list_is_redundant
 from .report_actions_limits import _print_usage_by_visibility
 from .report_helpers import fmt_price
 from .report_summary_insights import (
@@ -126,7 +127,14 @@ def render_final_summary_from_data(data: dict) -> None:
         print(f"  {'─' * 55}")
         _print_usage_by_visibility(actions)
     _print_top_consumers(
-        user_minutes, actions_gross, repo_data, premium_by_model, lfs_summary, visibility_by_repo
+        user_minutes,
+        actions_gross,
+        repo_data,
+        premium_by_model,
+        lfs_summary,
+        visibility_by_repo,
+        repo_consumers=data.get("repo_consumers"),
+        private_minutes=actions.get("private_minutes"),
     )
     _print_storage_breakdown(storage_analysis)
     _print_utilization(user_minutes, user_storage_gb_hours, actions=actions)
@@ -141,6 +149,7 @@ def render_final_summary_from_data(data: dict) -> None:
         storage_analysis,
         visibility_by_repo,
         actions=actions,
+        repo_consumers=data.get("repo_consumers"),
     )
     _print_recommendations(
         user_minutes,
@@ -150,6 +159,7 @@ def render_final_summary_from_data(data: dict) -> None:
         storage_analysis,
         visibility_by_repo,
         actions=actions,
+        repo_consumers=data.get("repo_consumers"),
     )
 
 
@@ -180,6 +190,9 @@ def _print_top_consumers(
     premium_by_model,
     lfs_summary,
     visibility_by_repo=None,
+    *,
+    repo_consumers=None,
+    private_minutes=None,
 ):
     print("  2. BIGGEST CONSUMERS BY CATEGORY")
     print(f"  {'─' * 55}")
@@ -203,6 +216,42 @@ def _print_top_consumers(
         label = _repo_label(full, visibility_by_repo)
         print(f"      {label:<45} {fmt_price(gross):>10}  ({pct:5.1f}%)")
     print()
+
+    if repo_consumers:
+        by_minutes = repo_consumers.get("by_minutes") or []
+        by_minutes_private = repo_consumers.get("by_minutes_private") or []
+        if by_minutes_private and not private_list_is_redundant(
+            by_minutes[:5], by_minutes_private[:5]
+        ):
+            print("    Private Actions Minutes (top 5 repos):")
+            for row in by_minutes_private[:5]:
+                mins = row["minutes"]
+                pct = (
+                    mins / private_minutes * 100.0
+                    if private_minutes and private_minutes > 0
+                    else 0.0
+                )
+                label = _repo_label(row["repo"], visibility_by_repo)
+                print(f"      {label:<45} {mins:>8.1f} min  ({pct:5.1f}% of private minutes)")
+            print()
+
+        by_storage = repo_consumers.get("by_storage") or []
+        if by_storage:
+            print("    Actions Storage (top 5 repos, billed):")
+            for row in by_storage[:5]:
+                label = _repo_label(row["repo"], visibility_by_repo)
+                print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
+            print()
+
+        by_storage_private = repo_consumers.get("by_storage_private") or []
+        if by_storage_private and not private_list_is_redundant(
+            by_storage[:5], by_storage_private[:5]
+        ):
+            print("    Private Actions Storage (top 5 repos, billed):")
+            for row in by_storage_private[:5]:
+                label = _repo_label(row["repo"], visibility_by_repo)
+                print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
+            print()
 
     # Copilot — by model
     print("    Copilot Premium Requests (by model):")
@@ -253,6 +302,24 @@ def _print_storage_breakdown(storage_analysis):
             label = f"{r['name']}{visibility_label(repo_visibility(r))}"
             print(f"      {label:<45} {r['total_storage']:>10.2f} GB")
         print()
+
+        private_top = sorted(
+            (
+                r
+                for r in storage_analysis.get("repos", [])
+                if repo_visibility(r) in ("private", "internal")
+            ),
+            key=lambda x: x["total_storage"],
+            reverse=True,
+        )[:10]
+        if private_top and not private_list_is_redundant(sorted_by_storage[:10], private_top):
+            print("    Top 10 Private Repos by Storage (scan)")
+            print(f"    {'REPO':<45} {'TOTAL':>10}")
+            print(f"    {'-' * 45} {'-' * 10}")
+            for r in private_top:
+                label = f"{r['name']}{visibility_label(repo_visibility(r))}"
+                print(f"      {label:<45} {r['total_storage']:>10.2f} GB")
+            print()
 
         top_storage = sorted_by_storage[0]
         top_label = f"{top_storage['name']}{visibility_label(repo_visibility(top_storage))}"

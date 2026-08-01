@@ -121,6 +121,26 @@ class ActionsReportTests(unittest.TestCase):
         self.assertIn("GB-hrs", out)
         self.assertIn("372", out)  # July allowance
 
+    def test_show_actions_top_consumers_accepts_optional_visibility_by_repo(self):
+        from github_usage.report_actions import show_actions_top_consumers
+
+        repo_data = [
+            ("octocat/private", 100.0, 0.0, 5.0, 1.0, {}),
+            ("octocat/public", 50.0, 0.0, 2.0, 0.5, {}),
+        ]
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            show_actions_top_consumers(repo_data)
+        self.assertIn("octocat/private", stdout.getvalue())
+        self.assertNotIn("[private]", stdout.getvalue())
+
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            show_actions_top_consumers(repo_data, visibility_by_repo={"octocat/private": "private"})
+        out = stdout.getvalue()
+        self.assertIn("octocat/private [private]", out)
+        self.assertNotIn("octocat/public [", out)
+
     def test_render_limits_summary_suppresses_quota_when_only_public(self):
         from github_usage.report_actions import render_limits_summary
 

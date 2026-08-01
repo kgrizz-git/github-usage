@@ -6,6 +6,7 @@ Split out of ``report_summary`` to stay under the module size budget.
 from __future__ import annotations
 
 from .report_helpers import days_in_month, fmt_price, gb_hours_to_avg_mb
+from .report_summary_private import private_concentration_recommendation, private_consumer_findings
 from .usage_split import flat_equivalent_gb_hours, storage_allowance_gb_hours
 from .visibility import repo_visibility, visibility_label
 
@@ -162,6 +163,9 @@ def _consumer_findings(
     repo_data,
     storage_analysis,
     visibility_by_repo,
+    *,
+    repo_consumers=None,
+    private_minutes=None,
 ) -> list[str]:
     findings: list[str] = []
     sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True) if repo_data else []
@@ -191,6 +195,7 @@ def _consumer_findings(
         size_str = f"{total_gb:.2f} GB" if total_gb >= 1 else f"{total_gb * 1024:.0f} MB"
         st_label = f"{top_st['name']}{visibility_label(repo_visibility(top_st))}"
         findings.append(f"Biggest storage consumer: {st_label} ({size_str})")
+    findings.extend(private_consumer_findings(repo_consumers, private_minutes, visibility_by_repo))
     return findings
 
 
@@ -247,13 +252,24 @@ def _collect_impactful_findings(
     storage_analysis,
     visibility_by_repo,
     actions: dict,
+    *,
+    repo_consumers=None,
 ) -> list[str]:
     findings: list[str] = []
     findings.extend(_larger_runner_findings(actions))
     findings.extend(_artifact_expiry_findings(storage_analysis))
+    private_minutes = (
+        float(actions.get("private_minutes") or 0.0) if "private_minutes" in actions else None
+    )
     findings.extend(
         _consumer_findings(
-            user_minutes, actions_gross, repo_data, storage_analysis, visibility_by_repo
+            user_minutes,
+            actions_gross,
+            repo_data,
+            storage_analysis,
+            visibility_by_repo,
+            repo_consumers=repo_consumers,
+            private_minutes=private_minutes,
         )
     )
     findings.extend(_copilot_model_findings(premium_by_model))
@@ -274,6 +290,7 @@ def _print_impactful_findings(
     visibility_by_repo=None,
     *,
     actions: dict | None = None,
+    repo_consumers=None,
 ):
     print("  5. TOP 3 MOST IMPACTFUL FINDINGS")
     print(f"  {'─' * 55}")
@@ -288,6 +305,7 @@ def _print_impactful_findings(
         storage_analysis,
         visibility_by_repo,
         actions or {},
+        repo_consumers=repo_consumers,
     )
     for i, finding in enumerate(findings[:3], 1):
         print(f"\n    {i}. {finding}")
@@ -400,6 +418,8 @@ def _collect_recommendations(
     storage_analysis,
     visibility_by_repo,
     actions: dict,
+    *,
+    repo_consumers=None,
 ) -> list[str]:
     has_split = "private_minutes" in actions
     filtered = bool(actions.get("filtered"))
@@ -410,8 +430,11 @@ def _collect_recommendations(
     recs = _minute_recommendations(
         private_min=private_min, has_split=has_split, skip_private_quota=skip_private_quota
     )
-    basis_minutes = private_min if has_split and not skip_private_quota else (user_minutes or 0)
-    recs.extend(_concentration_recommendation(repo_data, basis_minutes, visibility_by_repo))
+    recs.extend(_concentration_recommendation(repo_data, user_minutes or 0, visibility_by_repo))
+    if has_split and not skip_private_quota:
+        recs.extend(
+            private_concentration_recommendation(repo_consumers, private_min, visibility_by_repo)
+        )
     recs.extend(
         _private_storage_recommendation(
             actions, has_split=has_split, skip_private_quota=skip_private_quota
@@ -432,6 +455,7 @@ def _print_recommendations(
     visibility_by_repo=None,
     *,
     actions: dict | None = None,
+    repo_consumers=None,
 ):
     print("  6. QUICK RECOMMENDATIONS")
     print(f"  {'─' * 55}")
@@ -443,6 +467,7 @@ def _print_recommendations(
         storage_analysis,
         visibility_by_repo,
         actions or {},
+        repo_consumers=repo_consumers,
     )
     for i, rec in enumerate(recs, 1):
         print(f"\n    {i}. {rec}")
