@@ -63,7 +63,7 @@ class SetupView(VerticalScroll, AsyncViewMixin):
             "Setup & Report Profiles",
             "Three steps: (1) Secrets — API keys and default email addresses. "
             "(2) Profiles & Options — per-profile email report settings (see on-screen "
-            "guide for what applies to Usage Report vs email). Ctrl+S saves. "
+            "guide for what applies to Local Full Report vs email). Ctrl+S saves. "
             "(3) Verify Email Setup — dry-run for the active profile.",
         )
         yield Button("Start guided setup", id="start-guided-setup", variant="success")

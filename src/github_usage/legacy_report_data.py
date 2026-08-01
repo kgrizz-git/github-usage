@@ -156,7 +156,7 @@ def estimate_legacy_api_request_count(
     if repo_count > max_repos:
         notes.append(f"Repository list truncated to {max_repos} of {repo_count} repositories.")
     if estimated:
-        notes.append(f"Legacy report may use about {estimated} REST API requests.")
+        notes.append(f"Local full report may use about {estimated} REST API requests.")
     if include_release_assets:
         notes.append("Release asset totals are derived from storage analysis (no extra fetch).")
     return {

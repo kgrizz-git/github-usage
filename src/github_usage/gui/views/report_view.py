@@ -50,7 +50,7 @@ class ReportView(VerticalScroll, AsyncViewMixin):
 
     def compose(self) -> ComposeResult:
         yield ViewSection(
-            "Legacy Usage Report",
+            "Local Full Report",
             "Separate from the email report system. Fetches a fixed GitHub billing / "
             "Actions snapshot (does not read profile options from config.toml) and shows "
             "a summary table here. Useful for a quick usage check, not for validating "

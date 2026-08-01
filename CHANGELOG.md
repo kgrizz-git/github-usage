@@ -23,6 +23,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Terminology:** the interactive CLI/TUI usage report is now called the **local full report** in user-facing copy (README, `start.sh`, CLI help, TUI). Internal `legacy_*` module names are unchanged for now (tracked in `TO_DO.md`).
 - **GitHub Actions `setup-python` v7:** Bump `actions/setup-python` from v6 to v7 in CI, security, email-report, and the email-report template (folds in Dependabot #7; no workflow input changes — this repo does not use the removed `pip-install` input).
 - **CodeRabbit auto-review disabled** via `.coderabbit.yaml` (`reviews.auto_review.enabled: false`). Request a review manually with `@coderabbitai review` on a PR.
 - **TUI default theme:** Textual TUI now uses the built-in **monokai** theme by default.

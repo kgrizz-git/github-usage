@@ -57,12 +57,12 @@ Runs:
   github-usage runs --diff    Check for drift between local workflows and the remote default branch
                               (mutually exclusive with --api; --no-fetch skips the git fetch)
 
-Legacy report options:
+Local full report options:
   --export FORMAT         Export format: csv | xlsx | pdf | json | text | none
   --output PATH           Output file path (auto-generated if omitted)
   --json                  Shorthand for --export json (prints to stdout without --output)
   --no-interactive        Never prompt; use defaults
-  --dry-run               No-op for the legacy flow
+  --dry-run               No-op for the local full report flow
   --timeout SECONDS       Seconds to wait before failing a request
   --max-retries N         Maximum number of retry attempts for transient errors
   --refresh               Bypass local report cache and fetch fresh billing data

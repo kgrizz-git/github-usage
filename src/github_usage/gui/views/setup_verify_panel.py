@@ -30,10 +30,10 @@ class SetupVerifyPanel(VerticalScroll):
             "Runs the [b]email report[/b] pipeline end-to-end for the active profile "
             "(same command as scheduled sends, with --dry-run): reads config.toml options, "
             "loads secrets, calls GitHub, builds the email body. Nothing is mailed.\n\n"
-            "[b]Not the same as Usage Report:[/b] Usage Report is a separate, older "
-            "terminal-only billing summary. It ignores profile options, does not build "
+            "[b]Not the same as Local Full Report:[/b] Local Full Report is a separate "
+            "terminal/TUI billing summary. It ignores profile options, does not build "
             "email, and does not test Resend. Use Verify Email Setup to confirm email "
-            "configuration; use Usage Report only for a quick account usage snapshot.",
+            "configuration; use Local Full Report only for a quick account usage snapshot.",
         )
         yield Button("Verify Email Setup", id="verify-btn", variant="success")
         yield Static("Status", classes="SectionTitle")

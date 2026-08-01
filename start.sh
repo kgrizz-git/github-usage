@@ -12,7 +12,7 @@ Default (interactive terminal): launches the Textual TUI via github-usage.
 
 Commands (CLI shortcuts — no --cli required):
   setup         Configure local secrets, options, launchd, CI, and hooks.
-  report        Run a legacy one-off usage report.
+  report        Run a one-off local full usage report.
   email-report  Run and send an email report.
   runs          View all currently configured scheduled runs.
   runs-diff     Check for drift between local workflows and the remote default branch.
@@ -33,7 +33,7 @@ show_menu() {
     echo "github-usage (CLI menu — use ./start.sh without --cli for the TUI)"
     echo ""
     echo "  1) Run Guided Setup (setup)"
-    echo "  2) Run Legacy Usage Report (report)"
+    echo "  2) Run Local Full Report (report)"
     echo "  3) Run and Send Email Report (email-report)"
     echo "  4) View Scheduled Runs (profiles, launchd + GitHub cron)"
     echo "  5) Check Scheduled Runs Drift (runs-diff)"

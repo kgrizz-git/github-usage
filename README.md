@@ -69,7 +69,7 @@ Two interfaces exist. Do not mix their option numbers.
 
 | Interface | Invocation | Purpose |
 |-----------|------------|---------|
-| **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Top tabs for Setup, Usage Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs plus **Start guided setup**. Schedules use day/time pickers. Keys: **1**–**5** switch views, **j**/**k** line scroll, **PgUp**/**PgDn** page scroll, **Ctrl+Home**/**Ctrl+End** top/bottom, **Ctrl+S** save, **Ctrl+R** run/refresh, **Escape** cancel, **q** quit |
+| **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Top tabs for Setup, Local Full Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs plus **Start guided setup**. Schedules use day/time pickers. Keys: **1**–**5** switch views, **j**/**k** line scroll, **PgUp**/**PgDn** page scroll, **Ctrl+Home**/**Ctrl+End** top/bottom, **Ctrl+S** save, **Ctrl+R** run/refresh, **Escape** cancel, **q** quit |
 | **CLI bash menu** | `./start.sh --cli` | **1** setup · **2** report · **3** email-report · **4** runs · **5** runs-diff · **6** help · **7** exit |
 | **Setup wizard** | `./start.sh setup` or bash menu **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify |
 
@@ -192,7 +192,7 @@ github-usage email-report \
 
 `--include-consumers`, `--include-artifact-storage`, and `--include-release-assets` add repo-level API calls. They consume GitHub REST API request quota, not Actions minutes, Actions storage, Copilot requests, Git LFS quota, or billable GitHub usage. Use monthly schedules and conservative `--max-repos` values for accounts with many repositories.
 
-Repo-level sections annotate non-public repositories with `[private]` or `[internal]` tags. The legacy Usage Report per-repo Actions table groups rows by visibility with subtotals. `--only-public` and `--only-private` (mutually exclusive) filter which repositories are included in repo-level sections; filtering applies after the `--max-repos` limit. Set `only_public` / `only_private` in `[email_report]` in `config.toml` for scheduled runs.
+Repo-level sections annotate non-public repositories with `[private]` or `[internal]` tags. The local full report's per-repo Actions table groups rows by visibility with subtotals. `--only-public` and `--only-private` (mutually exclusive) filter which repositories are included in repo-level sections; filtering applies after the `--max-repos` limit. Set `only_public` / `only_private` in `[email_report]` in `config.toml` for scheduled runs.
 
 **Free-tier quota is private-first.** Limits Summary, utilization, forecasts, TUI rows, and exports measure Actions minutes and artifact storage against the free tier for **private** (and internal) repos only. Public standard-runner usage is shown separately and labeled free. Larger-runner SKUs are marked `*` (always billed). Artifact storage frames the 500 MB private allowance as GB-hours accrual (0.5 GB flat all month ≈ 360 GB-hrs for a 30-day month), splits Actions artifacts from release assets (releases are not quota-billed), and flags soon-to-expire / expired artifacts (default retention 90 days). Repos beyond `--max-repos` may appear as unattributed remainder vs the account billing total. Reports include a Sources footer linking GitHub’s Actions billing, runner pricing, and release-storage docs.
 
@@ -304,8 +304,8 @@ ref is available.
 
 ## Exporting Reports
 
-Both the legacy and email-report commands can write the report to a file in
-CSV, XLSX, PDF, JSON, or plain text format. The legacy path fetches data once
+Both the local full report and email-report commands can write the report to a file in
+CSV, XLSX, PDF, JSON, or plain text format. The local full report fetches data once
 and uses it for both terminal output and export (lower GitHub API usage when
 exporting). Exported files go through a
 redaction layer that masks usernames, repository names, email addresses, and
@@ -313,7 +313,7 @@ dollar amounts before writing; interactive terminal output and the email body
 are not redacted.
 
 ```sh
-# Legacy report
+# Local full report
 github-usage --export csv --no-interactive --output report.csv
 github-usage --export xlsx --no-interactive --output report.xlsx
 github-usage --export pdf --no-interactive --output report.pdf
@@ -326,7 +326,7 @@ github-usage email-report --export csv --output report.csv
 ```
 
 In an interactive terminal without `--export` and without `--no-interactive`,
-the legacy report prompts for a format (or `None` to skip).
+the local full report prompts for a format (or `None` to skip).
 
 ### Format-specific notes
 
@@ -466,4 +466,4 @@ scripts/docs-check
 
 ## Roadmap
 
-See [TO_DO.md](TO_DO.md) for planned work, including historical email reports and modularizing the current legacy implementation. Export formats (CSV, XLSX, PDF, JSON, text) are now implemented.
+See [TO_DO.md](TO_DO.md) for planned work, including historical email reports and renaming internal `legacy_*` modules to match the “local full report” name. Export formats (CSV, XLSX, PDF, JSON, text) are now implemented.

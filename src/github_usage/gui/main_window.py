@@ -28,7 +28,7 @@ class MainWindow(Container):
 
     VIEWS: dict[str, str] = {
         "setup": "Setup & Profiles",
-        "report": "Usage Report",
+        "report": "Local Full Report",
         "email": "Email Report",
         "schedules": "Schedules",
         "runs": "Runs & Drift",
@@ -61,7 +61,7 @@ class MainWindow(Container):
         with TabbedContent(id="main-tabs", initial="setup"):
             with TabPane("1. Setup & Profiles", id="setup"):
                 yield SetupView()
-            with TabPane("2. Usage Report", id="report"):
+            with TabPane("2. Local Full Report", id="report"):
                 yield ReportView()
             with TabPane("3. Email Report", id="email"):
                 yield EmailReportView()
