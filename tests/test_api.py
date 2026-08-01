@@ -163,3 +163,105 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(len(result), 2)
         self.assertEqual(call_count, 2)
+
+    def test_get_all_pages_unwraps_workflow_runs_and_follows_next(self):
+        """Object-shaped {workflow_runs: [...]} responses are unwrapped and paginated."""
+        import json
+
+        from github_usage.api import GitHubAPI
+        from github_usage.http_retry import Response
+
+        api = GitHubAPI("fake-token")
+
+        def mock_request_raw(method, path, params=None):
+            import http.client
+
+            headers = http.client.HTTPMessage()
+            page = params.get("page")  # type: ignore[union-attr]
+            if page == 1:
+                headers["Link"] = '<https://api.github.com/runs?page=2>; rel="next"'
+                body = json.dumps(
+                    {"total_count": 2, "workflow_runs": [{"id": 1, "name": "CI"}]}
+                ).encode()
+            else:
+                body = json.dumps(
+                    {"total_count": 2, "workflow_runs": [{"id": 2, "name": "Deploy"}]}
+                ).encode()
+            return Response(status=200, body=body, headers=headers)
+
+        with mock.patch.object(api, "request_raw", side_effect=mock_request_raw):
+            result = api.get_all_pages("/repos/octocat/api/actions/runs")
+
+        self.assertEqual(result, [{"id": 1, "name": "CI"}, {"id": 2, "name": "Deploy"}])
+
+    def test_get_all_pages_unwraps_artifacts_and_workflows(self):
+        """Recognized collection keys artifacts and workflows are also unwrapped."""
+        import json
+
+        from github_usage.api import GitHubAPI
+        from github_usage.http_retry import Response
+
+        api = GitHubAPI("fake-token")
+
+        def mock_request_raw(method, path, params=None):
+            import http.client
+
+            headers = http.client.HTTPMessage()
+            if "artifacts" in path:
+                body = json.dumps(
+                    {"total_count": 1, "artifacts": [{"id": 10, "size_in_bytes": 512}]}
+                ).encode()
+            else:
+                body = json.dumps(
+                    {"total_count": 1, "workflows": [{"id": 20, "name": "CI"}]}
+                ).encode()
+            return Response(status=200, body=body, headers=headers)
+
+        with mock.patch.object(api, "request_raw", side_effect=mock_request_raw):
+            artifacts = api.get_all_pages("/repos/octocat/api/actions/artifacts")
+            workflows = api.get_all_pages("/repos/octocat/api/actions/workflows")
+
+        self.assertEqual(artifacts, [{"id": 10, "size_in_bytes": 512}])
+        self.assertEqual(workflows, [{"id": 20, "name": "CI"}])
+
+    def test_get_all_pages_unknown_dict_shape_returns_empty(self):
+        """Unknown dict shapes still break without raising (current behavior)."""
+        import json
+
+        from github_usage.api import GitHubAPI
+        from github_usage.http_retry import Response
+
+        api = GitHubAPI("fake-token")
+
+        def mock_request_raw(method, path, params=None):
+            import http.client
+
+            headers = http.client.HTTPMessage()
+            body = json.dumps({"total_count": 1, "items": [{"id": 1}]}).encode()
+            return Response(status=200, body=body, headers=headers)
+
+        with mock.patch.object(api, "request_raw", side_effect=mock_request_raw):
+            result = api.get_all_pages("/unknown")
+
+        self.assertEqual(result, [])
+
+    def test_get_all_pages_null_collection_does_not_raise(self):
+        """Null collection values (e.g. workflow_runs: null) must not raise."""
+        import json
+
+        from github_usage.api import GitHubAPI
+        from github_usage.http_retry import Response
+
+        api = GitHubAPI("fake-token")
+
+        def mock_request_raw(method, path, params=None):
+            import http.client
+
+            headers = http.client.HTTPMessage()
+            body = json.dumps({"total_count": 0, "workflow_runs": None}).encode()
+            return Response(status=200, body=body, headers=headers)
+
+        with mock.patch.object(api, "request_raw", side_effect=mock_request_raw):
+            result = api.get_all_pages("/repos/octocat/api/actions/runs")
+
+        self.assertEqual(result, [])

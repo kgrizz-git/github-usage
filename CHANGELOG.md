@@ -38,6 +38,9 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **`get_all_pages` object-shaped collection unwrap:** GitHub Actions list endpoints (`workflow_runs`, `artifacts`, `workflows`) return `{total_count, <key>: [...]}` rather than a bare array. `get_all_pages` now unwraps those recognized keys and continues `rel="next"` pagination (null collections and unknown dict shapes still yield `[]` without raising). Restores artifact scan / `get_artifact_storage_details` and enables runs/workflows list access for later workflow estimation. Does **not** restore OS billable minutes (`billable` remains absent on live runs).
+- **`get_actions_from_runs` null `workflow_name` hygiene:** `run.get("workflow_name") or "Unknown"` so explicit JSON null does not become a `None` workflow key.
+
 - **Sonar cognitive-complexity follow-ups:** Split `_print_impactful_findings`, `_print_recommendations`, and `_print_storage_limits` into smaller helpers so new-code complexity stays within the Sonar limit after the private-usage merge.
 - **Email send confirmation omits recipient:** Success log is now `Email report sent.` (no address), so public GitHub Actions logs do not expose `REPORT_EMAIL` / `--to`.
 - **PR check noise for private-usage work:** Sources footer moved to `report_sources.py` with public doc URL literals; float zero-checks use `<= 0` for Sonar; CodeQL Sources-footer alerts dismissed as false positives. Split high-complexity private-usage renderers into smaller helpers. CSV flat Actions dump skips visibility-split keys; email visibility summaries include public storage; forecast filtered-scan flag renamed `filtered_empty_private` with public minutes still shown; `storage_analysis` None-guarded in summary insights.

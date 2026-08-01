@@ -9,7 +9,7 @@
 > **Reviewed:** 2026-07-31 — Assessment `tmp/assessment-2026-07-31-2330.md` adopted (see Constraints / Phase 1a / 4a / 4b–c / 6d). Phase 9 deep analysis split out to its own plan; Phase 8 deferrals tracked on `TO_DO.md`.
 > **Reviewed:** 2026-07-31 — Assessment `tmp/assessment-2026-07-31-2346.md` adopted: Phase 0b FakeAPI caveat — unwrap tests must use `GitHubAPI` + mocked `request_raw`, not `FakeAPI.get_all_pages`.
 >
-> **Implementation log:** (none yet)
+> **Implementation log:** Phase 0 complete 2026-08-01 (`get_all_pages` unwrap + tests + `workflow_name` hygiene).
 
 # Private-Only Top Consumers in Reports
 
@@ -62,6 +62,8 @@ Compute private-only rankings at the **data layer** (per-repo `visibility` alrea
 
 ## Phase 0 — Prerequisite: paging for object-shaped responses (`api.py`)
 
+**Done:** 2026-08-01 — Unwrapped `_COLLECTION_KEYS` (`workflow_runs`, `artifacts`, `workflows`) in `get_all_pages`; regression tests use real `GitHubAPI` + mocked `request_raw` (not FakeAPI); `billing.py` `workflow_name` hygiene. No deviations.
+
 `get_all_pages` only appends array responses; dict responses without `"message"` hit `break` and return `[]`. Affected endpoints:
 
 | Endpoint | Shape | Caller impact today |
@@ -72,7 +74,7 @@ Compute private-only rankings at the **data layer** (per-repo `visibility` alrea
 
 ### 0a. Fix `get_all_pages`
 
-Unwrap recognized collection keys and keep `rel="next"` pagination. Guard against null collections:
+- [x] Unwrap recognized collection keys and keep `rel="next"` pagination. Guard against null collections:
 
 ```python
 _COLLECTION_KEYS = ("workflow_runs", "artifacts", "workflows")
@@ -88,16 +90,16 @@ _COLLECTION_KEYS = ("workflow_runs", "artifacts", "workflows")
 
 ### 0b. Regression tests
 
-- `get_all_pages` unwraps `{"workflow_runs": [...]}` and follows `rel="next"`; unknown dict shape still breaks; `{"workflow_runs": null}` does not raise.
-- `get_actions_from_runs` against an object-shaped runs response returns runs into the loop (proves unwrap). Minutes/OS may still be zero when fixtures omit `billable` — that is expected against the live API.
-- Artifact collectors populate rows from object-shaped artifacts responses.
+- [x] `get_all_pages` unwraps `{"workflow_runs": [...]}` and follows `rel="next"`; unknown dict shape still breaks; `{"workflow_runs": null}` does not raise.
+- [x] `get_actions_from_runs` against an object-shaped runs response returns runs into the loop (proves unwrap). Minutes/OS may still be zero when fixtures omit `billable` — that is expected against the live API.
+- [x] Artifact collectors populate rows from object-shaped artifacts responses.
 
 **FakeAPI caveat (assessment 2346):** `tests/_fakes.py` `FakeAPI.get_all_pages` returns the preconfigured list from `pages_responses` and **does not** exercise `GitHubAPI.get_all_pages` unwrap logic. Phase 0b unwrap/pagination regressions must use a real `GitHubAPI("fake-token")` with `mock.patch.object(api, "request_raw", ...)` returning `Response` bodies — same pattern as `tests/test_api.py:114` (`test_get_all_pages_uses_link_header`). Do **not** feed object-shaped dicts through `FakeAPI.get_all_pages` and claim the unwrap is covered. Downstream tests that only use `FakeAPI.pages_responses` may still assert collector behavior, but they are not a substitute for the real unwrap unit test.
 
 ### 0c. What Phase 0 does and does not restore
 
-- **Restores:** artifact scan / `get_artifact_storage_details`; runs list access for Phase 4 estimation; workflows list for names.
-- **Does not restore:** "Actions Compute by OS" with real values. `get_actions_from_runs` still reads `run["billable"]`, which is absent live → OS section stays empty until a different data source exists. Fix `billing.py:166` to `run.get("workflow_name") or "Unknown"` as hygiene when the loop does run.
+- [x] **Restores:** artifact scan / `get_artifact_storage_details`; runs list access for Phase 4 estimation; workflows list for names.
+- [x] **Does not restore:** "Actions Compute by OS" with real values. `get_actions_from_runs` still reads `run["billable"]`, which is absent live → OS section stays empty until a different data source exists. Fix `billing.py:166` to `run.get("workflow_name") or "Unknown"` as hygiene when the loop does run.
 
 ---
 
@@ -354,7 +356,7 @@ Cap at 10 rows each. Watch ~480-line budget (currently ~435).
 
 ### 6d. Workflow breakdown + Phase 0
 
-- Object-shaped runs → `get_actions_from_runs` enters the loop; `workflow_name: null` → `"Unknown"`
+- [x] Object-shaped runs → `get_actions_from_runs` enters the loop; `workflow_name: null` → `"Unknown"` (Phase 0; Done 2026-08-01)
 - `fetch_workflow_minutes`: aggregates by `workflow_id`; skips non-`completed` and zero-duration; soft-fail name map → `run.name`; sorted desc; renderer includes caveat; fractional minutes (no ceil)
 - **Timezone math:** GitHub `...Z` timestamps and offset forms subtract cleanly (no aware/naive `TypeError`)
 - **Redundancy helper:** all-private combined Top-M does **not** suppress a longer private Top-N (`len(private) > len(combined)`)
@@ -414,7 +416,7 @@ Out of scope for this plan’s COMPLETE criteria. Tracked under **Actions / Loca
 
 ## Implementation order
 
-1. Phase 0 (paging + tests)
+1. ~~Phase 0 (paging + tests)~~ **Done 2026-08-01**
 2. Phase 1 + 6a/6b
 3. Phase 2 + 6c
 4. Phase 3 + 6e

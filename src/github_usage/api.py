@@ -7,6 +7,9 @@ import urllib.parse
 
 from . import __version__
 
+# GitHub list endpoints that return {total_count, <collection>: [...]} instead of a bare array.
+_COLLECTION_KEYS = ("workflow_runs", "artifacts", "workflows")
+
 
 class GitHubAPI:
     def __init__(self, token, timeout=None, max_retries=None):
@@ -127,7 +130,15 @@ class GitHubAPI:
             if not isinstance(result, list):
                 if isinstance(result, dict) and "message" in result:
                     raise RuntimeError(f"API error on {path}: {result['message']}")
-                break
+                if isinstance(result, dict):
+                    for key in _COLLECTION_KEYS:
+                        if key in result and isinstance(result[key], list):
+                            result = result[key]
+                            break
+                    else:
+                        break  # unknown dict shape — keep prior empty-list behavior
+                else:
+                    break
 
             all_items.extend(result)
             if limit and len(all_items) >= limit:

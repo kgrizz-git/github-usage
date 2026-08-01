@@ -90,6 +90,38 @@ class GetArtifactStorageDetailsTests(unittest.TestCase):
         result = get_artifact_storage_details(api, [_repo("octocat/repo")], max_repos=10)
         self.assertEqual(result["top_repos"], [])
 
+    def test_populates_from_object_shaped_artifacts_response(self):
+        """Artifact collector populates rows when GitHub returns {artifacts: [...]}."""
+        import json
+
+        from github_usage.api import GitHubAPI
+        from github_usage.http_retry import Response
+
+        api = GitHubAPI("fake-token")
+
+        def mock_request_raw(method, path, params=None):
+            import http.client
+
+            headers = http.client.HTTPMessage()
+            body = json.dumps(
+                {
+                    "total_count": 2,
+                    "artifacts": [
+                        {"id": 1, "size_in_bytes": 1024},
+                        {"id": 2, "size_in_bytes": 2048},
+                    ],
+                }
+            ).encode()
+            return Response(status=200, body=body, headers=headers)
+
+        with mock.patch.object(api, "request_raw", side_effect=mock_request_raw):
+            result = get_artifact_storage_details(api, [_repo("octocat/repo")], max_repos=10)
+
+        self.assertEqual(
+            result["top_repos"],
+            [{"repo": "octocat/repo", "artifact_bytes": 3072, "visibility": "public"}],
+        )
+
 
 class GetReleaseAssetDetailsTests(unittest.TestCase):
     def test_skips_assets_with_non_numeric_size(self):
