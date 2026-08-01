@@ -24,7 +24,7 @@ from .export_json import _DatetimeEncoder
 from .setup_config import SetupPaths
 
 DEFAULT_CACHE_MAX_AGE_SECONDS = 3600
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
 
 def cache_disabled() -> bool:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .billing import BillingFetchError, get_actions_per_repo
+from .repo_consumers import build_consumer_rankings
 from .report_helpers import gb_hours_to_avg_mb
 from .usage_split import split_rows_by_visibility
 from .visibility import repo_visibility
@@ -43,12 +44,12 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
                 "visibility": repo_visibility(repo),
             }
         )
+    rankings = build_consumer_rankings(rows, limit=limit)
     return {
         "scanned_repo_count": len(considered),
         "max_repos": max_repos,
         "truncated": len(repos) > max_repos,
-        "by_minutes": sorted(rows, key=lambda row: row["minutes"], reverse=True)[:limit],
-        "by_cost": sorted(rows, key=lambda row: row["gross"], reverse=True)[:limit],
+        **rankings,
         "errors": errors,
         "by_visibility": split_rows_by_visibility(rows, storage_key="storage_avg_mb", sku_key=None),
     }

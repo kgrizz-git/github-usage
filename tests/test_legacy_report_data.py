@@ -46,6 +46,48 @@ class LegacyReportDataTests(unittest.TestCase):
         self.assertEqual(consumers["by_minutes"][0]["visibility"], "public")
         self.assertEqual(consumers["by_cost"][0]["visibility"], "public")
 
+    def test_derive_repo_consumers_returns_private_and_storage_ranking_keys(self) -> None:
+        rows = [
+            {
+                "repo": "octocat/private",
+                "minutes": 40.0,
+                "gross": 4.0,
+                "avg_mb": 8.0,
+                "visibility": "private",
+            },
+            {
+                "repo": "octocat/public",
+                "minutes": 100.0,
+                "gross": 10.0,
+                "avg_mb": 50.0,
+                "visibility": "public",
+            },
+            {
+                "repo": "octocat/internal",
+                "minutes": 30.0,
+                "gross": 3.0,
+                "avg_mb": 6.0,
+                "visibility": "internal",
+            },
+        ]
+        consumers = derive_repo_consumers(
+            rows,
+            {},
+            max_repos=100,
+            truncated=False,
+            scanned_repo_count=3,
+        )
+        for key in (
+            "by_storage",
+            "by_minutes_private",
+            "by_storage_private",
+        ):
+            self.assertIn(key, consumers)
+        private_repos = {row["repo"] for row in consumers["by_minutes_private"]}
+        self.assertEqual(private_repos, {"octocat/private", "octocat/internal"})
+        self.assertNotIn("octocat/public", private_repos)
+        self.assertEqual(consumers["by_storage"][0]["repo"], "octocat/public")
+
     def test_derive_artifact_storage_from_storage_analysis(self) -> None:
         storage = {
             "repos": [

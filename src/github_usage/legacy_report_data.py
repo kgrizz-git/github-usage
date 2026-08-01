@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .billing import get_billing_summary, get_premium_request_usage
+from .repo_consumers import build_consumer_rankings
 from .report_account import fetch_account_info, fetch_rate_limits
 from .report_actions import fetch_actions_os_breakdown, fetch_repo_actions_table
 from .report_data import (
@@ -58,12 +59,12 @@ def derive_repo_consumers(
         }
         for row in repo_actions
     ]
+    rankings = build_consumer_rankings(rows, limit=limit)
     return {
         "scanned_repo_count": scanned_repo_count,
         "max_repos": max_repos,
         "truncated": truncated,
-        "by_minutes": sorted(rows, key=lambda row: row["minutes"], reverse=True)[:limit],
-        "by_cost": sorted(rows, key=lambda row: row["gross"], reverse=True)[:limit],
+        **rankings,
         "errors": dict(errors),
     }
 
