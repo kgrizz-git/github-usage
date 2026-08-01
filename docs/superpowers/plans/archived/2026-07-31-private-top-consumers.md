@@ -1,4 +1,4 @@
-> **Status:** IN PROGRESS
+> **Status:** COMPLETE
 
 > Line numbers are accurate as of 2026-07-31; relocate by anchor (function name + dict key) if they drift.
 >
@@ -105,6 +105,8 @@ _COLLECTION_KEYS = ("workflow_runs", "artifacts", "workflows")
 
 ## Phase 1 — Data: shared ranking helper + new `repo_consumers` keys
 
+**Done:** 2026-08-01 — `repo_consumers.py` with `build_consumer_rankings` and `private_list_is_redundant`; wired into email and legacy builders; `CACHE_VERSION` bumped to 3.
+
 ### 1a. New module `src/github_usage/repo_consumers.py` (~120 lines)
 
 ```python
@@ -129,19 +131,21 @@ def private_list_is_redundant(combined: list, private: list) -> bool:
 Also export `private_list_is_redundant` for Phase 2/3/5 renderers. Call sites should pass lists sliced to the **same display limits** they render (matched 5/5 or 10/10); the helper still guards mismatches.
 ### 1b. `get_repo_consumers` (`report_optional.py:23`) — email path
 
-Replace inline sort/slice with `build_consumer_rankings(rows, limit=limit)`; spread into returned dict. Keep `scanned_repo_count`, `max_repos`, `truncated`, `errors`, `by_visibility`. No new API calls.
+- [x] Replace inline sort/slice with `build_consumer_rankings(rows, limit=limit)`; spread into returned dict. Keep `scanned_repo_count`, `max_repos`, `truncated`, `errors`, `by_visibility`. No new API calls.
 
 ### 1c. `derive_repo_consumers` (`legacy_report_data.py:41`) — legacy path
 
-Same: build row shape, call helper, spread. Keep `errors` passthrough.
+- [x] Same: build row shape, call helper, spread. Keep `errors` passthrough.
 
 ### 1d. Cache
 
-Bump `CACHE_VERSION` (`report_cache.py:27`) from `2` → `3`. Update `tests/test_report_optional.py:244` assertion to `3`.
+- [x] Bump `CACHE_VERSION` (`report_cache.py:27`) from `2` → `3`. Update `tests/test_report_optional.py:244` assertion to `3`.
 
 ---
 
 ## Phase 2 — Local terminal report
+
+**Done:** 2026-08-01 — Private top lists in `render_actions_top_consumers`, `_print_top_consumers`, `_print_storage_breakdown`; insights findings and concentration recommendation.
 
 ### 2a. `render_actions_top_consumers` (`report_actions.py:268`)
 
@@ -183,6 +187,8 @@ When private rows exist and not redundant (`private_list_is_redundant`):
 
 ## Phase 3 — Email report
 
+**Done:** 2026-08-01 — Text and HTML consumer sections; `_email_report_html_tables.py` extracted.
+
 ### 3a. `email_report_text.py:_format_consumers_section` (`:126`)
 
 After combined lists, when keys non-empty and not redundant (`private_list_is_redundant`):
@@ -200,6 +206,8 @@ Mirror 3a via `_html_grouped_table`. **Mandatory:** extract table helpers (and P
 ---
 
 ## Phase 4 — Workflow breakdown for the top private-repo consumer (estimated minutes)
+
+**Done:** 2026-08-01 — `report_workflow_minutes.py`, builder wiring, terminal/email renderers with caveat.
 
 Live runs expose **no** billable minutes. Estimate from `updated_at − run_started_at` (fallback `created_at`), current calendar month. Label every section as an approximation.
 
@@ -324,6 +332,8 @@ Wall-clock over the current month — not GitHub billable. Billing meters **per 
 
 ## Phase 5 — TUI detail rows (`legacy_report_summary.py`)
 
+**Done:** 2026-08-01 — `_repo_rows` private minutes/storage and overall storage sections with redundancy guards.
+
 In `_repo_rows` (`:295`), after combined sections (skip when redundant via `private_list_is_redundant`):
 
 - `_section("Top private repos by Actions minutes")` — `by_minutes_private`
@@ -335,6 +345,8 @@ Cap at 10 rows each. Watch ~480-line budget (currently ~435).
 ---
 
 ## Phase 6 — Tests
+
+**Done:** 2026-08-01 — `test_repo_consumers.py`, builder/renderer/email/TUI/workflow tests per 6a–6e.
 
 ### 6a. `tests/test_repo_consumers.py`
 
@@ -357,11 +369,11 @@ Cap at 10 rows each. Watch ~480-line budget (currently ~435).
 ### 6d. Workflow breakdown + Phase 0
 
 - [x] Object-shaped runs → `get_actions_from_runs` enters the loop; `workflow_name: null` → `"Unknown"` (Phase 0; Done 2026-08-01)
-- `fetch_workflow_minutes`: aggregates by `workflow_id`; skips non-`completed` and zero-duration; soft-fail name map → `run.name`; sorted desc; renderer includes caveat; fractional minutes (no ceil)
-- **Timezone math:** GitHub `...Z` timestamps and offset forms subtract cleanly (no aware/naive `TypeError`)
-- **Redundancy helper:** all-private combined Top-M does **not** suppress a longer private Top-N (`len(private) > len(combined)`)
-- Shared `runs_cache`: second fetch for the same `(owner, name, range)` is a cache hit within one report build
-- Builders store `workflow_breakdown` only when top private has `minutes > 0`
+- [x] `fetch_workflow_minutes`: aggregates by `workflow_id`; skips non-`completed` and zero-duration; soft-fail name map → `run.name`; sorted desc; renderer includes caveat; fractional minutes (no ceil)
+- [x] **Timezone math:** GitHub `...Z` timestamps and offset forms subtract cleanly (no aware/naive `TypeError`)
+- [x] **Redundancy helper:** all-private combined Top-M does **not** suppress a longer private Top-N (`len(private) > len(combined)`)
+- [x] Shared `runs_cache`: second fetch for the same `(owner, name, range)` is a cache hit within one report build
+- [x] Builders store `workflow_breakdown` only when top private has `minutes > 0`
 
 ### 6e. Email
 
@@ -371,19 +383,21 @@ Cap at 10 rows each. Watch ~480-line budget (currently ~435).
 
 ## Phase 7 — Documentation & changelog
 
+**Done:** 2026-08-01 — README consumers section, consolidated CHANGELOG `[Unreleased]` entries, Phase 8 deferrals on `TO_DO.md`, verification scripts, plan archived.
+
 ### 7a. README
 
-Consumers sections include private-only top lists for Actions minutes and storage; storage ranked by billed avg MB; workflow breakdown for top private minutes consumer (estimated from run wall-clock — not billable; will not match billed repo total).
+- [x] Consumers sections include private-only top lists for Actions minutes and storage; storage ranked by billed avg MB; workflow breakdown for top private minutes consumer (estimated from run wall-clock — not billable; will not match billed repo total).
 
 ### 7b. CHANGELOG.md — `[Unreleased]`
 
-- **Added:** private-repo top consumers (minutes + storage) alongside overall rankings; overall top-by-storage list.
-- **Added:** minutes-by-workflow for top private consumer (estimated from run wall-clock; not billable — will not match billed totals).
-- **Fixed:** REST paging unwraps object-shaped responses (`workflow_runs`, `artifacts`, `workflows`), restoring the artifact-storage scan. (OS breakdown remains empty against the live API — no `billable` on runs.)
+- [x] **Added:** private-repo top consumers (minutes + storage) alongside overall rankings; overall top-by-storage list.
+- [x] **Added:** minutes-by-workflow for top private consumer (estimated from run wall-clock; not billable — will not match billed totals).
+- [x] **Fixed:** REST paging unwraps object-shaped responses (`workflow_runs`, `artifacts`, `workflows`), restoring the artifact-storage scan. (OS breakdown remains empty against the live API — no `billable` on runs.)
 
 ### 7c. TO_DO.md
 
-Move Phase 8 deferrals onto `TO_DO.md` (do not keep a long deferred list here). No other completed TO_DO items to remove for this plan’s core scope.
+- [x] Move Phase 8 deferrals onto `TO_DO.md` (do not keep a long deferred list here). No other completed TO_DO items to remove for this plan’s core scope.
 
 ---
 
@@ -417,13 +431,13 @@ Out of scope for this plan’s COMPLETE criteria. Tracked under **Actions / Loca
 ## Implementation order
 
 1. ~~Phase 0 (paging + tests)~~ **Done 2026-08-01**
-2. Phase 1 + 6a/6b
-3. Phase 2 + 6c
-4. Phase 3 + 6e
-5. Phase 4 + 6d
-6. Phase 5 + TUI tests
-7. Phase 7 + seed Phase 8 items onto `TO_DO.md` (if not already)
-8. `scripts/check`, `scripts/smoke`, `scripts/docs-check` → mark COMPLETE and archive
+2. ~~Phase 1 + 6a/6b~~ **Done 2026-08-01**
+3. ~~Phase 2 + 6c~~ **Done 2026-08-01**
+4. ~~Phase 3 + 6e~~ **Done 2026-08-01**
+5. ~~Phase 4 + 6d~~ **Done 2026-08-01**
+6. ~~Phase 5 + TUI tests~~ **Done 2026-08-01**
+7. ~~Phase 7 + seed Phase 8 items onto `TO_DO.md`~~ **Done 2026-08-01**
+8. ~~`scripts/check`, `scripts/smoke`, `scripts/docs-check` → mark COMPLETE and archive~~ **Done 2026-08-01**
 
 ---
 

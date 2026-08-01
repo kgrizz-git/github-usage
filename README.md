@@ -192,6 +192,14 @@ github-usage email-report \
 
 `--include-consumers`, `--include-artifact-storage`, and `--include-release-assets` add repo-level API calls. They consume GitHub REST API request quota, not Actions minutes, Actions storage, Copilot requests, Git LFS quota, or billable GitHub usage. Use monthly schedules and conservative `--max-repos` values for accounts with many repositories.
 
+With `--include-consumers` (local full report and email), the **repo consumers** sections rank repositories by Actions usage alongside the existing combined top-by-minutes and top-by-cost lists:
+
+- **Overall top-by-storage** — billed Actions storage ranked by average MB (`storage_avg_mb` from the billing API).
+- **Private-only top lists** — separate rankings for Actions minutes and billed storage among private and internal repos only (the quota-relevant slice). Shown only when they add signal beyond the combined list (for example, when public repos dominate the overall minutes ranking).
+- **Minutes by workflow** — for the top private-repo minutes consumer, an estimated per-workflow breakdown from completed run wall-clock time (start→end). This is **not billable** GitHub data: it uses fractional run elapsed time, not per-job rounding or OS multipliers, so the estimated total **will not match** the billed repo minutes figure. The section is labeled accordingly in terminal, TUI, and email output.
+
+The same consumer keys appear in JSON exports; dedicated CSV/XLSX/PDF columns for private rankings and workflow breakdown are planned (see `TO_DO.md`).
+
 Repo-level sections annotate non-public repositories with `[private]` or `[internal]` tags. The local full report's per-repo Actions table groups rows by visibility with subtotals. `--only-public` and `--only-private` (mutually exclusive) filter which repositories are included in repo-level sections; filtering applies after the `--max-repos` limit. Set `only_public` / `only_private` in `[email_report]` in `config.toml` for scheduled runs.
 
 **Free-tier quota is private-first.** Limits Summary, utilization, forecasts, TUI rows, and exports measure Actions minutes and artifact storage against the free tier for **private** (and internal) repos only. Public standard-runner usage is shown separately and labeled free. Larger-runner SKUs are marked `*` (always billed). Artifact storage frames the 500 MB private allowance as GB-hours accrual (0.5 GB flat all month ≈ 360 GB-hrs for a 30-day month), splits Actions artifacts from release assets (releases are not quota-billed), and flags soon-to-expire / expired artifacts (default retention 90 days). Repos beyond `--max-repos` may appear as unattributed remainder vs the account billing total. Reports include a Sources footer linking GitHub’s Actions billing, runner pricing, and release-storage docs.
