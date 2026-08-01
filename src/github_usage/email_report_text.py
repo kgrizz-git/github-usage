@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ._email_report_common import _bytes_to_mb, _generated_line
+from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 from .visibility import (
@@ -153,12 +154,25 @@ def _format_consumers_section(data: dict) -> list[str]:
             f"{r['minutes']:,.1f} min, {r['storage_avg_mb']:,.1f} MB avg storage"
         )
 
+    def _storage_value(r: dict) -> str:
+        return (
+            f"{r['storage_avg_mb']:,.1f} MB avg storage, "
+            f"{r['minutes']:,.1f} min, {fmt_price(r['gross'])}"
+        )
+
+    def _flat_list(title: str, rows: list[dict], *, value_fn) -> list[str]:
+        lines = [title]
+        for row in rows:
+            lines.append(f"- {_annotated_repo_name(row)}: {value_fn(row)}")
+        return lines
+
     lines: list[str] = []
     lines.extend(_visibility_usage_summary_lines(consumers))
+    by_minutes = consumers.get("by_minutes") or []
     lines.extend(
         _grouped_list(
             "Top Repositories by Actions Minutes",
-            consumers.get("by_minutes", []),
+            by_minutes,
             value_fn=_minutes_value,
         )
     )
@@ -168,6 +182,37 @@ def _format_consumers_section(data: dict) -> list[str]:
             "Top Repositories by Actions Cost", consumers.get("by_cost", []), value_fn=_cost_value
         )
     )
+    lines.append("")
+    by_storage = consumers.get("by_storage") or []
+    if by_storage:
+        lines.extend(
+            _grouped_list(
+                "Top Repositories by Actions Storage (all)",
+                by_storage,
+                value_fn=_storage_value,
+            )
+        )
+        lines.append("")
+    by_minutes_private = consumers.get("by_minutes_private") or []
+    if by_minutes_private and not private_list_is_redundant(by_minutes, by_minutes_private):
+        lines.extend(
+            _flat_list(
+                "Top Private Repositories by Actions Minutes",
+                by_minutes_private,
+                value_fn=_minutes_value,
+            )
+        )
+        lines.append("")
+    by_storage_private = consumers.get("by_storage_private") or []
+    if by_storage_private and not private_list_is_redundant(by_storage, by_storage_private):
+        lines.extend(
+            _flat_list(
+                "Top Private Repositories by Actions Storage",
+                by_storage_private,
+                value_fn=_storage_value,
+            )
+        )
+        lines.append("")
     if consumers.get("truncated"):
         lines.append(f"- Repo list truncated at {consumers.get('max_repos')} repositories.")
     lines.append("")
