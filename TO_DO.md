@@ -19,8 +19,13 @@
 
 ## Actions / Local Full Report
 
+- [ ] Private-only top consumers + wall-clock workflow breakdown — see [plan](docs/superpowers/plans/2026-07-31-private-top-consumers.md).
 - [ ] Retire dead Actions OS-from-runs path (honesty) — see [plan](docs/superpowers/plans/2026-07-31-actions-os-from-runs-honesty.md).
-- [ ] Opt-in monthly deep run analysis (top private repo by gross cost; job-level approx + calendar-month cache) — late **Phase 9** of [private-top-consumers plan](docs/superpowers/plans/2026-07-31-private-top-consumers.md).
+- [ ] Opt-in monthly deep run analysis (top private repo by gross cost; job-level approx + calendar-month cache) — see [plan](docs/superpowers/plans/2026-07-31-opt-in-deep-run-analysis.md) (depends on private-top-consumers Phase 0 / ideally Phase 4).
+- [ ] After private-top-consumers: add `TODO` comments at `repo_consumers` readers in `export_csv.py`, `export_xlsx.py`, and `export_pdf.py` for private ranking / workflow-breakdown columns or sheets.
+- [ ] Private-only **artifact-scan** ranking (artifact section already groups by visibility; billed storage ranking is in private-top-consumers).
+- [ ] Workflow breakdown for more than the single top private repo (extend beyond Phase 4’s one-repo wall-clock section).
+- [ ] Deep-analysis follow-ons (email section, top-N repos, export columns, auto-enable without flag) — deferred items in [opt-in deep-run plan](docs/superpowers/plans/2026-07-31-opt-in-deep-run-analysis.md) Phase 6.
 
 ## Code Health
 

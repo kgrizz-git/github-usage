@@ -4,9 +4,10 @@
 >
 > **Terminology:** user-facing name is **local full report** (CLI/TUI). Code modules still use `legacy_*` until the rename tracked in `TO_DO.md`.
 >
-> **Related:** OS-from-runs retirement → [`2026-07-31-actions-os-from-runs-honesty.md`](./2026-07-31-actions-os-from-runs-honesty.md). Opt-in deep analysis is **Phase 9** of this plan (not that one).
+> **Related:** OS-from-runs retirement → [`2026-07-31-actions-os-from-runs-honesty.md`](./2026-07-31-actions-os-from-runs-honesty.md). Opt-in deep analysis → [`2026-07-31-opt-in-deep-run-analysis.md`](./2026-07-31-opt-in-deep-run-analysis.md) (tracked on `TO_DO.md`; not in this plan’s implementation order).
 >
-> **Reviewed:** 2026-07-31 — Assessment `tmp/assessment-2026-07-31-2330.md` adopted (see Constraints / Phase 1a / 4a / 4b–c / 6d / 9).
+> **Reviewed:** 2026-07-31 — Assessment `tmp/assessment-2026-07-31-2330.md` adopted (see Constraints / Phase 1a / 4a / 4b–c / 6d). Phase 9 deep analysis split out to its own plan; Phase 8 deferrals tracked on `TO_DO.md`.
+> **Reviewed:** 2026-07-31 — Assessment `tmp/assessment-2026-07-31-2346.md` adopted: Phase 0b FakeAPI caveat — unwrap tests must use `GitHubAPI` + mocked `request_raw`, not `FakeAPI.get_all_pages`.
 >
 > **Implementation log:** (none yet)
 
@@ -88,8 +89,10 @@ _COLLECTION_KEYS = ("workflow_runs", "artifacts", "workflows")
 ### 0b. Regression tests
 
 - `get_all_pages` unwraps `{"workflow_runs": [...]}` and follows `rel="next"`; unknown dict shape still breaks; `{"workflow_runs": null}` does not raise.
-- `get_actions_from_runs` against object-shaped FakeAPI returns runs into the loop (proves unwrap). Minutes/OS may still be zero when fixtures omit `billable` — that is expected against the live API.
+- `get_actions_from_runs` against an object-shaped runs response returns runs into the loop (proves unwrap). Minutes/OS may still be zero when fixtures omit `billable` — that is expected against the live API.
 - Artifact collectors populate rows from object-shaped artifacts responses.
+
+**FakeAPI caveat (assessment 2346):** `tests/_fakes.py` `FakeAPI.get_all_pages` returns the preconfigured list from `pages_responses` and **does not** exercise `GitHubAPI.get_all_pages` unwrap logic. Phase 0b unwrap/pagination regressions must use a real `GitHubAPI("fake-token")` with `mock.patch.object(api, "request_raw", ...)` returning `Response` bodies — same pattern as `tests/test_api.py:114` (`test_get_all_pages_uses_link_header`). Do **not** feed object-shaped dicts through `FakeAPI.get_all_pages` and claim the unwrap is covered. Downstream tests that only use `FakeAPI.pages_responses` may still assert collector behavior, but they are not a substitute for the real unwrap unit test.
 
 ### 0c. What Phase 0 does and does not restore
 
@@ -204,7 +207,7 @@ Live runs expose **no** billable minutes. Estimate from `updated_at − run_star
 
 Put Phase 4 helpers in a new small module `src/github_usage/report_workflow_minutes.py` (keeps `report_actions.py` under ~400). Re-export `fetch_workflow_minutes` / `render_workflow_breakdown` from `report_actions.py` only if call sites already import from there; otherwise import the new module from builders/renderers directly.
 
-Shared runs cache — **must** be plumbed into Phase 4 and (when enabled) Phase 9; never `cache or {}`:
+Shared runs cache — **must** be plumbed into Phase 4 (and later the opt-in deep-analysis plan when enabled); never `cache or {}`:
 
 ```python
 def _fetch_runs_cached(api, owner: str, name: str, created_range: str, *, cache: dict) -> list:
@@ -222,7 +225,7 @@ def _fetch_runs_cached(api, owner: str, name: str, created_range: str, *, cache:
     return cache[key]
 ```
 
-`fetch_workflow_minutes` (and Phase 9 deep analysis when enabled) receive the same builder-owned `runs_cache: dict` (always a real dict, never `None` at the builder boundary). Do not plumb cache into OS-breakdown once that path is retired by the honesty plan.
+`fetch_workflow_minutes` receives a builder-owned `runs_cache: dict` (always a real dict, never `None` at the builder boundary). The opt-in deep-analysis plan reuses the same cache key convention when both run.
 
 ```python
 def fetch_workflow_minutes(api, owner: str, name: str, *, runs_cache: dict) -> dict | None:
@@ -275,7 +278,7 @@ Notes:
 - **`_parse_iso`:** reuse or match `storage._parse_iso_datetime` — always timezone-aware UTC (`Z` → `+00:00`, naive → UTC). Missing/bad timestamps skipped; never raise on subtract of mixed aware/naive.
 - Sort `(-minutes, name)` (constraint 4).
 - Do not reuse `get_actions_from_runs`' `workflow_minutes` (keys on null `workflow_name`). Hygiene-fix `billing.py:166` anyway.
-- Builder creates `runs_cache: dict = {}` once and passes it into Phase 4 and (when enabled) Phase 9.
+- Builder creates `runs_cache: dict = {}` once and passes it into Phase 4 (and deep analysis when that separate plan is wired).
 ### 4b. Legacy wiring — `build_legacy_report_data` (`legacy_report_data.py:206`)
 
 After `repo_consumers`, if `by_minutes_private` non-empty and `[0]["minutes"] > 0`, parse `owner/name` (`if "/" in repo:`), call `fetch_workflow_minutes`, store `report["workflow_breakdown"]` (default `None`).
@@ -355,7 +358,7 @@ Cap at 10 rows each. Watch ~480-line budget (currently ~435).
 - `fetch_workflow_minutes`: aggregates by `workflow_id`; skips non-`completed` and zero-duration; soft-fail name map → `run.name`; sorted desc; renderer includes caveat; fractional minutes (no ceil)
 - **Timezone math:** GitHub `...Z` timestamps and offset forms subtract cleanly (no aware/naive `TypeError`)
 - **Redundancy helper:** all-private combined Top-M does **not** suppress a longer private Top-N (`len(private) > len(combined)`)
-- Shared `runs_cache`: second fetch for the same `(owner, name, range)` is a cache hit (Phase 4 + Phase 9 when both enabled)
+- Shared `runs_cache`: second fetch for the same `(owner, name, range)` is a cache hit within one report build
 - Builders store `workflow_breakdown` only when top private has `minutes > 0`
 
 ### 6e. Email
@@ -378,65 +381,19 @@ Consumers sections include private-only top lists for Actions minutes and storag
 
 ### 7c. TO_DO.md
 
-No completed items to remove.
+Move Phase 8 deferrals onto `TO_DO.md` (do not keep a long deferred list here). No other completed TO_DO items to remove for this plan’s core scope.
 
 ---
 
-## Phase 8 — Deferred (exports / follow-ons)
+## Phase 8 — Deferred (tracked on TO_DO.md)
 
-- CSV/XLSX/PDF columns/sheets for private rankings and workflow breakdown — add `TODO` at `repo_consumers` readers in `export_csv.py:130`, `export_xlsx.py:221`, `export_pdf.py:188`.
-- Private-only artifact-scan ranking (section already groups by visibility).
+Out of scope for this plan’s COMPLETE criteria. Tracked under **Actions / Local Full Report** in `TO_DO.md`:
+
+- CSV/XLSX/PDF columns/sheets for private rankings and workflow breakdown (`TODO` comments at export `repo_consumers` readers).
+- Private-only artifact-scan ranking.
 - Workflow breakdown for more than the single top private repo.
-- New CLI flags / profile keys for Phases 0–7 (Phase 9 adds opt-in deep analysis only).
-- Default OS-from-runs path — **owned by** [`2026-07-31-actions-os-from-runs-honesty.md`](./2026-07-31-actions-os-from-runs-honesty.md) (retire dead section; do not restore via list-run `billable`).
-
----
-
-## Phase 9 — Opt-in monthly deep run analysis (late; default off)
-
-**Distinct from Phase 4:** Phase 4 is a cheap wall-clock-by-workflow estimate (always-on with consumers). Phase 9 is an **expensive**, closer-to-billable **job-level** approximation for one private repo — opt-in, preferably once per calendar month.
-
-### Ranking
-
-- Select the top **private/internal** repo by **`gross`** (Actions minutes cost before discount). If no private row has `gross > 0`, fall back to **`minutes`**.
-- Document as gross-cost ranking in CLI help / README.
-
-### 9a. CLI / config (default off)
-
-- [ ] `--deep-run-analysis` / `--no-deep-run-analysis` on the local full report path.
-- [ ] `--force-deep-run-analysis` to bypass calendar-month cache.
-- [ ] `deep_run_analysis = false` in profile/`config.toml` defaults (not enabled for email profiles by default).
-- [ ] Help text: ranking metric, jobs-per-run quota cost, monthly cache, approximate (ceil-per-job + OS multipliers — not GitHub's retired timing API).
-
-### 9b. Collector — `report_deep_run_analysis.py`
-
-- [ ] List current-month runs (shared `runs_cache` with Phase 4 when same repo; never `cache or {}`).
-- [ ] For each completed run (cap e.g. `max_runs=200`): `GET .../actions/runs/{id}/jobs`.
-- [ ] Per job: duration from `started_at`/`completed_at`; `ceil(seconds/60)`; map `labels` → Linux 1× / Windows 2× / macOS 10×; unknown/self-hosted/larger → separate buckets with caveats.
-- [ ] Aggregate by workflow and OS/label class; show approx totals **alongside** billed `minutes`/`gross` (expect divergence).
-- [ ] Soft-fail on 403/partial; do **not** call `/runs/{id}/timing` in the product path.
-
-### 9c. Once-a-month cache
-
-- [ ] Cache summarized analysis under gitignored cache dir, keyed by `{user/owner, repo, YYYY-MM, analysis_version}` (include `cached_at` / as-of date in the payload).
-- [ ] Cache hit → skip jobs fan-out; `--force-deep-run-analysis` refreshes.
-- [ ] **Staleness is intentional:** mid-month hits omit later runs. Render a visible one-line caveat, e.g. `(cached as of YYYY-MM-DD; later runs omitted — use --force-deep-run-analysis to refresh)`.
-- [ ] Do not store tokens or full raw job dumps — aggregates only.
-- [ ] Quota estimate: on cache miss, bump numeric `estimated_incremental_requests` by `ceil(runs/100) + min(run_count, max_runs)` (or a documented safe cap); on hit, `+0` for the deep path.
-
-### 9d. Render (local full report only for v1)
-
-- [ ] Section title e.g. **"Deep run analysis — top private repo by gross Actions cost (opt-in)"**.
-- [ ] Caveats: not official billable; job-sum can exceed run wall-clock; distinct from Phase 4 wall-clock estimate; **plus mid-month cache staleness line when serving cache**.
-- [ ] Email / export / multi-repo: **deferred** (Phase 8 list).
-- [ ] Flag off → zero extra calls.
-
-### 9e. Tests / docs
-
-- [ ] Ranking (gross vs minutes fallback); ceil + label mapping; FakeAPI object-shaped runs + jobs; cache hit skips jobs; flag off → no fetch.
-- [ ] **Mid-month cache:** seed cache mid-month, add newer runs to FakeAPI, assert cached (stale) result is served unless `--force-deep-run-analysis`.
-- [ ] README + changelog **Added:** opt-in deep run analysis (job-level approx; monthly cache; staleness caveat).
-- [ ] `scripts/smoke` after CLI flags land.
+- Opt-in deep run analysis → [`2026-07-31-opt-in-deep-run-analysis.md`](./2026-07-31-opt-in-deep-run-analysis.md).
+- OS-from-runs honesty → [`2026-07-31-actions-os-from-runs-honesty.md`](./2026-07-31-actions-os-from-runs-honesty.md).
 
 ---
 
@@ -445,14 +402,13 @@ No completed items to remove.
 1. Private = private + internal.
 2. Storage ranking = billed avg MB; scan view stays separate and labeled "(scan)".
 3. Rankings on `repo_consumers` via shared pure helper; overall lists kept.
-4. Phases 0–7: no new CLI/config except as already specified; cache version → 3. **Phase 9** adds opt-in `--deep-run-analysis` (default off) + monthly cache.
+4. No new CLI/config for Phases 0–7; cache version → 3. (Deep-analysis flags live in the separate opt-in plan.)
 5. `repo_data` 6-tuple unchanged.
 6. Redundancy / zero-division / deterministic-tie constraints as above; `private_list_is_redundant` requires `len(private) <= len(combined)` when combined is all-private.
-7. Workflow minutes estimated from run wall-clock for top private consumer only (top 10 terminal / top 5 email); always labeled as estimate that **will not match** billed totals (per-job rounding + multipliers + parallelism). `_parse_iso` is timezone-safe (UTC-aware).
-8. Phase 0 ships with this work: restores artifacts + enables Phase 4; does **not** claim to restore OS billable minutes (OS-from-runs retirement → separate honesty plan).
-9. Phase 4 lives in `report_workflow_minutes.py`; builder-owned `runs_cache` shared with Phase 9 when both run (never `cache or {}`). OS-breakdown sharing is moot once the honesty plan retires that path. Quota bump for Phase 4 is a **safe constant (`+= 10`)**, not exact `ceil(runs/100)+1`.
+7. Workflow minutes estimated from run wall-clock for top private consumer only (top 10 terminal / top 5 email); always labeled as estimate that **will not match** billed totals. `_parse_iso` is timezone-safe (UTC-aware).
+8. Phase 0 ships with this work: restores artifacts + enables Phase 4; does **not** claim to restore OS billable minutes.
+9. Phase 4 lives in `report_workflow_minutes.py`; builder-owned `runs_cache` (never `cache or {}`) — shared later with the opt-in deep-analysis plan when both run. Quota bump for Phase 4 is a **safe constant (`+= 10`)**, not exact `ceil(runs/100)+1`.
 10. TUI includes overall billed storage section (not optional).
-11. Phase 9 ranks by **gross** among private repos (minutes fallback); job-level ceil + multipliers; calendar-month cache with **visible staleness caveat**; local full report only for v1.
 
 ---
 
@@ -464,17 +420,15 @@ No completed items to remove.
 4. Phase 3 + 6e
 5. Phase 4 + 6d
 6. Phase 5 + TUI tests
-7. Phase 7 + Phase 8 TODOs
-8. **Phase 9** (opt-in deep analysis) — after Phases 0–4 are solid; can ship in a follow-up PR on the same plan before archive
-9. `scripts/check`, `scripts/smoke`, `scripts/docs-check` → mark COMPLETE and archive
+7. Phase 7 + seed Phase 8 items onto `TO_DO.md` (if not already)
+8. `scripts/check`, `scripts/smoke`, `scripts/docs-check` → mark COMPLETE and archive
 
 ---
 
 ## Verification
 
-- `scripts/check` — lint, types, tests, sizes (watch HTML/insights/TUI/`report_actions.py` line budgets; new `report_workflow_minutes.py` / `report_deep_run_analysis.py` stay small).
-- `scripts/smoke` — CLI entrypoints; after Phase 9, flag on/off.
+- `scripts/check` — lint, types, tests, sizes (watch HTML/insights/TUI/`report_actions.py` line budgets; new `report_workflow_minutes.py` stays small).
+- `scripts/smoke` — CLI entrypoints unchanged (no deep-analysis flags in this plan).
 - `scripts/docs-check` — README + changelog.
 - `./start.sh report` — private minutes top list (led by `WeekendDigestFreeAPIs` ~1,126 min, then `SpotiBye`, `PSDCalcRework`, `Notes_and_Ideas`, `SpotiByeMatcher`); summary private minutes + storage lists; overall lists still render; "Minutes by Workflow — Top Private Repo" with estimate caveat for `WeekendDigestFreeAPIs` (est total expected well below billed — do not expect parity). Artifact scan should populate. OS-from-runs section behavior deferred to honesty plan (may still be empty until that ships).
 - `./start.sh email-report` (or unit tests) — private lists + workflow block in text and HTML (`include_consumers` enabled).
-- Phase 9: with `--deep-run-analysis`, top private-by-gross analyzed; second run same month hits cache **and shows staleness caveat**; `--force-deep-run-analysis` refreshes; without flag, zero deep calls.
