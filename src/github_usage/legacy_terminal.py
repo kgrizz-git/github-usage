@@ -21,6 +21,7 @@ from .report_products import (
 from .report_sources import print_report_sources_footer
 from .report_storage import render_artifact_storage_section
 from .report_summary import render_final_summary_from_data
+from .report_workflow_minutes import render_workflow_breakdown
 
 
 def _print_section_error(label: str, errors: dict, key: str) -> None:
@@ -57,6 +58,7 @@ def render_legacy_report(
     render_repo_actions_table(data.get("repo_actions") or [])
     render_actions_top_consumers(data.get("repo_actions") or [])
     render_actions_os_breakdown(data.get("actions_os_breakdown"))
+    render_workflow_breakdown(data.get("workflow_breakdown"))
 
     if data.get("copilot") is None and errors.get("copilot"):
         _print_section_error("Copilot", errors, "copilot")

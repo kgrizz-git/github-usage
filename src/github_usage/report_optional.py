@@ -130,6 +130,8 @@ def estimate_api_request_count(
     repos_considered = min(repo_count, max_repos)
     per_repo_options = sum([include_consumers, include_artifact_storage, include_release_assets])
     estimated = repos_considered * per_repo_options
+    if include_consumers:
+        estimated += 10
     percent = None
     if core_remaining:
         percent = round(estimated / core_remaining * 100, 1)

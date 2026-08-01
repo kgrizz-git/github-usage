@@ -12,6 +12,7 @@ from ._email_report_html_tables import (
     html_minutes_row,
     html_repo_cell,
     html_storage_row,
+    html_workflow_breakdown_table,
 )
 from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
@@ -203,6 +204,13 @@ def _format_html_consumers_section(data: dict) -> list[str]:
     return parts
 
 
+def _format_html_workflow_breakdown_section(data: dict) -> list[str]:
+    breakdown = data.get("workflow_breakdown")
+    if not breakdown:
+        return []
+    return html_workflow_breakdown_table(breakdown, limit=5)
+
+
 def _format_html_artifact_storage_section(data: dict) -> list[str]:
     artifact_storage = data.get("artifact_storage")
     if not artifact_storage:
@@ -352,6 +360,7 @@ _SECTION_HTML_FORMATTERS = (
     _format_html_git_lfs_section,
     _format_html_monthly_costs_section,
     _format_html_consumers_section,
+    _format_html_workflow_breakdown_section,
     _format_html_artifact_storage_section,
     _format_html_release_assets_section,
     _format_html_insights_section,

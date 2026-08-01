@@ -82,3 +82,33 @@ def html_storage_row(row: dict) -> str:
 
 
 # Phase 4e: workflow breakdown table helpers go here.
+
+
+def html_workflow_row(entry: dict, *, total_minutes: float) -> str:
+    """Render one workflow breakdown table row."""
+    minutes = float(entry.get("minutes") or 0.0)
+    pct = minutes / total_minutes * 100.0 if total_minutes and total_minutes > 0 else 0.0
+    name = html.escape(str(entry.get("name") or "Unknown Workflow"))
+    runs = int(entry.get("runs") or 0)
+    return f"<tr><td>{name}</td><td>{runs}</td><td>{minutes:,.1f} min</td><td>{pct:.1f}%</td></tr>"
+
+
+def html_workflow_breakdown_table(breakdown: dict, *, limit: int = 5) -> list[str]:
+    """Build HTML table for per-workflow estimated minutes."""
+    from .report_workflow_minutes import WORKFLOW_CAVEAT
+
+    repo = html.escape(str(breakdown.get("repo") or "?"))
+    workflows = (breakdown.get("by_workflow") or [])[:limit]
+    if not workflows:
+        return []
+    total = float(breakdown.get("total_minutes") or 0.0)
+    parts = [
+        f"<h2>Minutes by Workflow — Top Private Repo ({repo})</h2>",
+        f'<p class="meta">{html.escape(WORKFLOW_CAVEAT)}</p>',
+        "<table>",
+        "<tr><th>Workflow</th><th>Runs</th><th>Minutes (est)</th><th>%</th></tr>",
+    ]
+    for entry in workflows:
+        parts.append(html_workflow_row(entry, total_minutes=total))
+    parts.append("</table>")
+    return parts

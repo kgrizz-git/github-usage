@@ -12,6 +12,7 @@ from .report_optional import (
     get_release_asset_details,
     get_repo_consumers,
 )
+from .report_workflow_minutes import workflow_breakdown_for_top_private
 from .usage_split import REPORT_SOURCES
 from .visibility import filter_repos_by_visibility, repo_visibility, visibility_label
 
@@ -250,6 +251,7 @@ def _fetch_sections(
     include_release_assets: bool,
     report: dict,
     errors: dict,
+    runs_cache: dict,
 ) -> None:
     """Populate the per-section keys on ``report`` and record errors. Mutates both dicts in place."""
     for key, enabled, getter in [
@@ -289,6 +291,11 @@ def _fetch_sections(
             report["release_assets"] = get_release_asset_details(api, repos, max_repos)
         except RuntimeError as exc:
             errors["release_assets"] = str(exc)
+
+    if include_consumers and report.get("repo_consumers"):
+        report["workflow_breakdown"] = workflow_breakdown_for_top_private(
+            api, report["repo_consumers"], runs_cache=runs_cache
+        )
 
 
 def build_report_data(
@@ -343,12 +350,14 @@ def build_report_data(
         "git_lfs": None,
         "monthly_costs": None,
         "repo_consumers": None,
+        "workflow_breakdown": None,
         "artifact_storage": None,
         "release_assets": None,
         "api_estimate": api_estimate,
         "insights": [],
     }
 
+    runs_cache: dict = {}
     _fetch_sections(
         api,
         username,
@@ -362,6 +371,7 @@ def build_report_data(
         include_release_assets=include_release_assets,
         report=report,
         errors=errors,
+        runs_cache=runs_cache,
     )
 
     report["insights"] = get_key_insights(report)

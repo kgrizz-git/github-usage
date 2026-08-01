@@ -30,6 +30,7 @@ from .report_data import (
 )
 from .report_products import fetch_billing_history
 from .report_storage import build_storage_summary
+from .report_workflow_minutes import workflow_breakdown_for_top_private
 from .storage import get_storage_analysis
 from .usage_split import REPORT_SOURCES, attach_actions_visibility_split
 from .visibility import filter_repos_by_visibility, repo_visibility
@@ -149,7 +150,7 @@ def estimate_legacy_api_request_count(
     # Per repo: Actions billing + artifacts pages + releases pages (storage_analysis once)
     per_repo = 3
     os_breakdown = min(OS_BREAKDOWN_LIMIT, repos_considered)
-    estimated = account_level + repos_considered * per_repo + os_breakdown
+    estimated = account_level + repos_considered * per_repo + os_breakdown + 10
     percent = None
     if core_remaining:
         percent = round(estimated / core_remaining * 100, 1)
@@ -245,12 +246,16 @@ def build_legacy_report_data(
     actions_os_breakdown = fetch_actions_os_breakdown(api, repos, limit=OS_BREAKDOWN_LIMIT)
     billing_history = fetch_billing_history(api, username)
 
+    runs_cache: dict = {}
     repo_consumers = derive_repo_consumers(
         repo_actions,
         repo_action_errors,
         max_repos=max_repos,
         truncated=truncated,
         scanned_repo_count=scanned_repo_count,
+    )
+    workflow_breakdown = workflow_breakdown_for_top_private(
+        api, repo_consumers, runs_cache=runs_cache
     )
     artifact_storage = derive_artifact_storage(
         storage_analysis,
@@ -286,6 +291,7 @@ def build_legacy_report_data(
         "git_lfs": None,
         "monthly_costs": None,
         "repo_consumers": repo_consumers,
+        "workflow_breakdown": workflow_breakdown,
         "artifact_storage": artifact_storage,
         "release_assets": release_assets,
         "api_estimate": api_estimate,

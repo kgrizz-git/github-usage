@@ -219,6 +219,32 @@ def _format_consumers_section(data: dict) -> list[str]:
     return lines
 
 
+def _format_workflow_breakdown_section(data: dict) -> list[str]:
+    breakdown = data.get("workflow_breakdown")
+    if not breakdown:
+        return []
+    from .report_workflow_minutes import WORKFLOW_CAVEAT
+
+    repo = breakdown.get("repo", "?")
+    total = float(breakdown.get("total_minutes") or 0.0)
+    workflows = (breakdown.get("by_workflow") or [])[:5]
+    if not workflows:
+        return []
+    lines = [
+        f"Minutes by Workflow — Top Private Repo ({repo})",
+        WORKFLOW_CAVEAT,
+        f"Total (est): {total:.1f} min",
+    ]
+    for entry in workflows:
+        minutes = float(entry.get("minutes") or 0.0)
+        pct = minutes / total * 100.0 if total and total > 0 else 0.0
+        name = entry.get("name") or "Unknown Workflow"
+        runs = int(entry.get("runs") or 0)
+        lines.append(f"- {name}: {minutes:,.1f} min ({pct:.1f}%), {runs} runs")
+    lines.append("")
+    return lines
+
+
 def _format_artifact_storage_section(data: dict) -> list[str]:
     artifact_storage = data.get("artifact_storage")
     if not artifact_storage:
@@ -344,6 +370,7 @@ _SECTION_FORMATTERS = (
     _format_git_lfs_section,
     _format_monthly_costs_section,
     _format_consumers_section,
+    _format_workflow_breakdown_section,
     _format_artifact_storage_section,
     _format_release_assets_section,
     _format_insights_section,
