@@ -4,7 +4,7 @@
 >
 > **Terminology:** user-facing name is **local full report** (CLI/TUI). Code modules still use `legacy_*` until the rename tracked in `TO_DO.md`.
 >
-> **Coordination:** Paging unwrap (`workflow_runs` / `artifacts` / `workflows`) is **owned by** [`2026-07-31-private-top-consumers.md`](./2026-07-31-private-top-consumers.md) Phase 0. This plan does **not** re-specify that unwrap. Opt-in job-level deep analysis lives as a **late phase of that same plan** (not here).
+> **Coordination:** Paging unwrap (`workflow_runs` / `artifacts` / `workflows`) is **owned by** [`2026-07-31-private-top-consumers.md`](./archived/2026-07-31-private-top-consumers.md) Phase 0. This plan does **not** re-specify that unwrap. Opt-in job-level deep analysis is a **separate plan** — [`2026-07-31-opt-in-deep-run-analysis.md`](./2026-07-31-opt-in-deep-run-analysis.md) (not here).
 >
 > **Implementation log:** (none yet)
 
@@ -35,7 +35,7 @@ Account-level **GitHub Actions Usage → Per-SKU Breakdown** already shows real 
 5. Fix tests that only pass with synthetic array + `billable` shapes so they cannot hide the live contract.
 6. Drop `+ os_breakdown` (up to +10) from `estimate_legacy_api_request_count` when the default path no longer fetches runs for OS.
 
-**Out of scope here:** opt-in job-level deep analysis (ceil-per-job + multipliers, monthly cache) — that is a late phase of [`2026-07-31-private-top-consumers.md`](./2026-07-31-private-top-consumers.md).
+**Out of scope here:** opt-in job-level deep analysis (ceil-per-job + multipliers, monthly cache) — see [`2026-07-31-opt-in-deep-run-analysis.md`](./2026-07-31-opt-in-deep-run-analysis.md).
 
 ## Constraints
 
@@ -71,12 +71,12 @@ Account-level **GitHub Actions Usage → Per-SKU Breakdown** already shows real 
 - [ ] Tests: object-shaped runs fixtures where claiming live shape; no-`billable` path asserts honest product behavior (omitted/explicit unavailable).
 - [ ] Legacy array+`billable` fixtures only if stub remains, clearly marked non-live.
 - [ ] Builder tests do not expect a populated OS-from-runs breakdown.
-- [ ] README: remove claims that local full report derives OS from workflow runs; point to SKU breakdown; mention deep analysis lives under private-top-consumers (opt-in late phase).
+- [ ] README: remove claims that local full report derives OS from workflow runs; point to SKU breakdown; mention opt-in deep analysis in [`2026-07-31-opt-in-deep-run-analysis.md`](./2026-07-31-opt-in-deep-run-analysis.md).
 - [ ] `CHANGELOG.md` `[Unreleased]` **Fixed/Changed:** no longer silently relies on absent run `billable`; OS-from-runs section retired or explicit; quota estimate no longer counts dead fetches.
 
 ## Phase 4 — Deferred (other plans)
 
-- Opt-in job-level deep analysis / monthly cache → private-top-consumers late phase.
+- Opt-in job-level deep analysis / monthly cache → [`2026-07-31-opt-in-deep-run-analysis.md`](./2026-07-31-opt-in-deep-run-analysis.md).
 - Restoring true per-workflow billable if GitHub ever exposes it again.
 
 ---

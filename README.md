@@ -196,7 +196,7 @@ With `--include-consumers` (local full report and email), the **repo consumers**
 
 - **Overall top-by-storage** — billed Actions storage ranked by average MB (`storage_avg_mb` from the billing API).
 - **Private-only top lists** — separate rankings for Actions minutes and billed storage among private and internal repos only (the quota-relevant slice). Shown only when they add signal beyond the combined list (for example, when public repos dominate the overall minutes ranking).
-- **Minutes by workflow** — for the top private-repo minutes consumer, an estimated per-workflow breakdown from completed run wall-clock time (start→end). This is **not billable** GitHub data: it uses fractional run elapsed time, not per-job rounding or OS multipliers, so the estimated total **will not match** the billed repo minutes figure. The section is labeled accordingly in terminal, TUI, and email output.
+- **Minutes by workflow** — for the top private-repo minutes consumer, an estimated per-workflow breakdown from completed run wall-clock time (start→end). This is **not billable** GitHub data: it uses fractional run elapsed time, not per-job rounding or OS multipliers, so the estimated total **will not match** the billed repo minutes figure. The section is labeled accordingly in terminal and email output (not the TUI summary view).
 
 The same consumer keys appear in JSON exports; dedicated CSV/XLSX/PDF columns for private rankings and workflow breakdown are planned (see `TO_DO.md`).
 

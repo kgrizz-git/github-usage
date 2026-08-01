@@ -1,6 +1,6 @@
 > **Status:** IN PROGRESS
 
-> Line numbers / anchors may drift; prefer function names. Depends on [`2026-07-31-private-top-consumers.md`](./2026-07-31-private-top-consumers.md) Phase 0 (paging unwrap) and ideally Phase 4 (`runs_cache` / wall-clock breakdown) so deep analysis can share the runs list.
+> Line numbers / anchors may drift; prefer function names. Depends on [`2026-07-31-private-top-consumers.md`](./archived/2026-07-31-private-top-consumers.md) Phase 0 (paging unwrap) and ideally Phase 4 (`runs_cache` / wall-clock breakdown) so deep analysis can share the runs list.
 >
 > **Terminology:** user-facing name is **local full report** (CLI/TUI).
 >
