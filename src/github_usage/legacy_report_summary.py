@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 from .visibility import repo_visibility, visibility_label
@@ -314,6 +315,47 @@ def _repo_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
             gross = float(item.get("gross", 0.0))
             minutes = float(item.get("minutes", 0.0))
             rows.append((repo, f"{fmt_price(gross)} · {minutes:.1f} min"))
+
+    by_storage = consumers.get("by_storage") or []
+    by_minutes_private = consumers.get("by_minutes_private") or []
+    by_storage_private = consumers.get("by_storage_private") or []
+    private_minutes = (data.get("actions") or {}).get("private_minutes")
+    private_minutes_f = float(private_minutes) if private_minutes is not None else None
+
+    if by_minutes_private and not private_list_is_redundant(
+        by_minutes[:10], by_minutes_private[:10]
+    ):
+        rows.append(_section("Top private repos by Actions minutes"))
+        for item in by_minutes_private[:10]:
+            repo = _annotated_repo(item)
+            minutes = float(item.get("minutes", 0.0))
+            gross = float(item.get("gross", 0.0))
+            pct = (
+                minutes / private_minutes_f * 100.0
+                if private_minutes_f and private_minutes_f > 0
+                else 0.0
+            )
+            if private_minutes_f and private_minutes_f > 0:
+                value = f"{minutes:.1f} min ({pct:.1f}% of private) · {fmt_price(gross)}"
+            else:
+                value = f"{minutes:.1f} min · {fmt_price(gross)}"
+            rows.append((repo, value))
+
+    if by_storage_private and not private_list_is_redundant(
+        by_storage[:10], by_storage_private[:10]
+    ):
+        rows.append(_section("Top private repos by Actions storage (billed)"))
+        for item in by_storage_private[:10]:
+            repo = _annotated_repo(item)
+            avg_mb = float(item.get("storage_avg_mb", 0.0))
+            rows.append((repo, f"{avg_mb:.1f} MB avg"))
+
+    if by_storage:
+        rows.append(_section("Top repos by Actions storage (billed)"))
+        for item in by_storage[:10]:
+            repo = _annotated_repo(item)
+            avg_mb = float(item.get("storage_avg_mb", 0.0))
+            rows.append((repo, f"{avg_mb:.1f} MB avg"))
 
     billed_storage = _repo_billed_storage_rows(data)
     if billed_storage:
