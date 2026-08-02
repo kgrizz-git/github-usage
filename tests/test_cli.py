@@ -402,6 +402,8 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("Monthly Forecast", output)
 
     def test_email_report_cached_path_passes_profile_premium_limit(self):
+        from datetime import date
+
         from github_usage import cli
         from github_usage.report_cache import CacheHit
 
@@ -429,8 +431,11 @@ class CliTests(unittest.TestCase):
                 return_value=(report_data, "octocat", CacheHit(from_cache=True)),
             ),
             mock.patch("github_usage.cli_email_report.GitHubAPI") as api_cls,
+            # Forecast is omitted when day_of_month < 3; pin mid-month.
+            mock.patch("github_usage.report_forecast_data.date") as mock_date,
             contextlib.redirect_stdout(stdout),
         ):
+            mock_date.today.return_value = date(2026, 7, 15)
             api = api_cls.return_value
             api.request.return_value = {"login": "octocat"}
             code = cli.main(

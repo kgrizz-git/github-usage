@@ -1,8 +1,13 @@
 import io
 import unittest
+from datetime import date
 from unittest import mock
 
 from tests.conftest import load_export_report_data
+
+# Forecast is omitted when day_of_month < 3; pin mid-month so sheet-presence
+# assertions are calendar-independent (matches test_forecast_sheet_present).
+_MID_MONTH = date(2026, 7, 15)
 
 XLSX_SECTIONS = [
     "Metadata",
@@ -36,6 +41,10 @@ def _has_openpyxl():
 class ExportXlsxTests(unittest.TestCase):
     def setUp(self):
         self.data = load_export_report_data()
+        date_patcher = mock.patch("github_usage.report_forecast_data.date")
+        mock_date = date_patcher.start()
+        mock_date.today.return_value = _MID_MONTH
+        self.addCleanup(date_patcher.stop)
 
     def _save(self, data=None):
         from github_usage import export_xlsx
@@ -239,12 +248,7 @@ class ExportXlsxTests(unittest.TestCase):
         self.assertEqual(rows[4][0], "Storage (avg MB)")
 
     def test_forecast_sheet_present(self):
-        from datetime import date
-        from unittest import mock
-
-        with mock.patch("github_usage.report_forecast_data.date") as mock_date:
-            mock_date.today.return_value = date(2026, 7, 15)
-            wb = self._open()
+        wb = self._open()
         self.assertIn("Forecast", wb.sheetnames)
         ws = wb["Forecast"]
         rows = list(ws.iter_rows(values_only=True))

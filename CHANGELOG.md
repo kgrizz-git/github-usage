@@ -40,6 +40,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **Calendar-dependent forecast export/email tests:** Pin `report_forecast_data.date.today` to a mid-month date in CSV/PDF/XLSX section-presence tests and the cached email-report CLI forecast assertion. Forecast is intentionally omitted when `day_of_month < 3`, so those tests failed on the 1st–2nd of each month without a date pin.
 - **REST paging unwrap for object-shaped Actions responses** ([plan](docs/superpowers/plans/archived/2026-07-31-private-top-consumers.md), Phase 0): `get_all_pages` unwraps `workflow_runs`, `artifacts`, and `workflows` collection keys and continues `rel="next"` pagination, restoring artifact scan / `get_artifact_storage_details` and enabling runs/workflows list access for workflow estimation. OS billable minutes from runs remain empty against the live API (`billable` absent on runs). `get_actions_from_runs` hygiene: `run.get("workflow_name") or "Unknown"` so explicit JSON null does not become a `None` workflow key.
 
 - **Sonar cognitive-complexity follow-ups:** Split `_print_impactful_findings`, `_print_recommendations`, and `_print_storage_limits` into smaller helpers so new-code complexity stays within the Sonar limit after the private-usage merge.
