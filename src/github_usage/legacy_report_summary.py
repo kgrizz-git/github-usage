@@ -292,8 +292,6 @@ def _actions_usage_rows(
         rows.extend(forecast_rows)
     return rows
 
-    return rows
-
 
 def _append_consumer_minute_rows(
     rows: list[tuple[str, str]], by_minutes: list[dict[str, Any]]
