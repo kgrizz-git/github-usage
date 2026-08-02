@@ -31,6 +31,35 @@ def _completed_run(
     }
 
 
+def _billing_summary_responses(login: str = "octocat") -> dict:
+    """Shared FakeAPI billing request_responses for legacy builder tests."""
+    return {
+        ("GET", "/user", ()): {"login": login, "type": "User", "plan": {}},
+        ("GET", "/rate_limit", ()): {"resources": {"core": {"limit": 5000, "remaining": 5000}}},
+        (
+            "GET",
+            f"/users/{login}/settings/billing/usage/summary",
+            (("product", "Actions"),),
+        ): {"usageItems": []},
+        (
+            "GET",
+            f"/users/{login}/settings/billing/usage/summary",
+            (("product", "Copilot"),),
+        ): {"usageItems": []},
+        (
+            "GET",
+            f"/users/{login}/settings/billing/usage/summary",
+            (("product", "git_lfs"),),
+        ): {"usageItems": []},
+        (
+            "GET",
+            f"/users/{login}/settings/billing/premium_request/usage",
+            (("product", "copilot"),),
+        ): {"usageItems": []},
+        ("GET", f"/users/{login}/settings/billing/usage", ()): {"usageItems": []},
+    }
+
+
 class FetchWorkflowMinutesTests(unittest.TestCase):
     def test_aggregates_by_workflow_id_sorted_desc(self) -> None:
         from github_usage.report_workflow_minutes import fetch_workflow_minutes
@@ -196,33 +225,7 @@ class BuilderWorkflowBreakdownTests(unittest.TestCase):
 
         repos = [{"name": "priv", "owner": {"login": "octocat"}, "full_name": "octocat/priv"}]
         api = FakeAPI(
-            request_responses={
-                ("GET", "/user", ()): {"login": "octocat", "type": "User", "plan": {}},
-                ("GET", "/rate_limit", ()): {
-                    "resources": {"core": {"limit": 5000, "remaining": 5000}}
-                },
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Actions"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "git_lfs"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/premium_request/usage",
-                    (("product", "copilot"),),
-                ): {"usageItems": []},
-                ("GET", "/users/octocat/settings/billing/usage", ()): {"usageItems": []},
-            },
+            request_responses=_billing_summary_responses(),
             pages_responses={
                 "/user/repos": repos,
                 "/repos/octocat/priv/actions/runs": [

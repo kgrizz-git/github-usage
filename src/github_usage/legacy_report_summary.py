@@ -292,6 +292,89 @@ def _actions_usage_rows(
         rows.extend(forecast_rows)
     return rows
 
+    return rows
+
+
+def _append_consumer_minute_rows(
+    rows: list[tuple[str, str]], by_minutes: list[dict[str, Any]]
+) -> None:
+    if not by_minutes:
+        return
+    rows.append(_section("Top repos by Actions minutes"))
+    for item in by_minutes[:10]:
+        repo = _annotated_repo(item)
+        minutes = float(item.get("minutes", 0.0))
+        gross = float(item.get("gross", 0.0))
+        rows.append((repo, f"{minutes:.1f} min · {fmt_price(gross)}"))
+
+
+def _append_consumer_cost_rows(rows: list[tuple[str, str]], by_cost: list[dict[str, Any]]) -> None:
+    if not by_cost:
+        return
+    rows.append(_section("Top repos by Actions cost"))
+    for item in by_cost[:10]:
+        repo = _annotated_repo(item)
+        gross = float(item.get("gross", 0.0))
+        minutes = float(item.get("minutes", 0.0))
+        rows.append((repo, f"{fmt_price(gross)} · {minutes:.1f} min"))
+
+
+def _append_private_consumer_minute_rows(
+    rows: list[tuple[str, str]],
+    *,
+    by_minutes: list[dict[str, Any]],
+    by_minutes_private: list[dict[str, Any]],
+    private_minutes_f: float | None,
+) -> None:
+    if not by_minutes_private or private_list_is_redundant(
+        by_minutes[:10], by_minutes_private[:10]
+    ):
+        return
+    rows.append(_section("Top private repos by Actions minutes"))
+    for item in by_minutes_private[:10]:
+        repo = _annotated_repo(item)
+        minutes = float(item.get("minutes", 0.0))
+        gross = float(item.get("gross", 0.0))
+        pct = (
+            minutes / private_minutes_f * 100.0
+            if private_minutes_f and private_minutes_f > 0
+            else 0.0
+        )
+        if private_minutes_f and private_minutes_f > 0:
+            value = f"{minutes:.1f} min ({pct:.1f}% of private) · {fmt_price(gross)}"
+        else:
+            value = f"{minutes:.1f} min · {fmt_price(gross)}"
+        rows.append((repo, value))
+
+
+def _append_private_storage_consumer_rows(
+    rows: list[tuple[str, str]],
+    *,
+    by_storage: list[dict[str, Any]],
+    by_storage_private: list[dict[str, Any]],
+) -> None:
+    if not by_storage_private or private_list_is_redundant(
+        by_storage[:10], by_storage_private[:10]
+    ):
+        return
+    rows.append(_section("Top private repos by Actions storage (billed)"))
+    for item in by_storage_private[:10]:
+        repo = _annotated_repo(item)
+        avg_mb = float(item.get("storage_avg_mb", 0.0))
+        rows.append((repo, f"{avg_mb:.1f} MB avg"))
+
+
+def _append_overall_storage_consumer_rows(
+    rows: list[tuple[str, str]], by_storage: list[dict[str, Any]]
+) -> None:
+    if not by_storage:
+        return
+    rows.append(_section("Top repos by Actions storage (billed)"))
+    for item in by_storage[:10]:
+        repo = _annotated_repo(item)
+        avg_mb = float(item.get("storage_avg_mb", 0.0))
+        rows.append((repo, f"{avg_mb:.1f} MB avg"))
+
 
 def _repo_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     """Repository-related rows for the detail table."""
@@ -299,63 +382,26 @@ def _repo_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     consumers = data.get("repo_consumers") or {}
     by_minutes = consumers.get("by_minutes") or []
     by_cost = consumers.get("by_cost") or []
-
-    if by_minutes:
-        rows.append(_section("Top repos by Actions minutes"))
-        for item in by_minutes[:10]:
-            repo = _annotated_repo(item)
-            minutes = float(item.get("minutes", 0.0))
-            gross = float(item.get("gross", 0.0))
-            rows.append((repo, f"{minutes:.1f} min · {fmt_price(gross)}"))
-
-    if by_cost:
-        rows.append(_section("Top repos by Actions cost"))
-        for item in by_cost[:10]:
-            repo = _annotated_repo(item)
-            gross = float(item.get("gross", 0.0))
-            minutes = float(item.get("minutes", 0.0))
-            rows.append((repo, f"{fmt_price(gross)} · {minutes:.1f} min"))
-
     by_storage = consumers.get("by_storage") or []
     by_minutes_private = consumers.get("by_minutes_private") or []
     by_storage_private = consumers.get("by_storage_private") or []
     private_minutes = (data.get("actions") or {}).get("private_minutes")
     private_minutes_f = float(private_minutes) if private_minutes is not None else None
 
-    if by_minutes_private and not private_list_is_redundant(
-        by_minutes[:10], by_minutes_private[:10]
-    ):
-        rows.append(_section("Top private repos by Actions minutes"))
-        for item in by_minutes_private[:10]:
-            repo = _annotated_repo(item)
-            minutes = float(item.get("minutes", 0.0))
-            gross = float(item.get("gross", 0.0))
-            pct = (
-                minutes / private_minutes_f * 100.0
-                if private_minutes_f and private_minutes_f > 0
-                else 0.0
-            )
-            if private_minutes_f and private_minutes_f > 0:
-                value = f"{minutes:.1f} min ({pct:.1f}% of private) · {fmt_price(gross)}"
-            else:
-                value = f"{minutes:.1f} min · {fmt_price(gross)}"
-            rows.append((repo, value))
-
-    if by_storage_private and not private_list_is_redundant(
-        by_storage[:10], by_storage_private[:10]
-    ):
-        rows.append(_section("Top private repos by Actions storage (billed)"))
-        for item in by_storage_private[:10]:
-            repo = _annotated_repo(item)
-            avg_mb = float(item.get("storage_avg_mb", 0.0))
-            rows.append((repo, f"{avg_mb:.1f} MB avg"))
-
-    if by_storage:
-        rows.append(_section("Top repos by Actions storage (billed)"))
-        for item in by_storage[:10]:
-            repo = _annotated_repo(item)
-            avg_mb = float(item.get("storage_avg_mb", 0.0))
-            rows.append((repo, f"{avg_mb:.1f} MB avg"))
+    _append_consumer_minute_rows(rows, by_minutes)
+    _append_consumer_cost_rows(rows, by_cost)
+    _append_private_consumer_minute_rows(
+        rows,
+        by_minutes=by_minutes,
+        by_minutes_private=by_minutes_private,
+        private_minutes_f=private_minutes_f,
+    )
+    _append_private_storage_consumer_rows(
+        rows,
+        by_storage=by_storage,
+        by_storage_private=by_storage_private,
+    )
+    _append_overall_storage_consumer_rows(rows, by_storage)
 
     billed_storage = _repo_billed_storage_rows(data)
     if billed_storage:

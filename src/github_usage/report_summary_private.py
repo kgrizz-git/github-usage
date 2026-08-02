@@ -28,21 +28,24 @@ def private_consumer_findings(
     by_minutes = repo_consumers.get("by_minutes") or []
     by_minutes_private = repo_consumers.get("by_minutes_private") or []
     if by_minutes_private and not private_list_is_redundant(by_minutes[:5], by_minutes_private[:5]):
-        top_priv = by_minutes_private[0]
-        label = _repo_label(top_priv["repo"], visibility_by_repo)
-        pct_priv = _pct_of_private_minutes(top_priv["minutes"], private_minutes)
-        findings.append(
-            f"Biggest private Actions consumer: {label} "
-            f"at {top_priv['minutes']:.0f} min ({pct_priv:.1f}% of private minutes)."
-        )
+        top_priv = next(iter(by_minutes_private), None)
+        if top_priv is not None:
+            label = _repo_label(top_priv["repo"], visibility_by_repo)
+            pct_priv = _pct_of_private_minutes(top_priv["minutes"], private_minutes)
+            findings.append(
+                f"Biggest private Actions consumer: {label} "
+                f"at {top_priv['minutes']:.0f} min ({pct_priv:.1f}% of private minutes)."
+            )
     by_storage = repo_consumers.get("by_storage") or []
     by_storage_private = repo_consumers.get("by_storage_private") or []
     if by_storage_private and not private_list_is_redundant(by_storage[:5], by_storage_private[:5]):
-        top_st_priv = by_storage_private[0]
-        label = _repo_label(top_st_priv["repo"], visibility_by_repo)
-        findings.append(
-            f"Biggest private storage consumer: {label} ({top_st_priv['storage_avg_mb']:.1f} MB)."
-        )
+        top_st_priv = next(iter(by_storage_private), None)
+        if top_st_priv is not None:
+            label = _repo_label(top_st_priv["repo"], visibility_by_repo)
+            findings.append(
+                f"Biggest private storage consumer: {label} "
+                f"({top_st_priv['storage_avg_mb']:.1f} MB)."
+            )
     return findings
 
 

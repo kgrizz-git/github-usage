@@ -9,6 +9,11 @@ from github_usage.legacy_report_summary import (
     legacy_report_detail_rows,
     legacy_report_summary_rows,
 )
+from tests._consumer_fixtures import (
+    consumer_row,
+    legacy_all_private_consumer_data,
+    legacy_mixed_consumer_data,
+)
 
 
 class LegacyReportSummaryTests(unittest.TestCase):
@@ -222,77 +227,8 @@ class LegacyReportSummaryTests(unittest.TestCase):
         self.assertIn("Private 30.0 / 500 MB", storage)
         self.assertIn("public 12.0 MB (free)", storage)
 
-    def _mixed_consumer_fixture(self) -> dict:
-        return {
-            "actions": {"private_minutes": 400.0},
-            "repo_consumers": {
-                "by_minutes": [
-                    {
-                        "repo": "octocat/pub",
-                        "minutes": 500.0,
-                        "gross": 5.0,
-                        "storage_avg_mb": 10.0,
-                        "visibility": "public",
-                    },
-                    {
-                        "repo": "octocat/priv",
-                        "minutes": 300.0,
-                        "gross": 3.0,
-                        "storage_avg_mb": 80.0,
-                        "visibility": "private",
-                    },
-                ],
-                "by_cost": [
-                    {
-                        "repo": "octocat/pub",
-                        "minutes": 500.0,
-                        "gross": 5.0,
-                        "storage_avg_mb": 10.0,
-                        "visibility": "public",
-                    },
-                ],
-                "by_minutes_private": [
-                    {
-                        "repo": "octocat/priv",
-                        "minutes": 300.0,
-                        "gross": 3.0,
-                        "storage_avg_mb": 80.0,
-                        "visibility": "private",
-                    },
-                ],
-                "by_storage": [
-                    {
-                        "repo": "octocat/priv",
-                        "minutes": 300.0,
-                        "gross": 3.0,
-                        "storage_avg_mb": 80.0,
-                        "visibility": "private",
-                    },
-                    {
-                        "repo": "octocat/pub",
-                        "minutes": 500.0,
-                        "gross": 5.0,
-                        "storage_avg_mb": 10.0,
-                        "visibility": "public",
-                    },
-                ],
-                "by_storage_private": [
-                    {
-                        "repo": "octocat/priv",
-                        "minutes": 300.0,
-                        "gross": 3.0,
-                        "storage_avg_mb": 80.0,
-                        "visibility": "private",
-                    },
-                ],
-            },
-            "repo_actions": [],
-            "storage_analysis": {"repos": []},
-            "artifact_storage": {},
-        }
-
     def test_repo_rows_include_private_and_overall_storage_sections(self) -> None:
-        rows = _repo_rows(self._mixed_consumer_fixture())
+        rows = _repo_rows(legacy_mixed_consumer_data())
         metrics = [metric for metric, _value in rows]
         self.assertIn("── Top private repos by Actions minutes ──", metrics)
         self.assertIn("── Top private repos by Actions storage (billed) ──", metrics)
@@ -309,79 +245,7 @@ class LegacyReportSummaryTests(unittest.TestCase):
         self.assertTrue(any("80.0 MB avg" in value for value in priv_storage_rows))
 
     def test_repo_rows_skip_private_sections_when_redundant(self) -> None:
-        data = {
-            "actions": {"private_minutes": 800.0},
-            "repo_consumers": {
-                "by_minutes": [
-                    {
-                        "repo": "octocat/priv1",
-                        "minutes": 500.0,
-                        "gross": 5.0,
-                        "storage_avg_mb": 80.0,
-                        "visibility": "private",
-                    },
-                    {
-                        "repo": "octocat/priv2",
-                        "minutes": 300.0,
-                        "gross": 3.0,
-                        "storage_avg_mb": 60.0,
-                        "visibility": "private",
-                    },
-                ],
-                "by_minutes_private": [
-                    {
-                        "repo": "octocat/priv1",
-                        "minutes": 500.0,
-                        "gross": 5.0,
-                        "storage_avg_mb": 80.0,
-                        "visibility": "private",
-                    },
-                    {
-                        "repo": "octocat/priv2",
-                        "minutes": 300.0,
-                        "gross": 3.0,
-                        "storage_avg_mb": 60.0,
-                        "visibility": "private",
-                    },
-                ],
-                "by_storage": [
-                    {
-                        "repo": "octocat/priv1",
-                        "minutes": 500.0,
-                        "gross": 5.0,
-                        "storage_avg_mb": 80.0,
-                        "visibility": "private",
-                    },
-                    {
-                        "repo": "octocat/priv2",
-                        "minutes": 300.0,
-                        "gross": 3.0,
-                        "storage_avg_mb": 60.0,
-                        "visibility": "private",
-                    },
-                ],
-                "by_storage_private": [
-                    {
-                        "repo": "octocat/priv1",
-                        "minutes": 500.0,
-                        "gross": 5.0,
-                        "storage_avg_mb": 80.0,
-                        "visibility": "private",
-                    },
-                    {
-                        "repo": "octocat/priv2",
-                        "minutes": 300.0,
-                        "gross": 3.0,
-                        "storage_avg_mb": 60.0,
-                        "visibility": "private",
-                    },
-                ],
-            },
-            "repo_actions": [],
-            "storage_analysis": {"repos": []},
-            "artifact_storage": {},
-        }
-        rows = _repo_rows(data)
+        rows = _repo_rows(legacy_all_private_consumer_data())
         metrics = [metric for metric, _value in rows]
         self.assertNotIn("── Top private repos by Actions minutes ──", metrics)
         self.assertNotIn("── Top private repos by Actions storage (billed) ──", metrics)
@@ -389,13 +253,13 @@ class LegacyReportSummaryTests(unittest.TestCase):
 
     def test_repo_rows_cap_consumer_sections_at_ten(self) -> None:
         rows_data = [
-            {
-                "repo": f"octocat/repo{i}",
-                "minutes": float(100 - i),
-                "gross": 1.0,
-                "storage_avg_mb": float(100 - i),
-                "visibility": "private",
-            }
+            consumer_row(
+                f"octocat/repo{i}",
+                minutes=float(100 - i),
+                gross=1.0,
+                storage_avg_mb=float(100 - i),
+                visibility="private",
+            )
             for i in range(12)
         ]
         data = {

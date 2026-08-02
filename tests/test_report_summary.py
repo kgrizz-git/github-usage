@@ -2,6 +2,15 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 
+from tests._consumer_fixtures import (
+    all_private_repo_data,
+    all_private_top_consumers,
+    consumer_row,
+    findings_pub_priv_consumers,
+    mixed_pub_priv_consumers,
+    mixed_pub_priv_repo_data,
+    pub_priv_partial_consumers,
+)
 from tests._fakes import FakeAPI
 
 
@@ -99,62 +108,8 @@ class SummaryTests(unittest.TestCase):
     def test_print_top_consumers_private_and_storage_sections(self):
         from github_usage.report_summary import _print_top_consumers
 
-        repo_data = [
-            ("octocat/pub", 500.0, 0.0, 10.0, 5.0, {}),
-            ("octocat/priv", 300.0, 0.0, 80.0, 3.0, {}),
-        ]
-        repo_consumers = {
-            "by_minutes": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-            ],
-            "by_storage_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-        }
+        repo_data = mixed_pub_priv_repo_data()
+        repo_consumers = mixed_pub_priv_consumers()
         stdout = StringIO()
         with redirect_stdout(stdout):
             _print_top_consumers(
@@ -177,76 +132,8 @@ class SummaryTests(unittest.TestCase):
     def test_print_top_consumers_skips_private_sections_when_redundant(self):
         from github_usage.report_summary import _print_top_consumers
 
-        repo_data = [
-            ("octocat/priv1", 500.0, 0.0, 80.0, 5.0, {}),
-            ("octocat/priv2", 300.0, 0.0, 60.0, 3.0, {}),
-        ]
-        repo_consumers = {
-            "by_minutes": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 60.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 60.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 60.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage_private": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 60.0,
-                    "visibility": "private",
-                },
-            ],
-        }
+        repo_data = all_private_repo_data()
+        repo_consumers = all_private_top_consumers()
         stdout = StringIO()
         with redirect_stdout(stdout):
             _print_top_consumers(
@@ -265,51 +152,7 @@ class SummaryTests(unittest.TestCase):
     def test_print_top_consumers_private_minutes_zero_division_guard(self):
         from github_usage.report_summary import _print_top_consumers
 
-        repo_consumers = {
-            "by_minutes": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 100.0,
-                    "gross": 1.0,
-                    "storage_avg_mb": 5.0,
-                    "visibility": "public",
-                },
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 50.0,
-                    "gross": 0.5,
-                    "storage_avg_mb": 3.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 50.0,
-                    "gross": 0.5,
-                    "storage_avg_mb": 3.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 100.0,
-                    "gross": 1.0,
-                    "storage_avg_mb": 5.0,
-                    "visibility": "public",
-                },
-            ],
-            "by_storage_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 50.0,
-                    "gross": 0.5,
-                    "storage_avg_mb": 3.0,
-                    "visibility": "private",
-                },
-            ],
-        }
+        repo_consumers = pub_priv_partial_consumers()
         stdout = StringIO()
         with redirect_stdout(stdout):
             _print_top_consumers(
@@ -408,51 +251,7 @@ class SummaryTests(unittest.TestCase):
     def test_consumer_findings_private_actions_and_storage(self):
         from github_usage.report_summary_insights import _consumer_findings
 
-        repo_consumers = {
-            "by_minutes": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-            ],
-            "by_storage_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-        }
+        repo_consumers = findings_pub_priv_consumers()
         findings = _consumer_findings(
             800.0,
             8.0,
@@ -471,54 +270,8 @@ class SummaryTests(unittest.TestCase):
     def test_print_impactful_findings_includes_private_consumer_findings(self):
         from github_usage.report_summary import _print_impactful_findings
 
-        repo_data = [
-            ("octocat/priv", 300.0, 0.0, 80.0, 3.0, {}),
-        ]
-        repo_consumers = {
-            "by_minutes": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-            ],
-            "by_storage_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-        }
+        repo_data = [("octocat/priv", 300.0, 0.0, 80.0, 3.0, {})]
+        repo_consumers = findings_pub_priv_consumers()
         stdout = StringIO()
         with redirect_stdout(stdout):
             _print_impactful_findings(
@@ -546,46 +299,30 @@ class SummaryTests(unittest.TestCase):
             ("octocat/priv1", 400.0, 0.0, 1.0, 0.0, {}),
             ("octocat/priv2", 300.0, 0.0, 1.0, 0.0, {}),
         ]
+        priv1 = consumer_row(
+            "octocat/priv1",
+            minutes=400.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="private",
+        )
+        priv2 = consumer_row(
+            "octocat/priv2",
+            minutes=300.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="private",
+        )
+        pub = consumer_row(
+            "octocat/pub",
+            minutes=100.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="public",
+        )
         repo_consumers = {
-            "by_minutes": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 400.0,
-                    "gross": 0.0,
-                    "storage_avg_mb": 1.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 0.0,
-                    "storage_avg_mb": 1.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 100.0,
-                    "gross": 0.0,
-                    "storage_avg_mb": 1.0,
-                    "visibility": "public",
-                },
-            ],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 400.0,
-                    "gross": 0.0,
-                    "storage_avg_mb": 1.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 0.0,
-                    "storage_avg_mb": 1.0,
-                    "visibility": "private",
-                },
-            ],
+            "by_minutes": [priv1, priv2, pub],
+            "by_minutes_private": [priv1, priv2],
         }
         stdout = StringIO()
         with redirect_stdout(stdout):

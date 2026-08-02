@@ -12,6 +12,9 @@ from .visibility import (
     visibility_label,
 )
 
+_HTML_TABLE_OPEN = "<table>"
+_HTML_TABLE_CLOSE = "</table>"
+
 
 def html_repo_cell(row: dict) -> str:
     """Render a repo name cell with optional visibility tag."""
@@ -28,29 +31,29 @@ def html_grouped_table(title: str, rows: list[dict], *, headers: list[str], valu
     parts = [f"<h2>{html.escape(title)}</h2>"]
     groups = group_by_visibility(rows)
     if len(groups) <= 1:
-        parts.append("<table>")
+        parts.append(_HTML_TABLE_OPEN)
         parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
         for row in rows:
             parts.append(value_fn(row))
-        parts.append("</table>")
+        parts.append(_HTML_TABLE_CLOSE)
         return parts
     for vis, group_rows in groups.items():
         parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
-        parts.append("<table>")
+        parts.append(_HTML_TABLE_OPEN)
         parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
         for row in group_rows:
             parts.append(value_fn(row))
-        parts.append("</table>")
+        parts.append(_HTML_TABLE_CLOSE)
     return parts
 
 
 def html_flat_table(title: str, rows: list[dict], *, headers: list[str], value_fn) -> list[str]:
     """Build a single HTML table without visibility grouping (private-only lists)."""
-    parts = [f"<h2>{html.escape(title)}</h2>", "<table>"]
+    parts = [f"<h2>{html.escape(title)}</h2>", _HTML_TABLE_OPEN]
     parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
     for row in rows:
         parts.append(value_fn(row))
-    parts.append("</table>")
+    parts.append(_HTML_TABLE_CLOSE)
     return parts
 
 
@@ -98,17 +101,18 @@ def html_workflow_breakdown_table(breakdown: dict, *, limit: int = 5) -> list[st
     from .report_workflow_minutes import WORKFLOW_CAVEAT
 
     repo = html.escape(str(breakdown.get("repo") or "?"))
-    workflows = (breakdown.get("by_workflow") or [])[:limit]
+    raw_workflows = breakdown.get("by_workflow")
+    workflows = list(raw_workflows)[:limit] if isinstance(raw_workflows, list) else []
     if not workflows:
         return []
     total = float(breakdown.get("total_minutes") or 0.0)
     parts = [
         f"<h2>Minutes by Workflow — Top Private Repo ({repo})</h2>",
         f'<p class="meta">{html.escape(WORKFLOW_CAVEAT)}</p>',
-        "<table>",
+        _HTML_TABLE_OPEN,
         "<tr><th>Workflow</th><th>Runs</th><th>Minutes (est)</th><th>%</th></tr>",
     ]
     for entry in workflows:
         parts.append(html_workflow_row(entry, total_minutes=total))
-    parts.append("</table>")
+    parts.append(_HTML_TABLE_CLOSE)
     return parts

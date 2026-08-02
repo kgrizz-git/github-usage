@@ -3,6 +3,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from tests._consumer_fixtures import (
+    all_private_top_consumers,
+    mixed_pub_priv_consumers,
+    single_private_redundant_consumers,
+)
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -730,74 +736,7 @@ class EmailReportTests(unittest.TestCase):
         self.assertIn("Public Repos:", joined)
 
     def _mixed_visibility_repo_consumers(self) -> dict:
-        return {
-            "by_minutes": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_cost": [
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/pub",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 10.0,
-                    "visibility": "public",
-                },
-            ],
-            "by_storage_private": [
-                {
-                    "repo": "octocat/priv",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-        }
+        return mixed_pub_priv_consumers(by_cost_mode="both")
 
     def test_consumers_section_includes_storage_and_private_lists_text(self):
         from github_usage.email_report_text import _format_consumers_section
@@ -813,74 +752,7 @@ class EmailReportTests(unittest.TestCase):
     def test_consumers_section_skips_redundant_private_lists_text(self):
         from github_usage.email_report_text import _format_consumers_section
 
-        consumers = {
-            "by_minutes": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 60.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_cost": [],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 60.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 60.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage_private": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-                {
-                    "repo": "octocat/priv2",
-                    "minutes": 300.0,
-                    "gross": 3.0,
-                    "storage_avg_mb": 60.0,
-                    "visibility": "private",
-                },
-            ],
-        }
-        text = "\n".join(_format_consumers_section({"repo_consumers": consumers}))
+        text = "\n".join(_format_consumers_section({"repo_consumers": all_private_top_consumers()}))
         self.assertIn("Top Repositories by Actions Storage (all)", text)
         self.assertNotIn("Top Private Repositories by Actions Minutes", text)
         self.assertNotIn("Top Private Repositories by Actions Storage", text)
@@ -922,46 +794,9 @@ class EmailReportTests(unittest.TestCase):
     def test_consumers_section_skips_redundant_private_lists_html(self):
         from github_usage.email_report_html import _format_html_consumers_section
 
-        consumers = {
-            "by_minutes": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_cost": [],
-            "by_minutes_private": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-            "by_storage_private": [
-                {
-                    "repo": "octocat/priv1",
-                    "minutes": 500.0,
-                    "gross": 5.0,
-                    "storage_avg_mb": 80.0,
-                    "visibility": "private",
-                },
-            ],
-        }
-        joined = "\n".join(_format_html_consumers_section({"repo_consumers": consumers}))
+        joined = "\n".join(
+            _format_html_consumers_section({"repo_consumers": single_private_redundant_consumers()})
+        )
         self.assertIn("Top Repositories by Actions Storage (all)", joined)
         self.assertNotIn("Top Private Repositories by Actions Minutes", joined)
         self.assertNotIn("Top Private Repositories by Actions Storage", joined)
