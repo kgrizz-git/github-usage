@@ -105,6 +105,8 @@ class FetchWorkflowMinutesTests(unittest.TestCase):
             pages_responses={"/repos/o/r/actions/runs": runs},
         )
         result = fetch_workflow_minutes(api, "o", "r", runs_cache={})
+        self.assertIsNotNone(result)
+        assert result is not None
 
         self.assertEqual(result["by_workflow"][0]["name"], "Nightly")
 
@@ -114,6 +116,8 @@ class FetchWorkflowMinutesTests(unittest.TestCase):
         runs = [_completed_run(updated_at="2026-08-01T10:00:30Z")]  # 30 sec = 0.5 min
         api = FakeAPI(pages_responses={"/repos/o/r/actions/runs": runs})
         result = fetch_workflow_minutes(api, "o", "r", runs_cache={})
+        self.assertIsNotNone(result)
+        assert result is not None
 
         self.assertAlmostEqual(result["by_workflow"][0]["minutes"], 0.5)
         self.assertAlmostEqual(result["total_minutes"], 0.5)
@@ -129,6 +133,8 @@ class FetchWorkflowMinutesTests(unittest.TestCase):
         ]
         api = FakeAPI(pages_responses={"/repos/o/r/actions/runs": runs})
         result = fetch_workflow_minutes(api, "o", "r", runs_cache={})
+        self.assertIsNotNone(result)
+        assert result is not None
 
         self.assertAlmostEqual(result["by_workflow"][0]["minutes"], 1.5)
 
