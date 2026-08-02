@@ -19,7 +19,8 @@ def parse_iso_datetime(value: str | None) -> datetime | None:
     """Parse an ISO-8601 timestamp; return ``None`` on missing/invalid input.
 
     Always returns a timezone-aware UTC datetime when parsing succeeds
-    (``Z`` → ``+00:00``; naive timestamps are assumed UTC).
+    (``Z`` → ``+00:00``; naive timestamps are assumed UTC; non-UTC offsets
+    are converted with ``astimezone(UTC)`` so ``.date()`` is calendar-stable).
     """
     if not value or not isinstance(value, str):
         return None
@@ -29,7 +30,7 @@ def parse_iso_datetime(value: str | None) -> datetime | None:
         return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
-    return parsed
+    return parsed.astimezone(UTC)
 
 
 # Backward-compatible private alias for in-module historical call sites.

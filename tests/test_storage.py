@@ -140,3 +140,29 @@ class ReportStorageTests(unittest.TestCase):
 
         self.assertIsNone(build_storage_summary({"storage_gb_hours": 10.0}))
         self.assertIsNone(build_storage_summary(None))
+
+    def test_parse_iso_datetime_normalizes_non_utc_offsets(self):
+        """Non-UTC offsets convert to UTC so .date() does not shift calendars."""
+        from datetime import UTC
+
+        from github_usage.storage import parse_iso_datetime
+
+        # Local evening of Aug 1 in +02:00 is still Aug 1 UTC after conversion.
+        parsed = parse_iso_datetime("2026-08-01T23:30:00+02:00")
+        assert parsed is not None
+        self.assertEqual(parsed.tzinfo, UTC)
+        self.assertEqual(parsed.isoformat(), "2026-08-01T21:30:00+00:00")
+        self.assertEqual(parsed.date().isoformat(), "2026-08-01")
+
+        # Near midnight local would become previous UTC day without normalization.
+        crossed = parse_iso_datetime("2026-08-02T00:30:00+02:00")
+        assert crossed is not None
+        self.assertEqual(crossed.date().isoformat(), "2026-08-01")
+
+        naive = parse_iso_datetime("2026-08-02T12:00:00")
+        assert naive is not None
+        self.assertEqual(naive.tzinfo, UTC)
+        self.assertEqual(naive.isoformat(), "2026-08-02T12:00:00+00:00")
+
+        self.assertIsNone(parse_iso_datetime(None))
+        self.assertIsNone(parse_iso_datetime("not-a-timestamp"))
