@@ -381,7 +381,7 @@ class BuilderWorkflowBreakdownTests(unittest.TestCase):
                 max_repos=100,
                 warn_over=None,
             )
-        self.assertNotIn("workflow_breakdown", report)
+        self.assertIsNone(report.get("workflow_breakdown"))
         self.assertEqual(report["errors"].get("workflow_breakdown"), "workflow fetch failed")
 
     def test_legacy_builder_soft_fails_workflow_breakdown(self) -> None:
