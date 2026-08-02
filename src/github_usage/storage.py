@@ -15,8 +15,12 @@ from .visibility import repo_visibility
 _EXPIRING_SOON_DAYS = 7
 
 
-def _parse_iso_datetime(value: str | None) -> datetime | None:
-    """Parse an ISO-8601 timestamp; return ``None`` on missing/invalid input."""
+def parse_iso_datetime(value: str | None) -> datetime | None:
+    """Parse an ISO-8601 timestamp; return ``None`` on missing/invalid input.
+
+    Always returns a timezone-aware UTC datetime when parsing succeeds
+    (``Z`` → ``+00:00``; naive timestamps are assumed UTC).
+    """
     if not value or not isinstance(value, str):
         return None
     try:
@@ -26,6 +30,10 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed
+
+
+# Backward-compatible private alias for in-module historical call sites.
+_parse_iso_datetime = parse_iso_datetime
 
 
 def _days_until(expires_at: str | None, *, today: date) -> int | None:

@@ -5,7 +5,7 @@ Split out of ``report_summary`` to stay under the module size budget.
 
 from __future__ import annotations
 
-from .report_helpers import days_in_month, fmt_price, gb_hours_to_avg_mb
+from .report_helpers import days_in_month, fmt_price, gb_hours_to_avg_mb, repo_label
 from .report_summary_private import private_concentration_recommendation, private_consumer_findings
 from .usage_split import flat_equivalent_gb_hours, storage_allowance_gb_hours
 from .visibility import repo_visibility, visibility_label
@@ -13,12 +13,6 @@ from .visibility import repo_visibility, visibility_label
 _FREE_MIN_LIMIT = 2000
 _FREE_STORAGE_MB = 500
 _BAR_LEN = 40
-
-
-def _repo_label(full: str, visibility_by_repo: dict[str, str] | None) -> str:
-    if not visibility_by_repo:
-        return full
-    return f"{full}{visibility_label(visibility_by_repo.get(full, 'public'))}"
 
 
 def _usage_bar(pct: float) -> str:
@@ -179,14 +173,14 @@ def _consumer_findings(
         top_repo = sorted_repos[0]
         pct_of_total = top_repo[1] / user_minutes * 100 if user_minutes else 0
         findings.append(
-            f"Biggest Actions consumer: {_repo_label(top_repo[0], visibility_by_repo)} "
+            f"Biggest Actions consumer: {repo_label(top_repo[0], visibility_by_repo)} "
             f"at {top_repo[1]:.0f} min ({pct_of_total:.1f}% of total)"
         )
     if sorted_by_cost:
         top_cost = sorted_by_cost[0]
         pct_cost = top_cost[4] / actions_gross * 100 if actions_gross else 0
         findings.append(
-            f"Highest Actions cost: {_repo_label(top_cost[0], visibility_by_repo)} "
+            f"Highest Actions cost: {repo_label(top_cost[0], visibility_by_repo)} "
             f"at {fmt_price(top_cost[4])} ({pct_cost:.1f}% of total)"
         )
     if sorted_by_storage:
@@ -343,7 +337,7 @@ def _concentration_recommendation(repo_data, basis_minutes, visibility_by_repo) 
     top2_sum = sorted_repos[0][1] + sorted_repos[1][1]
     if top2_sum / basis_minutes * 100 <= 70:
         return []
-    top_labels = ", ".join(_repo_label(str(row[0]), visibility_by_repo) for row in sorted_repos[:2])
+    top_labels = ", ".join(repo_label(str(row[0]), visibility_by_repo) for row in sorted_repos[:2])
     return [
         f"Top 2 repos ({top_labels}) consume "
         f"{top2_sum / basis_minutes * 100:.0f}% of Actions — "

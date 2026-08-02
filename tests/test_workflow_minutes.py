@@ -339,6 +339,95 @@ class BuilderWorkflowBreakdownTests(unittest.TestCase):
             )
         self.assertIsNotNone(report.get("workflow_breakdown"))
 
+    def test_email_builder_soft_fails_workflow_breakdown(self) -> None:
+        """RuntimeError from workflow fetch is recorded; report still completes."""
+        from github_usage.report_data import build_report_data
+
+        repos = [
+            {
+                "name": "priv",
+                "owner": {"login": "octocat"},
+                "full_name": "octocat/priv",
+                "private": True,
+            }
+        ]
+        api = FakeAPI(
+            request_responses={
+                ("GET", "/rate_limit", ()): {
+                    "resources": {"core": {"limit": 5000, "remaining": 5000}}
+                },
+            },
+            pages_responses={"/user/repos": repos},
+        )
+        with (
+            mock.patch(
+                "github_usage.report_optional.get_actions_per_repo",
+                return_value=(25.0, 0.0, {"sku": {"grossAmount": 1.0}}),
+            ),
+            mock.patch(
+                "github_usage.report_data.workflow_breakdown_for_top_private",
+                side_effect=RuntimeError("workflow fetch failed"),
+            ),
+        ):
+            report = build_report_data(
+                api,
+                "octocat",
+                include_actions=False,
+                include_copilot=False,
+                include_lfs=False,
+                include_consumers=True,
+                include_artifact_storage=False,
+                include_release_assets=False,
+                max_repos=100,
+                warn_over=None,
+            )
+        self.assertNotIn("workflow_breakdown", report)
+        self.assertEqual(report["errors"].get("workflow_breakdown"), "workflow fetch failed")
+
+    def test_legacy_builder_soft_fails_workflow_breakdown(self) -> None:
+        """RuntimeError from workflow fetch is recorded; legacy report still completes."""
+        from github_usage.legacy_report_data import build_legacy_report_data
+
+        with (
+            mock.patch(
+                "github_usage.legacy_report_data.fetch_repo_actions_table",
+                return_value=(
+                    [
+                        {
+                            "repo": "octocat/priv",
+                            "minutes": 50.0,
+                            "storage_gb_hours": 1.0,
+                            "avg_mb": 1.0,
+                            "gross": 1.0,
+                            "sku": {},
+                            "visibility": "private",
+                        }
+                    ],
+                    {},
+                ),
+            ),
+            mock.patch(
+                "github_usage.legacy_report_data.workflow_breakdown_for_top_private",
+                side_effect=RuntimeError("workflow fetch failed"),
+            ),
+        ):
+            data = build_legacy_report_data(
+                FakeAPI(
+                    request_responses={
+                        ("GET", "/rate_limit", ()): {
+                            "resources": {"core": {"limit": 5000, "remaining": 5000}}
+                        },
+                    },
+                    pages_responses={"/user/repos": []},
+                ),
+                "octocat",
+                max_repos=100,
+                account={"login": "octocat", "type": "User", "plan": {}},
+                rate_limits={"resources": {"core": {"limit": 5000, "remaining": 5000}}},
+            )
+        self.assertIsNone(data.get("workflow_breakdown"))
+        self.assertEqual(data["errors"].get("workflow_breakdown"), "workflow fetch failed")
+
 
 class QuotaEstimateTests(unittest.TestCase):
     def test_legacy_estimate_includes_workflow_breakdown_headroom(self) -> None:

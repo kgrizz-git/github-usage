@@ -293,9 +293,12 @@ def _fetch_sections(
             errors["release_assets"] = str(exc)
 
     if include_consumers and report.get("repo_consumers"):
-        report["workflow_breakdown"] = workflow_breakdown_for_top_private(
-            api, report["repo_consumers"], runs_cache=runs_cache
-        )
+        try:
+            report["workflow_breakdown"] = workflow_breakdown_for_top_private(
+                api, report["repo_consumers"], runs_cache=runs_cache
+            )
+        except RuntimeError as exc:
+            errors["workflow_breakdown"] = str(exc)
 
 
 def build_report_data(

@@ -245,7 +245,7 @@ class BillingTests(unittest.TestCase):
             }
         )
 
-        total_min, os_min, wf_min = get_actions_from_runs(api, "octocat", "api")
+        total_min, _os_min, wf_min = get_actions_from_runs(api, "octocat", "api")
 
         self.assertEqual(total_min, 1.0)
         self.assertEqual(wf_min, {"Unknown": 1.0})

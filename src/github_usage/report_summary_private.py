@@ -5,13 +5,7 @@ from __future__ import annotations
 from itertools import islice
 
 from .repo_consumers import private_list_is_redundant
-from .visibility import visibility_label
-
-
-def _repo_label(full: str, visibility_by_repo: dict[str, str] | None) -> str:
-    if not visibility_by_repo:
-        return full
-    return f"{full}{visibility_label(visibility_by_repo.get(full, 'public'))}"
+from .report_helpers import repo_label
 
 
 def _pct_of_private_minutes(minutes: float, private_minutes: float | None) -> float:
@@ -38,7 +32,7 @@ def private_consumer_findings(
     private_m = _capped(by_minutes_private)
     top_priv = next(iter(private_m), None)
     if top_priv is not None and not private_list_is_redundant(combined_m, private_m):
-        label = _repo_label(top_priv["repo"], visibility_by_repo)
+        label = repo_label(top_priv["repo"], visibility_by_repo)
         pct_priv = _pct_of_private_minutes(top_priv["minutes"], private_minutes)
         findings.append(
             f"Biggest private Actions consumer: {label} "
@@ -50,7 +44,7 @@ def private_consumer_findings(
     private_s = _capped(by_storage_private)
     top_st_priv = next(iter(private_s), None)
     if top_st_priv is not None and not private_list_is_redundant(combined_s, private_s):
-        label = _repo_label(top_st_priv["repo"], visibility_by_repo)
+        label = repo_label(top_st_priv["repo"], visibility_by_repo)
         findings.append(
             f"Biggest private storage consumer: {label} ({top_st_priv['storage_avg_mb']:.1f} MB)."
         )
@@ -63,14 +57,17 @@ def private_concentration_recommendation(
     visibility_by_repo: dict[str, str] | None,
 ) -> list[str]:
     """Recommend self-hosted runners when top 2 private repos dominate private minutes."""
+    by_minutes = list((repo_consumers or {}).get("by_minutes") or [])
     by_minutes_private = list((repo_consumers or {}).get("by_minutes_private") or [])
     if len(by_minutes_private) < 2 or not private_minutes or private_minutes <= 0:
+        return []
+    if private_list_is_redundant(by_minutes[:2], by_minutes_private[:2]):
         return []
     first, second = by_minutes_private[0], by_minutes_private[1]
     top2_sum = first["minutes"] + second["minutes"]
     if top2_sum / private_minutes * 100 <= 70:
         return []
-    top_labels = ", ".join(_repo_label(row["repo"], visibility_by_repo) for row in (first, second))
+    top_labels = ", ".join(repo_label(row["repo"], visibility_by_repo) for row in (first, second))
     return [
         f"Top 2 private repos ({top_labels}) consume "
         f"{top2_sum / private_minutes * 100:.0f}% of private Actions minutes — "

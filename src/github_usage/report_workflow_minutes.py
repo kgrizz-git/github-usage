@@ -9,14 +9,12 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from .storage import _parse_iso_datetime
+from .storage import parse_iso_datetime
+
+# Extra REST requests budgeted for the top-private workflow-minute breakdown.
+WORKFLOW_MINUTES_REQUEST_HEADROOM = 10
 
 WORKFLOW_CAVEAT = "(estimated from run wall-clock; not billable — will not match billed repo total)"
-
-
-def _parse_iso(value: str | None):
-    """Parse ISO timestamps as timezone-aware UTC (delegates to storage helper)."""
-    return _parse_iso_datetime(value)
 
 
 def _fetch_runs_cached(api, owner: str, name: str, created_range: str, *, cache: dict) -> list:
@@ -41,7 +39,7 @@ def _workflow_name_map(api, owner: str, name: str) -> dict:
         return {
             wf["id"]: wf["name"] for wf in workflows if wf.get("id") is not None and wf.get("name")
         }
-    except Exception:
+    except RuntimeError:
         return {}
 
 
@@ -62,8 +60,10 @@ def fetch_workflow_minutes(api, owner: str, name: str, *, runs_cache: dict) -> d
     for run in runs:
         if run.get("status") != "completed":
             continue
-        end = _parse_iso(run.get("updated_at"))
-        start = _parse_iso(run.get("run_started_at")) or _parse_iso(run.get("created_at"))
+        end = parse_iso_datetime(run.get("updated_at"))
+        start = parse_iso_datetime(run.get("run_started_at")) or parse_iso_datetime(
+            run.get("created_at")
+        )
         if not start or not end or end <= start:
             continue
         wf_id = run.get("workflow_id") or run.get("name") or "unknown"

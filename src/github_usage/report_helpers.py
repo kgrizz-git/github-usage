@@ -5,6 +5,15 @@ from __future__ import annotations
 import calendar
 from datetime import date, timedelta
 
+from .visibility import visibility_label
+
+
+def repo_label(full: str, visibility_by_repo: dict[str, str] | None) -> str:
+    """Return ``full`` with a visibility tag when ``visibility_by_repo`` is provided."""
+    if not visibility_by_repo:
+        return full
+    return f"{full}{visibility_label(visibility_by_repo.get(full, 'public'))}"
+
 
 def hours_in_month(reference_date: date | None = None) -> int:
     """Return the number of hours in the reference date's calendar month."""

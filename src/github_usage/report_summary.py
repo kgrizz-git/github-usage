@@ -5,7 +5,7 @@ from __future__ import annotations
 from .billing import get_premium_request_usage
 from .repo_consumers import private_list_is_redundant
 from .report_actions_limits import _print_usage_by_visibility
-from .report_helpers import fmt_price
+from .report_helpers import fmt_price, repo_label
 from .report_summary_insights import (
     _print_impactful_findings,
     _print_recommendations,
@@ -177,12 +177,6 @@ def _print_cost_overview(total_gross, total_discount, total_net):
     print()
 
 
-def _repo_label(full: str, visibility_by_repo: dict[str, str] | None) -> str:
-    if not visibility_by_repo:
-        return full
-    return f"{full}{visibility_label(visibility_by_repo.get(full, 'public'))}"
-
-
 def _print_top_consumers(
     user_minutes,
     actions_gross,
@@ -202,7 +196,7 @@ def _print_top_consumers(
     print("\n    Actions Minutes (top 5 repos):")
     for full, mins, _gb, _avg_mb, gross, _ in sorted_repos[:5]:
         pct = mins / user_minutes * 100 if user_minutes and user_minutes > 0 else 0
-        label = _repo_label(full, visibility_by_repo)
+        label = repo_label(full, visibility_by_repo)
         print(f"      {label:<45} {mins:>8.1f} min  ({pct:5.1f}%)  {fmt_price(gross)}")
     if not sorted_repos:
         print("      No Actions usage found.")
@@ -213,7 +207,7 @@ def _print_top_consumers(
     print("    Actions Cost (top 5 repos):")
     for full, _mins, _gb, _avg_mb, gross, _ in sorted_by_cost[:5]:
         pct = gross / actions_gross * 100 if (actions_gross or 0) > 0 else 0
-        label = _repo_label(full, visibility_by_repo)
+        label = repo_label(full, visibility_by_repo)
         print(f"      {label:<45} {fmt_price(gross):>10}  ({pct:5.1f}%)")
     print()
 
@@ -231,7 +225,7 @@ def _print_top_consumers(
                     if private_minutes and private_minutes > 0
                     else 0.0
                 )
-                label = _repo_label(row["repo"], visibility_by_repo)
+                label = repo_label(row["repo"], visibility_by_repo)
                 print(f"      {label:<45} {mins:>8.1f} min  ({pct:5.1f}% of private minutes)")
             print()
 
@@ -239,7 +233,7 @@ def _print_top_consumers(
         if by_storage:
             print("    Actions Storage (top 5 repos, billed):")
             for row in by_storage[:5]:
-                label = _repo_label(row["repo"], visibility_by_repo)
+                label = repo_label(row["repo"], visibility_by_repo)
                 print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
             print()
 
@@ -249,7 +243,7 @@ def _print_top_consumers(
         ):
             print("    Private Actions Storage (top 5 repos, billed):")
             for row in by_storage_private[:5]:
-                label = _repo_label(row["repo"], visibility_by_repo)
+                label = repo_label(row["repo"], visibility_by_repo)
                 print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
             print()
 

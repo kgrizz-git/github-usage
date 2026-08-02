@@ -294,8 +294,9 @@ class SummaryTests(unittest.TestCase):
     def test_print_recommendations_private_concentration(self):
         from github_usage.report_summary import _print_recommendations
 
+        # Overall top-2 includes a public repo so the private top-2 is not redundant.
         repo_data = [
-            ("octocat/pub", 100.0, 0.0, 1.0, 0.0, {}),
+            ("octocat/pub", 500.0, 0.0, 1.0, 0.0, {}),
             ("octocat/priv1", 400.0, 0.0, 1.0, 0.0, {}),
             ("octocat/priv2", 300.0, 0.0, 1.0, 0.0, {}),
         ]
@@ -315,19 +316,19 @@ class SummaryTests(unittest.TestCase):
         )
         pub = consumer_row(
             "octocat/pub",
-            minutes=100.0,
+            minutes=500.0,
             gross=0.0,
             storage_avg_mb=1.0,
             visibility="public",
         )
         repo_consumers = {
-            "by_minutes": [priv1, priv2, pub],
+            "by_minutes": [pub, priv1, priv2],
             "by_minutes_private": [priv1, priv2],
         }
         stdout = StringIO()
         with redirect_stdout(stdout):
             _print_recommendations(
-                800.0,
+                1200.0,
                 repo_data,
                 {},
                 None,
@@ -340,6 +341,48 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("Top 2 repos", output)
         self.assertIn("Top 2 private repos", output)
         self.assertIn("private Actions minutes", output)
+
+    def test_print_recommendations_skips_redundant_private_concentration(self):
+        """When private top-2 matches overall top-2, omit the private-only recommendation."""
+        from github_usage.report_summary import _print_recommendations
+
+        priv1 = consumer_row(
+            "octocat/priv1",
+            minutes=400.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="private",
+        )
+        priv2 = consumer_row(
+            "octocat/priv2",
+            minutes=300.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="private",
+        )
+        repo_data = [
+            ("octocat/priv1", 400.0, 0.0, 1.0, 0.0, {}),
+            ("octocat/priv2", 300.0, 0.0, 1.0, 0.0, {}),
+        ]
+        repo_consumers = {
+            "by_minutes": [priv1, priv2],
+            "by_minutes_private": [priv1, priv2],
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_recommendations(
+                700.0,
+                repo_data,
+                {},
+                None,
+                {},
+                visibility_by_repo={"octocat/priv1": "private", "octocat/priv2": "private"},
+                actions={"private_minutes": 700.0},
+                repo_consumers=repo_consumers,
+            )
+        output = stdout.getvalue()
+        self.assertIn("Top 2 repos", output)
+        self.assertNotIn("Top 2 private repos", output)
 
     def test_print_top_consumers_sorts_correctly(self):
         """Top 5 repos ordered by minutes and cost."""
