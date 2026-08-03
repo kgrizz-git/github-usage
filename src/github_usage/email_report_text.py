@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ._email_report_common import _bytes_to_mb, _generated_line
+from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 from .visibility import (
@@ -123,53 +124,141 @@ def _visibility_usage_summary_lines(consumers: dict) -> list[str]:
     ]
 
 
+def _minutes_value(r: dict) -> str:
+    return (
+        f"{r['minutes']:,.1f} min, "
+        f"{fmt_price(r['gross'])}, {r['storage_avg_mb']:,.1f} MB avg storage"
+    )
+
+
+def _cost_value(r: dict) -> str:
+    return (
+        f"{fmt_price(r['gross'])}, "
+        f"{r['minutes']:,.1f} min, {r['storage_avg_mb']:,.1f} MB avg storage"
+    )
+
+
+def _storage_value(r: dict) -> str:
+    return (
+        f"{r['storage_avg_mb']:,.1f} MB avg storage, "
+        f"{r['minutes']:,.1f} min, {fmt_price(r['gross'])}"
+    )
+
+
+def _grouped_consumer_list(title: str, rows: list[dict], *, value_fn) -> list[str]:
+    lines = [title]
+    groups = group_by_visibility(rows)
+    if len(groups) <= 1:
+        for row in rows:
+            lines.append(f"- {_annotated_repo_name(row)}: {value_fn(row)}")
+    else:
+        for vis, group_rows in groups.items():
+            lines.append(f"\n  {visibility_group_header(vis)}")
+            for row in group_rows:
+                lines.append(f"  - {_annotated_repo_name(row)}: {value_fn(row)}")
+    return lines
+
+
+def _flat_consumer_list(title: str, rows: list[dict], *, value_fn) -> list[str]:
+    lines = [title]
+    for row in rows:
+        lines.append(f"- {_annotated_repo_name(row)}: {value_fn(row)}")
+    return lines
+
+
+def _append_private_consumer_sections(
+    lines: list[str],
+    consumers: dict,
+    *,
+    by_minutes: list[dict],
+    by_storage: list[dict],
+) -> None:
+    by_minutes_private = consumers.get("by_minutes_private") or []
+    if by_minutes_private and not private_list_is_redundant(by_minutes, by_minutes_private):
+        lines.extend(
+            _flat_consumer_list(
+                "Top Private Repositories by Actions Minutes",
+                by_minutes_private,
+                value_fn=_minutes_value,
+            )
+        )
+        lines.append("")
+    by_storage_private = consumers.get("by_storage_private") or []
+    if by_storage_private and not private_list_is_redundant(by_storage, by_storage_private):
+        lines.extend(
+            _flat_consumer_list(
+                "Top Private Repositories by Actions Storage",
+                by_storage_private,
+                value_fn=_storage_value,
+            )
+        )
+        lines.append("")
+
+
 def _format_consumers_section(data: dict) -> list[str]:
     consumers = data.get("repo_consumers")
     if not consumers:
         return []
 
-    def _grouped_list(title: str, rows: list[dict], *, value_fn) -> list[str]:
-        lines = [title]
-        groups = group_by_visibility(rows)
-        if len(groups) <= 1:
-            for row in rows:
-                lines.append(f"- {_annotated_repo_name(row)}: {value_fn(row)}")
-        else:
-            for vis, group_rows in groups.items():
-                lines.append(f"\n  {visibility_group_header(vis)}")
-                for row in group_rows:
-                    lines.append(f"  - {_annotated_repo_name(row)}: {value_fn(row)}")
-        return lines
-
-    def _minutes_value(r: dict) -> str:
-        return (
-            f"{r['minutes']:,.1f} min, "
-            f"{fmt_price(r['gross'])}, {r['storage_avg_mb']:,.1f} MB avg storage"
-        )
-
-    def _cost_value(r: dict) -> str:
-        return (
-            f"{fmt_price(r['gross'])}, "
-            f"{r['minutes']:,.1f} min, {r['storage_avg_mb']:,.1f} MB avg storage"
-        )
-
     lines: list[str] = []
     lines.extend(_visibility_usage_summary_lines(consumers))
+    by_minutes = consumers.get("by_minutes") or []
     lines.extend(
-        _grouped_list(
+        _grouped_consumer_list(
             "Top Repositories by Actions Minutes",
-            consumers.get("by_minutes", []),
+            by_minutes,
             value_fn=_minutes_value,
         )
     )
     lines.append("")
     lines.extend(
-        _grouped_list(
+        _grouped_consumer_list(
             "Top Repositories by Actions Cost", consumers.get("by_cost", []), value_fn=_cost_value
         )
     )
+    lines.append("")
+    by_storage = consumers.get("by_storage") or []
+    if by_storage:
+        lines.extend(
+            _grouped_consumer_list(
+                "Top Repositories by Actions Storage (all)",
+                by_storage,
+                value_fn=_storage_value,
+            )
+        )
+        lines.append("")
+    _append_private_consumer_sections(
+        lines, consumers, by_minutes=by_minutes, by_storage=by_storage
+    )
     if consumers.get("truncated"):
         lines.append(f"- Repo list truncated at {consumers.get('max_repos')} repositories.")
+    lines.append("")
+    return lines
+
+
+def _format_workflow_breakdown_section(data: dict) -> list[str]:
+    breakdown = data.get("workflow_breakdown")
+    if not breakdown:
+        return []
+    from .report_workflow_minutes import WORKFLOW_CAVEAT
+
+    repo = breakdown.get("repo", "?")
+    total = float(breakdown.get("total_minutes") or 0.0)
+    raw_workflows = breakdown.get("by_workflow")
+    workflows = list(raw_workflows)[:5] if isinstance(raw_workflows, list) else []
+    if not workflows:
+        return []
+    lines = [
+        f"Minutes by Workflow — Top Private Repo ({repo})",
+        WORKFLOW_CAVEAT,
+        f"Total (est): {total:.1f} min",
+    ]
+    for entry in workflows:
+        minutes = float(entry.get("minutes") or 0.0)
+        pct = minutes / total * 100.0 if total and total > 0 else 0.0
+        name = entry.get("name") or "Unknown Workflow"
+        runs = int(entry.get("runs") or 0)
+        lines.append(f"- {name}: {minutes:,.1f} min ({pct:.1f}%), {runs} runs")
     lines.append("")
     return lines
 
@@ -299,6 +388,7 @@ _SECTION_FORMATTERS = (
     _format_git_lfs_section,
     _format_monthly_costs_section,
     _format_consumers_section,
+    _format_workflow_breakdown_section,
     _format_artifact_storage_section,
     _format_release_assets_section,
     _format_insights_section,

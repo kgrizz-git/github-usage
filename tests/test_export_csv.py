@@ -1,9 +1,15 @@
 import csv
 import io
 import unittest
+from datetime import date
+from unittest import mock
 
 from github_usage import export_csv
 from tests.conftest import load_export_report_data
+
+# Forecast is omitted when day_of_month < 3; pin mid-month so section-presence
+# assertions are calendar-independent (matches test_forecast_section_present).
+_MID_MONTH = date(2026, 7, 15)
 
 CSV_SECTIONS = [
     "Report Metadata",
@@ -26,6 +32,10 @@ CSV_SECTIONS = [
 class ExportCsvTests(unittest.TestCase):
     def setUp(self):
         self.data = load_export_report_data()
+        date_patcher = mock.patch("github_usage.report_forecast_data.date")
+        mock_date = date_patcher.start()
+        mock_date.today.return_value = _MID_MONTH
+        self.addCleanup(date_patcher.stop)
 
     def _rows(self, data=None):
         buf = io.StringIO()
@@ -134,12 +144,7 @@ class ExportCsvTests(unittest.TestCase):
         self.assertEqual(rows[-1], [])
 
     def test_forecast_section_present(self):
-        from datetime import date
-        from unittest import mock
-
-        with mock.patch("github_usage.report_forecast_data.date") as mock_date:
-            mock_date.today.return_value = date(2026, 7, 15)
-            rows = self._rows()
+        rows = self._rows()
         forecast_idx = next(i for i, r in enumerate(rows) if r and r[0] == "### Forecast ###")
         self.assertEqual(
             rows[forecast_idx + 1],

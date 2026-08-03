@@ -5,23 +5,22 @@ from __future__ import annotations
 import html
 
 from ._email_report_common import _bytes_to_mb, _generated_line
+from ._email_report_html_tables import (
+    html_cost_consumer_row,
+    html_flat_table,
+    html_grouped_table,
+    html_minutes_row,
+    html_repo_cell,
+    html_storage_row,
+    html_workflow_breakdown_table,
+)
+from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 from .visibility import (
     group_by_visibility,
-    repo_visibility,
     visibility_group_header,
-    visibility_label,
 )
-
-
-def _html_repo_cell(row: dict) -> str:
-    repo = html.escape(row["repo"])
-    vis = repo_visibility(row)
-    if vis == "public":
-        return repo
-    tag = html.escape(visibility_label(vis).strip())
-    return f'{repo} <span class="visibility-tag">[{tag}]</span>'
 
 
 def _html_cost_row(label: str, cost: dict[str, float]) -> str:
@@ -124,26 +123,6 @@ def _format_html_monthly_costs_section(data: dict) -> list[str]:
     ]
 
 
-def _html_grouped_table(title: str, rows: list[dict], *, headers: list[str], value_fn) -> list[str]:
-    parts = [f"<h2>{html.escape(title)}</h2>"]
-    groups = group_by_visibility(rows)
-    if len(groups) <= 1:
-        parts.append("<table>")
-        parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
-        for row in rows:
-            parts.append(value_fn(row))
-        parts.append("</table>")
-        return parts
-    for vis, group_rows in groups.items():
-        parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
-        parts.append("<table>")
-        parts.append(f"<tr>{''.join(f'<th>{html.escape(h)}</th>' for h in headers)}</tr>")
-        for row in group_rows:
-            parts.append(value_fn(row))
-        parts.append("</table>")
-    return parts
-
-
 def _html_private_public_summary(by_vis: dict) -> list[str]:
     priv = by_vis.get("private") or {}
     pub = by_vis.get("public") or {}
@@ -163,24 +142,6 @@ def _html_private_public_summary(by_vis: dict) -> list[str]:
     ]
 
 
-def _html_minutes_row(row: dict) -> str:
-    return (
-        f"<tr><td>{_html_repo_cell(row)}</td>"
-        f"<td>{row['minutes']:,.1f} min</td>"
-        f"<td>{fmt_price(row['gross'])}</td>"
-        f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
-    )
-
-
-def _html_cost_consumer_row(row: dict) -> str:
-    return (
-        f"<tr><td>{_html_repo_cell(row)}</td>"
-        f"<td>{fmt_price(row['gross'])}</td>"
-        f"<td>{row['minutes']:,.1f} min</td>"
-        f"<td>{row['storage_avg_mb']:,.1f} MB avg</td></tr>"
-    )
-
-
 def _format_html_consumers_section(data: dict) -> list[str]:
     consumers = data.get("repo_consumers")
     if not consumers:
@@ -189,27 +150,65 @@ def _format_html_consumers_section(data: dict) -> list[str]:
     by_vis = consumers.get("by_visibility")
     if by_vis:
         parts.extend(_html_private_public_summary(by_vis))
+    by_minutes = consumers.get("by_minutes") or []
     parts.extend(
-        _html_grouped_table(
+        html_grouped_table(
             "Top Repositories by Actions Minutes",
-            consumers.get("by_minutes", []),
+            by_minutes,
             headers=["Repo", "Minutes", "Gross", "Storage"],
-            value_fn=_html_minutes_row,
+            value_fn=html_minutes_row,
         )
     )
     parts.extend(
-        _html_grouped_table(
+        html_grouped_table(
             "Top Repositories by Actions Cost",
             consumers.get("by_cost", []),
             headers=["Repo", "Gross", "Minutes", "Storage"],
-            value_fn=_html_cost_consumer_row,
+            value_fn=html_cost_consumer_row,
         )
     )
+    by_storage = consumers.get("by_storage") or []
+    if by_storage:
+        parts.extend(
+            html_grouped_table(
+                "Top Repositories by Actions Storage (all)",
+                by_storage,
+                headers=["Repo", "Storage", "Minutes", "Gross"],
+                value_fn=html_storage_row,
+            )
+        )
+    by_minutes_private = consumers.get("by_minutes_private") or []
+    if by_minutes_private and not private_list_is_redundant(by_minutes, by_minutes_private):
+        parts.extend(
+            html_flat_table(
+                "Top Private Repositories by Actions Minutes",
+                by_minutes_private,
+                headers=["Repo", "Minutes", "Gross", "Storage"],
+                value_fn=html_minutes_row,
+            )
+        )
+    by_storage_private = consumers.get("by_storage_private") or []
+    if by_storage_private and not private_list_is_redundant(by_storage, by_storage_private):
+        parts.extend(
+            html_flat_table(
+                "Top Private Repositories by Actions Storage",
+                by_storage_private,
+                headers=["Repo", "Storage", "Minutes", "Gross"],
+                value_fn=html_storage_row,
+            )
+        )
     if consumers.get("truncated"):
         parts.append(
             f"<p><em>Repo list truncated at {consumers.get('max_repos')} repositories.</em></p>"
         )
     return parts
+
+
+def _format_html_workflow_breakdown_section(data: dict) -> list[str]:
+    breakdown = data.get("workflow_breakdown")
+    if not breakdown:
+        return []
+    return html_workflow_breakdown_table(breakdown, limit=5)
 
 
 def _format_html_artifact_storage_section(data: dict) -> list[str]:
@@ -223,7 +222,7 @@ def _format_html_artifact_storage_section(data: dict) -> list[str]:
         parts.append("<ul>")
         for row in repos:
             parts.append(
-                f"<li>{_html_repo_cell(row)}: "
+                f"<li>{html_repo_cell(row)}: "
                 f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
             )
         parts.append("</ul>")
@@ -233,7 +232,7 @@ def _format_html_artifact_storage_section(data: dict) -> list[str]:
             parts.append("<ul>")
             for row in group_rows:
                 parts.append(
-                    f"<li>{_html_repo_cell(row)}: "
+                    f"<li>{html_repo_cell(row)}: "
                     f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
                 )
             parts.append("</ul>")
@@ -256,7 +255,7 @@ def _format_html_release_assets_section(data: dict) -> list[str]:
         parts.append("<ul>")
         for row in repos:
             parts.append(
-                f"<li>{_html_repo_cell(row)}: "
+                f"<li>{html_repo_cell(row)}: "
                 f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets</li>"
             )
         parts.append("</ul>")
@@ -266,7 +265,7 @@ def _format_html_release_assets_section(data: dict) -> list[str]:
             parts.append("<ul>")
             for row in group_rows:
                 parts.append(
-                    f"<li>{_html_repo_cell(row)}: "
+                    f"<li>{html_repo_cell(row)}: "
                     f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets</li>"
                 )
             parts.append("</ul>")
@@ -361,6 +360,7 @@ _SECTION_HTML_FORMATTERS = (
     _format_html_git_lfs_section,
     _format_html_monthly_costs_section,
     _format_html_consumers_section,
+    _format_html_workflow_breakdown_section,
     _format_html_artifact_storage_section,
     _format_html_release_assets_section,
     _format_html_insights_section,

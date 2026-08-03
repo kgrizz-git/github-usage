@@ -1,9 +1,14 @@
 import io
 import re
 import unittest
+from datetime import date
 from unittest import mock
 
 from tests.conftest import load_export_report_data
+
+# Forecast is omitted when day_of_month < 3; pin mid-month so section/page
+# assertions are calendar-independent.
+_MID_MONTH = date(2026, 7, 15)
 
 
 def _has_fpdf2():
@@ -58,6 +63,10 @@ PDF_SECTIONS = [
 class ExportPdfTests(unittest.TestCase):
     def setUp(self):
         self.data = load_export_report_data()
+        date_patcher = mock.patch("github_usage.report_forecast_data.date")
+        mock_date = date_patcher.start()
+        mock_date.today.return_value = _MID_MONTH
+        self.addCleanup(date_patcher.stop)
 
     def _save(self, data=None):
         from github_usage import export_pdf

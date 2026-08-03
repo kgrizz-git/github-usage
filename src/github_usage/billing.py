@@ -163,6 +163,6 @@ def get_actions_from_runs(api, owner, repo):
             os_millis[os_name] += millis
             run_minutes += millis / 60000
         total_minutes += run_minutes
-        wf_name = run.get("workflow_name", "Unknown")
+        wf_name = run.get("workflow_name") or "Unknown"
         workflow_minutes[wf_name] = workflow_minutes.get(wf_name, 0) + run_minutes
     return round(total_minutes, 1), os_millis, workflow_minutes

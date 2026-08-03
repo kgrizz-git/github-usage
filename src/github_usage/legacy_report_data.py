@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .billing import get_billing_summary, get_premium_request_usage
+from .repo_consumers import build_consumer_rankings
 from .report_account import fetch_account_info, fetch_rate_limits
 from .report_actions import fetch_actions_os_breakdown, fetch_repo_actions_table
 from .report_data import (
@@ -29,6 +30,10 @@ from .report_data import (
 )
 from .report_products import fetch_billing_history
 from .report_storage import build_storage_summary
+from .report_workflow_minutes import (
+    WORKFLOW_MINUTES_REQUEST_HEADROOM,
+    workflow_breakdown_for_top_private,
+)
 from .storage import get_storage_analysis
 from .usage_split import REPORT_SOURCES, attach_actions_visibility_split
 from .visibility import filter_repos_by_visibility, repo_visibility
@@ -58,12 +63,12 @@ def derive_repo_consumers(
         }
         for row in repo_actions
     ]
+    rankings = build_consumer_rankings(rows, limit=limit)
     return {
         "scanned_repo_count": scanned_repo_count,
         "max_repos": max_repos,
         "truncated": truncated,
-        "by_minutes": sorted(rows, key=lambda row: row["minutes"], reverse=True)[:limit],
-        "by_cost": sorted(rows, key=lambda row: row["gross"], reverse=True)[:limit],
+        **rankings,
         "errors": dict(errors),
     }
 
@@ -148,7 +153,12 @@ def estimate_legacy_api_request_count(
     # Per repo: Actions billing + artifacts pages + releases pages (storage_analysis once)
     per_repo = 3
     os_breakdown = min(OS_BREAKDOWN_LIMIT, repos_considered)
-    estimated = account_level + repos_considered * per_repo + os_breakdown
+    estimated = (
+        account_level
+        + repos_considered * per_repo
+        + os_breakdown
+        + WORKFLOW_MINUTES_REQUEST_HEADROOM
+    )
     percent = None
     if core_remaining:
         percent = round(estimated / core_remaining * 100, 1)
@@ -156,7 +166,7 @@ def estimate_legacy_api_request_count(
     if repo_count > max_repos:
         notes.append(f"Repository list truncated to {max_repos} of {repo_count} repositories.")
     if estimated:
-        notes.append(f"Legacy report may use about {estimated} REST API requests.")
+        notes.append(f"Local full report may use about {estimated} REST API requests.")
     if include_release_assets:
         notes.append("Release asset totals are derived from storage analysis (no extra fetch).")
     return {
@@ -244,6 +254,7 @@ def build_legacy_report_data(
     actions_os_breakdown = fetch_actions_os_breakdown(api, repos, limit=OS_BREAKDOWN_LIMIT)
     billing_history = fetch_billing_history(api, username)
 
+    runs_cache: dict = {}
     repo_consumers = derive_repo_consumers(
         repo_actions,
         repo_action_errors,
@@ -251,6 +262,13 @@ def build_legacy_report_data(
         truncated=truncated,
         scanned_repo_count=scanned_repo_count,
     )
+    try:
+        workflow_breakdown = workflow_breakdown_for_top_private(
+            api, repo_consumers, runs_cache=runs_cache
+        )
+    except RuntimeError as exc:
+        errors["workflow_breakdown"] = str(exc)
+        workflow_breakdown = None
     artifact_storage = derive_artifact_storage(
         storage_analysis,
         max_repos=max_repos,
@@ -285,6 +303,7 @@ def build_legacy_report_data(
         "git_lfs": None,
         "monthly_costs": None,
         "repo_consumers": repo_consumers,
+        "workflow_breakdown": workflow_breakdown,
         "artifact_storage": artifact_storage,
         "release_assets": release_assets,
         "api_estimate": api_estimate,

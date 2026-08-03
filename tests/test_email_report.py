@@ -3,6 +3,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from tests._consumer_fixtures import (
+    all_private_top_consumers,
+    mixed_pub_priv_consumers,
+    single_private_redundant_consumers,
+)
+
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -728,6 +734,101 @@ class EmailReportTests(unittest.TestCase):
         joined = "\n".join(parts)
         self.assertIn("Private Repos:", joined)
         self.assertIn("Public Repos:", joined)
+
+    def _mixed_visibility_repo_consumers(self) -> dict:
+        return mixed_pub_priv_consumers(by_cost_mode="both")
+
+    def test_consumers_section_includes_storage_and_private_lists_text(self):
+        from github_usage.email_report_text import _format_consumers_section
+
+        data = {"repo_consumers": self._mixed_visibility_repo_consumers()}
+        text = "\n".join(_format_consumers_section(data))
+        self.assertIn("Top Repositories by Actions Storage (all)", text)
+        self.assertIn("Top Private Repositories by Actions Minutes", text)
+        self.assertIn("Top Private Repositories by Actions Storage", text)
+        self.assertIn("octocat/priv [private]", text)
+        self.assertIn("80.0 MB avg storage", text)
+
+    def test_consumers_section_skips_redundant_private_lists_text(self):
+        from github_usage.email_report_text import _format_consumers_section
+
+        text = "\n".join(_format_consumers_section({"repo_consumers": all_private_top_consumers()}))
+        self.assertIn("Top Repositories by Actions Storage (all)", text)
+        self.assertNotIn("Top Private Repositories by Actions Minutes", text)
+        self.assertNotIn("Top Private Repositories by Actions Storage", text)
+
+    def test_consumers_section_unchanged_without_new_keys_text(self):
+        from github_usage.email_report_text import _format_consumers_section
+
+        data = {
+            "repo_consumers": {
+                "by_minutes": [
+                    {
+                        "repo": "org/pub",
+                        "visibility": "public",
+                        "minutes": 50.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 5.0,
+                    },
+                ],
+                "by_cost": [],
+            }
+        }
+        text = "\n".join(_format_consumers_section(data))
+        self.assertIn("Top Repositories by Actions Minutes", text)
+        self.assertNotIn("Top Repositories by Actions Storage (all)", text)
+        self.assertNotIn("Top Private Repositories by Actions Minutes", text)
+        self.assertNotIn("Top Private Repositories by Actions Storage", text)
+
+    def test_consumers_section_includes_storage_and_private_lists_html(self):
+        from github_usage.email_report_html import _format_html_consumers_section
+
+        data = {"repo_consumers": self._mixed_visibility_repo_consumers()}
+        joined = "\n".join(_format_html_consumers_section(data))
+        self.assertIn("Top Repositories by Actions Storage (all)", joined)
+        self.assertIn("Top Private Repositories by Actions Minutes", joined)
+        self.assertIn("Top Private Repositories by Actions Storage", joined)
+        self.assertIn("octocat/priv", joined)
+        self.assertIn("80.0 MB avg", joined)
+
+    def test_consumers_section_skips_redundant_private_lists_html(self):
+        from github_usage.email_report_html import _format_html_consumers_section
+
+        joined = "\n".join(
+            _format_html_consumers_section({"repo_consumers": single_private_redundant_consumers()})
+        )
+        self.assertIn("Top Repositories by Actions Storage (all)", joined)
+        self.assertNotIn("Top Private Repositories by Actions Minutes", joined)
+        self.assertNotIn("Top Private Repositories by Actions Storage", joined)
+
+    def test_consumers_section_unchanged_without_new_keys_html(self):
+        from github_usage.email_report_html import _format_html_consumers_section
+
+        data = {
+            "repo_consumers": {
+                "by_minutes": [
+                    {
+                        "repo": "org/pub",
+                        "visibility": "public",
+                        "minutes": 50.0,
+                        "gross": 0.0,
+                        "storage_avg_mb": 5.0,
+                    },
+                ],
+                "by_cost": [],
+            }
+        }
+        joined = "\n".join(_format_html_consumers_section(data))
+        self.assertIn("Top Repositories by Actions Minutes", joined)
+        self.assertNotIn("Top Repositories by Actions Storage (all)", joined)
+        self.assertNotIn("Top Private Repositories by Actions Minutes", joined)
+        self.assertNotIn("Top Private Repositories by Actions Storage", joined)
+
+    def test_html_table_helpers_live_in_dedicated_module(self):
+        from github_usage import _email_report_html_tables as tables
+
+        self.assertTrue(callable(tables.html_grouped_table))
+        self.assertTrue(callable(tables.html_storage_row))
 
 
 if __name__ == "__main__":

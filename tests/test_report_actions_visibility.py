@@ -83,6 +83,34 @@ class RenderActionsVisibilityTests(unittest.TestCase):
         self.assertIn("o/private [private]", out)
         self.assertNotIn("o/public [", out)
 
+    def test_render_actions_top_consumers_shows_private_section_when_mixed(self) -> None:
+        repo_actions = [
+            {"repo": "o/pub1", "minutes": 100.0, "avg_mb": 1.0, "visibility": "public"},
+            {"repo": "o/pub2", "minutes": 90.0, "avg_mb": 1.0, "visibility": "public"},
+            {"repo": "o/priv1", "minutes": 80.0, "avg_mb": 2.0, "visibility": "private"},
+            {"repo": "o/priv2", "minutes": 70.0, "avg_mb": 3.0, "visibility": "private"},
+        ]
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            render_actions_top_consumers(repo_actions)
+        out = buf.getvalue()
+        self.assertIn("Top 10 Repos by Actions Minutes", out)
+        self.assertIn("Top 10 Private Repos by Actions Minutes", out)
+        self.assertIn("o/priv1", out)
+        self.assertIn("o/priv2", out)
+
+    def test_render_actions_top_consumers_skips_private_when_redundant(self) -> None:
+        repo_actions = [
+            {"repo": "o/priv1", "minutes": 100.0, "avg_mb": 1.0, "visibility": "private"},
+            {"repo": "o/priv2", "minutes": 90.0, "avg_mb": 1.0, "visibility": "private"},
+        ]
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            render_actions_top_consumers(repo_actions)
+        out = buf.getvalue()
+        self.assertIn("Top 10 Repos by Actions Minutes", out)
+        self.assertNotIn("Top 10 Private Repos by Actions Minutes", out)
+
     def test_render_actions_os_breakdown_annotates_visibility(self) -> None:
         breakdown = {
             "found": True,

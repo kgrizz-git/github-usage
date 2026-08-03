@@ -17,9 +17,19 @@
 
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
 
+## Actions / Local Full Report
+
+- [ ] CSV/XLSX/PDF columns/sheets for private rankings and workflow breakdown — add `TODO` comments at `repo_consumers` readers in `export_csv.py`, `export_xlsx.py`, and `export_pdf.py`.
+- [ ] Private-only **artifact-scan** ranking (artifact section already groups by visibility; billed storage ranking shipped in [archived plan](docs/superpowers/plans/archived/2026-07-31-private-top-consumers.md)).
+- [ ] Workflow breakdown for more than the single top private repo (extend beyond the one-repo wall-clock section).
+- [ ] Opt-in monthly deep run analysis (top private repo by gross cost; job-level approx + calendar-month cache) — see [plan](docs/superpowers/plans/2026-07-31-opt-in-deep-run-analysis.md).
+- [ ] Retire dead Actions OS-from-runs path (honesty) — see [plan](docs/superpowers/plans/2026-07-31-actions-os-from-runs-honesty.md).
+- [ ] Deep-analysis follow-ons (email section, top-N repos, export columns, auto-enable without flag) — deferred items in [opt-in deep-run plan](docs/superpowers/plans/2026-07-31-opt-in-deep-run-analysis.md) Phase 6.
+
 ## Code Health
 
 - [ ] Refactor `src/github_usage/setup_config.py` (507 lines, over the 500-line limit per `scripts/check-sizes`). Extract a focused submodule — e.g. profile schema/loading (`load_report_profiles`, `find_profile`, `ensure_profiles`, `_default_profile`) and/or the TOML writer helpers (`_emit_*_block`, `write_config`) — to bring the file back under the threshold. Also watch `setup_wizard.py` (461 lines) and the `_manage_profiles()`/`_run_email_report()` functions, which are approaching their limits.
+- [ ] Rename internal `legacy_*` modules/symbols to “local full report” naming (`legacy_report_data` → e.g. `local_report_data`, cache `kind="legacy"`, CLI/TUI internals, tests). User-facing copy already says “local full report”; this is the code rename. Keep a thin `legacy` compatibility shim if external imports still need it.
 
 ## Configuration & Setup
 
@@ -34,5 +44,5 @@
 ## Blocked, Indefinitely Deferred
 
 - [ ] Add a `--month YYYY-MM` flag so users can query a specific billing period. **Deferred** — see `docs/api-discovery-month.md`; GitHub's billing endpoints ignore `since`/`until` parameters.
-- [ ] Add historical email reports with `github-usage email-report --month YYYY-MM` after GitHub billing API period/filter behavior is specified and tested. **Blocked** by the same API gap as the legacy `--month` flag.
+- [ ] Add historical email reports with `github-usage email-report --month YYYY-MM` after GitHub billing API period/filter behavior is specified and tested. **Blocked** by the same API gap as the local full report `--month` flag.
 - [ ] Add month-over-month and year-over-year comparison sections once historical report data is available.

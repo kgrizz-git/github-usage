@@ -90,6 +90,38 @@ class GetArtifactStorageDetailsTests(unittest.TestCase):
         result = get_artifact_storage_details(api, [_repo("octocat/repo")], max_repos=10)
         self.assertEqual(result["top_repos"], [])
 
+    def test_populates_from_object_shaped_artifacts_response(self):
+        """Artifact collector populates rows when GitHub returns {artifacts: [...]}."""
+        import json
+
+        from github_usage.api import GitHubAPI
+        from github_usage.http_retry import Response
+
+        api = GitHubAPI("fake-token")
+
+        def mock_request_raw(method, path, params=None):
+            import http.client
+
+            headers = http.client.HTTPMessage()
+            body = json.dumps(
+                {
+                    "total_count": 2,
+                    "artifacts": [
+                        {"id": 1, "size_in_bytes": 1024},
+                        {"id": 2, "size_in_bytes": 2048},
+                    ],
+                }
+            ).encode()
+            return Response(status=200, body=body, headers=headers)
+
+        with mock.patch.object(api, "request_raw", side_effect=mock_request_raw):
+            result = get_artifact_storage_details(api, [_repo("octocat/repo")], max_repos=10)
+
+        self.assertEqual(
+            result["top_repos"],
+            [{"repo": "octocat/repo", "artifact_bytes": 3072, "visibility": "public"}],
+        )
+
 
 class GetReleaseAssetDetailsTests(unittest.TestCase):
     def test_skips_assets_with_non_numeric_size(self):
@@ -237,11 +269,39 @@ class GetRepoConsumersTests(unittest.TestCase):
         self.assertEqual(result["by_visibility"]["public"]["minutes"], 0.0)
 
 
+class RepoConsumersPrivateRankingTests(unittest.TestCase):
+    def test_get_repo_consumers_returns_private_and_storage_ranking_keys(self):
+        repos = [
+            {**_repo("octocat/private1", name="private1"), "visibility": "private"},
+            {**_repo("octocat/public1", name="public1"), "visibility": "public"},
+            {**_repo("octocat/internal1", name="internal1"), "visibility": "internal"},
+        ]
+        with mock.patch(
+            "github_usage.report_optional.get_actions_per_repo",
+            side_effect=[
+                (40.0, 1.0, {"sku": {"grossAmount": 4.0}}),
+                (100.0, 5.0, {"sku": {"grossAmount": 10.0}}),
+                (30.0, 2.0, {"sku": {"grossAmount": 3.0}}),
+            ],
+        ):
+            result = get_repo_consumers(mock.Mock(), repos, limit=5, max_repos=10)
+        for key in (
+            "by_storage",
+            "by_minutes_private",
+            "by_storage_private",
+        ):
+            self.assertIn(key, result)
+        private_repos = {row["repo"] for row in result["by_minutes_private"]}
+        self.assertEqual(private_repos, {"octocat/private1", "octocat/internal1"})
+        self.assertNotIn("octocat/public1", private_repos)
+        self.assertEqual(result["by_storage"][0]["repo"], "octocat/public1")
+
+
 class CacheVersionTests(unittest.TestCase):
-    def test_cache_version_is_2(self):
+    def test_cache_version_is_3(self):
         from github_usage.report_cache import CACHE_VERSION
 
-        self.assertEqual(CACHE_VERSION, 2)
+        self.assertEqual(CACHE_VERSION, 3)
 
 
 if __name__ == "__main__":

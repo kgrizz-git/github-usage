@@ -2,6 +2,15 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 
+from tests._consumer_fixtures import (
+    all_private_repo_data,
+    all_private_top_consumers,
+    consumer_row,
+    findings_pub_priv_consumers,
+    mixed_pub_priv_consumers,
+    mixed_pub_priv_repo_data,
+    pub_priv_partial_consumers,
+)
 from tests._fakes import FakeAPI
 
 
@@ -95,6 +104,285 @@ class SummaryTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertIn("Upgrade from free tier", output)
+
+    def test_print_top_consumers_private_and_storage_sections(self):
+        from github_usage.report_summary import _print_top_consumers
+
+        repo_data = mixed_pub_priv_repo_data()
+        repo_consumers = mixed_pub_priv_consumers()
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_top_consumers(
+                800.0,
+                8.0,
+                repo_data,
+                {},
+                None,
+                visibility_by_repo={"octocat/priv": "private"},
+                repo_consumers=repo_consumers,
+                private_minutes=400.0,
+            )
+        output = stdout.getvalue()
+        self.assertIn("Private Actions Minutes (top 5 repos):", output)
+        self.assertIn("Actions Storage (top 5 repos, billed):", output)
+        self.assertIn("Private Actions Storage (top 5 repos, billed):", output)
+        self.assertIn("octocat/priv [private]", output)
+        self.assertIn("75.0%", output)  # 300/400 private minutes
+
+    def test_print_top_consumers_skips_private_sections_when_redundant(self):
+        from github_usage.report_summary import _print_top_consumers
+
+        repo_data = all_private_repo_data()
+        repo_consumers = all_private_top_consumers()
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_top_consumers(
+                800.0,
+                8.0,
+                repo_data,
+                {},
+                None,
+                repo_consumers=repo_consumers,
+                private_minutes=800.0,
+            )
+        output = stdout.getvalue()
+        self.assertNotIn("Private Actions Minutes (top 5 repos):", output)
+        self.assertNotIn("Private Actions Storage (top 5 repos, billed):", output)
+
+    def test_print_top_consumers_private_minutes_zero_division_guard(self):
+        from github_usage.report_summary import _print_top_consumers
+
+        repo_consumers = pub_priv_partial_consumers()
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_top_consumers(
+                150.0,
+                1.5,
+                [("octocat/priv", 50.0, 0.0, 3.0, 0.5, {})],
+                {},
+                None,
+                repo_consumers=repo_consumers,
+                private_minutes=0.0,
+            )
+        output = stdout.getvalue()
+        self.assertIn("Private Actions Minutes (top 5 repos):", output)
+        self.assertIn("0.0% of private minutes", output)
+
+    def test_print_storage_breakdown_private_scan_section(self):
+        from github_usage.report_summary import _print_storage_breakdown
+
+        storage_analysis = {
+            "repos": [
+                {"name": "octocat/pub", "total_storage": 2.0, "visibility": "public", "items": []},
+                {
+                    "name": "octocat/priv",
+                    "total_storage": 1.5,
+                    "visibility": "private",
+                    "items": [],
+                },
+            ]
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_storage_breakdown(storage_analysis)
+        output = stdout.getvalue()
+        self.assertIn("Top 10 Private Repos by Storage (scan)", output)
+        self.assertIn("octocat/priv [private]", output)
+
+    def test_print_storage_breakdown_private_scan_tie_breaks_on_repo_name(self):
+        from github_usage.report_summary import _print_storage_breakdown
+
+        storage_analysis = {
+            "repos": [
+                {
+                    "name": "octocat/pub",
+                    "total_storage": 5.0,
+                    "visibility": "public",
+                    "items": [],
+                },
+                {
+                    "name": "octocat/z-priv",
+                    "total_storage": 2.0,
+                    "visibility": "private",
+                    "items": [],
+                },
+                {
+                    "name": "octocat/a-priv",
+                    "total_storage": 2.0,
+                    "visibility": "private",
+                    "items": [],
+                },
+            ]
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_storage_breakdown(storage_analysis)
+        output = stdout.getvalue()
+        private_section = output.split("Top 10 Private Repos by Storage (scan)", 1)[1]
+        self.assertLess(
+            private_section.index("octocat/a-priv"),
+            private_section.index("octocat/z-priv"),
+        )
+
+    def test_print_storage_breakdown_skips_private_when_redundant(self):
+        from github_usage.report_summary import _print_storage_breakdown
+
+        storage_analysis = {
+            "repos": [
+                {
+                    "name": "octocat/priv1",
+                    "total_storage": 2.0,
+                    "visibility": "private",
+                    "items": [],
+                },
+                {
+                    "name": "octocat/priv2",
+                    "total_storage": 1.0,
+                    "visibility": "private",
+                    "items": [],
+                },
+            ]
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_storage_breakdown(storage_analysis)
+        self.assertNotIn("Top 10 Private Repos by Storage (scan)", stdout.getvalue())
+
+    def test_consumer_findings_private_actions_and_storage(self):
+        from github_usage.report_summary_insights import _consumer_findings
+
+        repo_consumers = findings_pub_priv_consumers()
+        findings = _consumer_findings(
+            800.0,
+            8.0,
+            [("octocat/priv", 300.0, 0.0, 80.0, 3.0, {})],
+            {"repos": []},
+            {"octocat/priv": "private"},
+            repo_consumers=repo_consumers,
+            private_minutes=400.0,
+        )
+        joined = "\n".join(findings)
+        self.assertIn("Biggest private Actions consumer", joined)
+        self.assertIn("Biggest private storage consumer", joined)
+        self.assertIn("75.0% of private minutes", joined)
+        self.assertIn("80.0 MB", joined)
+
+    def test_print_impactful_findings_includes_private_consumer_findings(self):
+        from github_usage.report_summary import _print_impactful_findings
+
+        repo_data = [("octocat/priv", 300.0, 0.0, 80.0, 3.0, {})]
+        repo_consumers = findings_pub_priv_consumers()
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_impactful_findings(
+                800.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                repo_data,
+                {},
+                {"repos": []},
+                visibility_by_repo={"octocat/priv": "private"},
+                actions={"private_minutes": 400.0},
+                repo_consumers=repo_consumers,
+            )
+        output = stdout.getvalue()
+        self.assertIn("Biggest private Actions consumer", output)
+        self.assertIn("75.0% of private minutes", output)
+
+    def test_print_recommendations_private_concentration(self):
+        from github_usage.report_summary import _print_recommendations
+
+        # Overall top-2 includes a public repo so the private top-2 is not redundant.
+        repo_data = [
+            ("octocat/pub", 500.0, 0.0, 1.0, 0.0, {}),
+            ("octocat/priv1", 400.0, 0.0, 1.0, 0.0, {}),
+            ("octocat/priv2", 300.0, 0.0, 1.0, 0.0, {}),
+        ]
+        priv1 = consumer_row(
+            "octocat/priv1",
+            minutes=400.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="private",
+        )
+        priv2 = consumer_row(
+            "octocat/priv2",
+            minutes=300.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="private",
+        )
+        pub = consumer_row(
+            "octocat/pub",
+            minutes=500.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="public",
+        )
+        repo_consumers = {
+            "by_minutes": [pub, priv1, priv2],
+            "by_minutes_private": [priv1, priv2],
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_recommendations(
+                1200.0,
+                repo_data,
+                {},
+                None,
+                {},
+                visibility_by_repo={"octocat/priv1": "private", "octocat/priv2": "private"},
+                actions={"private_minutes": 700.0},
+                repo_consumers=repo_consumers,
+            )
+        output = stdout.getvalue()
+        self.assertIn("Top 2 repos", output)
+        self.assertIn("Top 2 private repos", output)
+        self.assertIn("private Actions minutes", output)
+
+    def test_print_recommendations_skips_redundant_private_concentration(self):
+        """When private top-2 matches overall top-2, omit the private-only recommendation."""
+        from github_usage.report_summary import _print_recommendations
+
+        priv1 = consumer_row(
+            "octocat/priv1",
+            minutes=400.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="private",
+        )
+        priv2 = consumer_row(
+            "octocat/priv2",
+            minutes=300.0,
+            gross=0.0,
+            storage_avg_mb=1.0,
+            visibility="private",
+        )
+        repo_data = [
+            ("octocat/priv1", 400.0, 0.0, 1.0, 0.0, {}),
+            ("octocat/priv2", 300.0, 0.0, 1.0, 0.0, {}),
+        ]
+        repo_consumers = {
+            "by_minutes": [priv1, priv2],
+            "by_minutes_private": [priv1, priv2],
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            _print_recommendations(
+                700.0,
+                repo_data,
+                {},
+                None,
+                {},
+                visibility_by_repo={"octocat/priv1": "private", "octocat/priv2": "private"},
+                actions={"private_minutes": 700.0},
+                repo_consumers=repo_consumers,
+            )
+        output = stdout.getvalue()
+        self.assertIn("Top 2 repos", output)
+        self.assertNotIn("Top 2 private repos", output)
 
     def test_print_top_consumers_sorts_correctly(self):
         """Top 5 repos ordered by minutes and cost."""

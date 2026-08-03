@@ -63,7 +63,7 @@ class SetupProfilesPanel(VerticalScroll):
             yield Static(
                 "· [b]Email Report[/b], [b]Verify Email Setup[/b], and [b]scheduled sends[/b] "
                 "(launchd / GitHub Actions) use the options below.\n"
-                "· [b]Usage Report[/b] (main tab 2) is separate: fixed legacy billing snapshot; "
+                "· [b]Local Full Report[/b] (main tab 2) is separate: fixed billing snapshot; "
                 "it does not read these options.\n"
                 "· [b]target_email[/b] overrides REPORT_EMAIL for this profile's email sends only.",
                 classes="HelpText",

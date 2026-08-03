@@ -188,6 +188,69 @@ class BillingTests(unittest.TestCase):
         # "Unknown" workflow for runs without workflow_name
         self.assertEqual(wf_min.get("Unknown"), 0.0)
 
+    def test_get_actions_from_runs_object_shaped_enters_loop(self):
+        """Object-shaped runs response is unwrapped so runs enter the aggregation loop.
+
+        Uses real GitHubAPI + mocked request_raw (not FakeAPI) to exercise unwrap.
+        Fixtures omit billable — minutes/OS stay zero (expected vs live API).
+        workflow_name: null must map to \"Unknown\".
+        """
+        import json
+        from unittest import mock
+
+        from github_usage.api import GitHubAPI
+        from github_usage.billing import get_actions_from_runs
+        from github_usage.http_retry import Response
+
+        api = GitHubAPI("fake-token")
+
+        def mock_request_raw(method, path, params=None):
+            import http.client
+
+            headers = http.client.HTTPMessage()
+            body = json.dumps(
+                {
+                    "total_count": 2,
+                    "workflow_runs": [
+                        {"id": 1, "workflow_name": None},
+                        {"id": 2, "workflow_name": "CI"},
+                    ],
+                }
+            ).encode()
+            return Response(status=200, body=body, headers=headers)
+
+        with mock.patch.object(api, "request_raw", side_effect=mock_request_raw):
+            total_min, os_min, wf_min = get_actions_from_runs(api, "octocat", "api")
+
+        # Loop entered: both runs contribute to workflow_minutes (even at 0.0 minutes)
+        self.assertIn("Unknown", wf_min)
+        self.assertIn("CI", wf_min)
+        self.assertEqual(wf_min["Unknown"], 0.0)
+        self.assertEqual(wf_min["CI"], 0.0)
+        self.assertEqual(total_min, 0.0)
+        self.assertEqual(os_min, {"UBUNTU": 0, "WINDOWS": 0, "MACOS": 0})
+
+    def test_get_actions_from_runs_null_workflow_name_is_unknown(self):
+        """Explicit workflow_name: null must become \"Unknown\" (not None key)."""
+        from github_usage.billing import get_actions_from_runs
+
+        api = FakeAPI(
+            pages_responses={
+                "/repos/octocat/api/actions/runs": [
+                    {
+                        "workflow_name": None,
+                        "billable": {"UBUNTU": {"millis": 60000}},
+                    },
+                ]
+            }
+        )
+
+        total_min, _os_min, wf_min = get_actions_from_runs(api, "octocat", "api")
+
+        self.assertEqual(total_min, 1.0)
+        self.assertEqual(wf_min, {"Unknown": 1.0})
+        self.assertNotIn(None, wf_min)
+
     def test_get_actions_from_runs_empty(self):
         from github_usage.billing import get_actions_from_runs
 
