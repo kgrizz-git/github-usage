@@ -4,5 +4,5 @@ try:
     from .setup_wizard_screen import SetupWizardScreen
 
     __all__ = ["SetupWizardScreen"]
-except ImportError:
+except ModuleNotFoundError:
     pass

@@ -80,6 +80,18 @@ class WizardEmailFormatFlowTests(unittest.TestCase):
     def test_wizard_data_default_email_format_is_text(self):
         self.assertEqual(WizardData().email_format, "text")
 
+    def test_load_initial_data_normalizes_uppercase_email_format(self):
+        write_config(self.paths.config_file, {"email_report": {"email_format": "HTML"}})
+        with mock.patch("github_usage.gui.wizard.setup_wizard_flow.read_secrets", return_value={}):
+            data = load_initial_data(self.paths)
+        self.assertEqual(data.email_format, "html")
+
+    def test_load_initial_data_rejects_invalid_email_format(self):
+        write_config(self.paths.config_file, {"email_report": {"email_format": "plaintext"}})
+        with mock.patch("github_usage.gui.wizard.setup_wizard_flow.read_secrets", return_value={}):
+            data = load_initial_data(self.paths)
+        self.assertEqual(data.email_format, "text")
+
 
 if __name__ == "__main__":
     unittest.main()

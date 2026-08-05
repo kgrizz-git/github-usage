@@ -79,7 +79,8 @@ def load_initial_data(paths: SetupPaths) -> WizardData:
     data.only_public = bool(email.get("only_public"))
     data.only_private = bool(email.get("only_private"))
     data.max_repos = int(email.get("max_repos", 100))
-    data.email_format = str(email.get("email_format", "text"))
+    raw = str(email.get("email_format", "text")).lower()
+    data.email_format = raw if raw in {"text", "html"} else "text"
     data.target_email = profile.get("target_email", "")
     sched = profile.get("schedule", {})
     data.local_weekday = int(sched.get("weekday", 1))

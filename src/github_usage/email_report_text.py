@@ -44,7 +44,7 @@ def _format_actions_section(data: dict) -> list[str]:
     if not actions:
         return []
     net = (data.get("monthly_costs") or {}).get("actions", {}).get("net", 0.0)
-    has_split = "private_minutes" in actions
+    has_split = "public_minutes" in actions
     lines = [
         "Actions",
         (
@@ -346,6 +346,7 @@ def _format_errors_section(data: dict) -> list[str]:
 
 
 def _public_repos_text_note(forecast: dict) -> str:
+    """Return the public-repos footnote line, or empty string when data is absent/zero."""
     pub_min = float(forecast.get("public_minutes") or 0.0)
     pub_mb = float(forecast.get("public_storage_avg_mb") or 0.0)
     if pub_min <= 0 and pub_mb <= 0:

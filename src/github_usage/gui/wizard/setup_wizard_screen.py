@@ -216,7 +216,7 @@ class SetupWizardScreen(ModalScreen[bool]):
         self._data.only_public = self.query_one("#wizard-only-public", Checkbox).value
         self._data.only_private = self.query_one("#wizard-only-private", Checkbox).value
         fmt = self.query_one("#wizard-email-format", Select).value
-        self._data.email_format = str(fmt) if fmt and fmt is not Select.BLANK else "text"
+        self._data.email_format = str(fmt) if fmt in ("text", "html") else "text"
         self._data.target_email = self.query_one("#wizard-target-email", Input).value.strip()
 
     def _read_local_from_form(self) -> bool:
