@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import plistlib
+import re
 import subprocess  # nosec B404
 import sys
 from pathlib import Path
@@ -13,10 +14,25 @@ from .setup_config import DEFAULT_PROFILE_NAME, SetupPaths, find_profile, load_c
 LEGACY_LABEL = "com.github.github-usage.email-report"
 LEGACY_LAUNCH_AGENT_NAME = f"{LEGACY_LABEL}.plist"
 
+# Profile names are embedded in filesystem paths (plist filenames) and launchctl
+# labels. Restrict them to a safe identifier charset so a config value can never
+# introduce path separators or ``..`` traversal into a LaunchAgents destination.
+_VALID_PROFILE_NAME = re.compile(r"\A[A-Za-z0-9._-]+\Z")
+
+
+def _validate_profile_name(profile_name: str) -> str:
+    """Return ``profile_name`` if it is a safe path/label component, else raise."""
+    if not _VALID_PROFILE_NAME.match(profile_name) or profile_name in {".", ".."}:
+        raise ValueError(
+            f"Invalid profile name {profile_name!r}: "
+            "only letters, digits, '.', '_' and '-' are allowed."
+        )
+    return profile_name
+
 
 def label_for(profile_name: str) -> str:
     """Return the LaunchAgent label for a report profile."""
-    return f"com.github.github-usage.email-report.{profile_name}"
+    return f"com.github.github-usage.email-report.{_validate_profile_name(profile_name)}"
 
 
 def launch_agent_dest(profile_name: str) -> Path:
@@ -55,6 +71,7 @@ def generate_plist(paths: SetupPaths, profile_name: str = DEFAULT_PROFILE_NAME) 
 
 
 def _bootout_plist(dest: Path) -> tuple[int, str]:
+    """Unload ``dest`` from the user's launchd domain; ignore already-unloaded errors."""
     uid = os.getuid()
     domain = f"gui/{uid}"
     result = subprocess.run(  # nosec
@@ -68,6 +85,7 @@ def _bootout_plist(dest: Path) -> tuple[int, str]:
 
 
 def _bootstrap_plist(dest: Path) -> tuple[int, str]:
+    """Load ``dest`` into the user's launchd domain."""
     uid = os.getuid()
     domain = f"gui/{uid}"
     result = subprocess.run(  # nosec
@@ -81,6 +99,7 @@ def _bootstrap_plist(dest: Path) -> tuple[int, str]:
 
 
 def _profile_names(paths: SetupPaths) -> list[str]:
+    """Return configured profile names, or ``[DEFAULT_PROFILE_NAME]`` if no config exists."""
     if paths.config_file.is_file():
         config = load_config(paths.config_file)
         return [p["name"] for p in config["profiles"]]
@@ -88,6 +107,7 @@ def _profile_names(paths: SetupPaths) -> list[str]:
 
 
 def _remove_legacy_plist() -> None:
+    """Unload and delete the legacy single-profile plist if present."""
     dest = legacy_launch_agent_dest()
     if dest.exists():
         _bootout_plist(dest)
@@ -162,6 +182,7 @@ def launch_agent_status(paths: SetupPaths | None = None) -> str:
 
 
 def _configure_launchd(paths) -> int:
+    """Interactively prompt the user to install, uninstall, or generate LaunchAgent plists."""
     import sys
 
     if sys.platform != "darwin":

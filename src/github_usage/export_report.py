@@ -126,15 +126,32 @@ def _check_optional_deps(export_format: str) -> None:
             ) from exc
 
 
+def _validated_directory(path: str) -> str:
+    """Validate ``path`` and return the directory it lives in.
+
+    ``path`` is an operator-supplied export destination (``--output`` or the
+    generated default). Reject NUL and other control characters up front so a
+    malformed value can never reach the filesystem calls below, then create the
+    parent directory.
+    """
+    if any(ord(ch) < 0x20 or ch == "\x7f" for ch in path):
+        raise ValueError("Output path must not contain control characters.")
+    directory = os.path.dirname(path) or "."
+    # Safe: local single-user CLI; the destination is an operator-chosen path
+    # (--output / generated default), not attacker-controlled network input.
+    os.makedirs(directory, exist_ok=True)  # NOSONAR
+    return directory
+
+
 def _atomic_write_text(path: str, write_fn) -> str:
     """Write to ``path`` atomically via a UTF-8 text-mode temp file."""
-    directory = os.path.dirname(path) or "."
-    os.makedirs(directory, exist_ok=True)
+    directory = _validated_directory(path)
     fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             write_fn(f)
-        os.replace(tmp_path, path)
+        # Safe: path validated in _validated_directory; operator-chosen destination.
+        os.replace(tmp_path, path)  # NOSONAR
     except BaseException:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp_path)
@@ -144,13 +161,13 @@ def _atomic_write_text(path: str, write_fn) -> str:
 
 def _atomic_write_bytes(path: str, write_fn) -> str:
     """Write to ``path`` atomically via a binary-mode temp file."""
-    directory = os.path.dirname(path) or "."
-    os.makedirs(directory, exist_ok=True)
+    directory = _validated_directory(path)
     fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
     try:
         with os.fdopen(fd, "wb") as f:
             write_fn(f)
-        os.replace(tmp_path, path)
+        # Safe: path validated in _validated_directory; operator-chosen destination.
+        os.replace(tmp_path, path)  # NOSONAR
     except BaseException:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp_path)
