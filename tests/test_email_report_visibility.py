@@ -75,6 +75,13 @@ class EmailReportVisibilityTests(unittest.TestCase):
         self.assertIn("visibility-tag", note)
         self.assertIn("5.0 MB avg storage", note)
 
+    def test_public_repos_html_note_omits_storage_when_minutes_positive_mb_zero(self):
+        from github_usage.email_report_html import _public_repos_html_note
+
+        note = _public_repos_html_note({"public_minutes": 300.0, "public_storage_avg_mb": 0.0})
+        self.assertIn("300.0 min", note)
+        self.assertNotIn("MB", note)
+
     def test_public_repos_html_note_returns_empty_when_both_zero(self):
         from github_usage.email_report_html import _public_repos_html_note
 

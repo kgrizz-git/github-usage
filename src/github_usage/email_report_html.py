@@ -310,10 +310,7 @@ def _public_repos_html_note(forecast: dict) -> str:
     if pub_min <= 0 and pub_mb <= 0:
         return ""
     storage_part = f" · {pub_mb:,.1f} MB avg storage" if pub_mb > 0 else ""
-    return (
-        f'<p class="visibility-tag">+ Public repos (free): '
-        f"{pub_min:,.1f} min{html.escape(storage_part)}</p>"
-    )
+    return f'<p class="visibility-tag">+ Public repos (free): {pub_min:,.1f} min{storage_part}</p>'
 
 
 def _format_html_forecast_section(
@@ -353,7 +350,7 @@ def _format_html_forecast_section(
 
     parts = [
         f"<h2>Monthly Forecast{scope_note}</h2>",
-        (f"<p>Day {forecast['day_of_month']} of {forecast['days_in_month']}</p>"),
+        f"<p>Day {forecast['day_of_month']} of {forecast['days_in_month']}</p>",
         "<table>",
         "<tr><th>Metric</th><th>Current</th><th>Projected</th><th>Limit</th><th>Run-out</th></tr>",
     ]
@@ -364,7 +361,7 @@ def _format_html_forecast_section(
             f"<td>{metric['current']:,.1f}</td>"
             f"<td>{metric['projected']:,.1f}</td>"
             f"<td>{_limit(metric['limit'])}</td>"
-            f"<td>{html.escape(_run_out(metric['run_out_day']))}</td>"
+            f"<td>{_run_out(metric['run_out_day'])}</td>"
             "</tr>"
         )
     parts.append("</table>")

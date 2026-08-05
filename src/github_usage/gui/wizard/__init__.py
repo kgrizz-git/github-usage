@@ -7,3 +7,4 @@ try:
 except ModuleNotFoundError as exc:
     if exc.name is None or not exc.name.startswith("textual"):
         raise
+    __all__ = []
