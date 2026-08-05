@@ -71,6 +71,7 @@ def generate_plist(paths: SetupPaths, profile_name: str = DEFAULT_PROFILE_NAME) 
 
 
 def _bootout_plist(dest: Path) -> tuple[int, str]:
+    """Unload ``dest`` from the user's launchd domain; ignore already-unloaded errors."""
     uid = os.getuid()
     domain = f"gui/{uid}"
     result = subprocess.run(  # nosec
@@ -84,6 +85,7 @@ def _bootout_plist(dest: Path) -> tuple[int, str]:
 
 
 def _bootstrap_plist(dest: Path) -> tuple[int, str]:
+    """Load ``dest`` into the user's launchd domain."""
     uid = os.getuid()
     domain = f"gui/{uid}"
     result = subprocess.run(  # nosec
@@ -97,6 +99,7 @@ def _bootstrap_plist(dest: Path) -> tuple[int, str]:
 
 
 def _profile_names(paths: SetupPaths) -> list[str]:
+    """Return configured profile names, or ``[DEFAULT_PROFILE_NAME]`` if no config exists."""
     if paths.config_file.is_file():
         config = load_config(paths.config_file)
         return [p["name"] for p in config["profiles"]]
@@ -104,6 +107,7 @@ def _profile_names(paths: SetupPaths) -> list[str]:
 
 
 def _remove_legacy_plist() -> None:
+    """Unload and delete the legacy single-profile plist if present."""
     dest = legacy_launch_agent_dest()
     if dest.exists():
         _bootout_plist(dest)
@@ -178,6 +182,7 @@ def launch_agent_status(paths: SetupPaths | None = None) -> str:
 
 
 def _configure_launchd(paths) -> int:
+    """Interactively prompt the user to install, uninstall, or generate LaunchAgent plists."""
     import sys
 
     if sys.platform != "darwin":

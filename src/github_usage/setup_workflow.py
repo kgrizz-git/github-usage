@@ -60,6 +60,7 @@ def validate_cron(expr: str) -> str:
 
 
 def _validate_cron_field(field: str, name: str, lo: int, hi: int) -> None:
+    """Raise ``ValueError`` if any sub-expression in ``field`` is outside ``[lo, hi]``."""
     for sub in field.split(","):
         if sub == "*":
             continue
@@ -94,6 +95,7 @@ def _validate_cron_field(field: str, name: str, lo: int, hi: int) -> None:
 
 
 def _profile_suffix(profile_name: str) -> str:
+    """Return the workflow filename suffix for a non-default profile (empty for default)."""
     return "" if profile_name == DEFAULT_PROFILE_NAME else f"-{profile_name}"
 
 
