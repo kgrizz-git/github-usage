@@ -17,8 +17,14 @@ include_forecast = true
 # When omitted, premium requests are projected but no run-out day is shown.
 # premium_requests_limit = 10000
 max_repos = 100
-# Email body format: "text" (default) or "html". HTML requires the renderer
-# in github_usage.email_report.format_html_report; text uses format_report_email.
+# Email body format: "text" (default) or "html".
+# HTML delivers styled tables to clients that support it; text is the fallback.
+#
+# IMPORTANT — how this setting reaches GitHub Actions:
+#   .github-usage/config.toml is gitignored (it holds secrets alongside settings).
+#   After changing email_format here, re-run setup option 5 "GitHub Actions workflow"
+#   (or the TUI wizard) to re-render .github/workflows/email-report.yml, then
+#   commit that file. The workflow YAML is the committed source of truth for CI.
 email_format = "text"
 warn_over = [
   "25",
