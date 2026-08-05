@@ -327,6 +327,11 @@ def _format_html_forecast_section(
     def _run_out(value: int | None) -> str:
         return f"day {value}" if value is not None else "--"
 
+    has_split = "public_minutes" in forecast
+    scope_note = (
+        ' <span class="visibility-tag">(private repos — quota-counted)</span>' if has_split else ""
+    )
+
     rows = [
         ("Actions Minutes", forecast["minutes"]),
         ("Storage (avg MB)", forecast["storage_avg_mb"]),
@@ -334,7 +339,7 @@ def _format_html_forecast_section(
     ]
 
     parts = [
-        "<h2>Monthly Forecast</h2>",
+        f"<h2>Monthly Forecast{scope_note}</h2>",
         (f"<p>Day {forecast['day_of_month']} of {forecast['days_in_month']}</p>"),
         "<table>",
         "<tr><th>Metric</th><th>Current</th><th>Projected</th><th>Limit</th><th>Run-out</th></tr>",
@@ -350,6 +355,15 @@ def _format_html_forecast_section(
             "</tr>"
         )
     parts.append("</table>")
+    if has_split:
+        pub_min = float(forecast.get("public_minutes") or 0.0)
+        pub_mb = float(forecast.get("public_storage_avg_mb") or 0.0)
+        if pub_min > 0 or pub_mb > 0:
+            storage_part = f" · {pub_mb:,.1f} MB avg storage" if pub_mb > 0 else ""
+            parts.append(
+                f'<p class="visibility-tag">+ Public repos (free): '
+                f"{pub_min:,.1f} min{html.escape(storage_part)}</p>"
+            )
     return parts
 
 

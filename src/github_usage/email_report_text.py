@@ -44,7 +44,8 @@ def _format_actions_section(data: dict) -> list[str]:
     if not actions:
         return []
     net = (data.get("monthly_costs") or {}).get("actions", {}).get("net", 0.0)
-    return [
+    has_split = "private_minutes" in actions
+    lines = [
         "Actions",
         (
             f"- Minutes: {actions.get('minutes', 0.0):,.1f} / "
@@ -57,8 +58,15 @@ def _format_actions_section(data: dict) -> list[str]:
             f"({actions.get('storage_percent', 0.0):.1f}%)"
         ),
         f"- Net cost: {fmt_price(net)}",
-        "",
     ]
+    if has_split:
+        priv_min = float(actions.get("private_minutes") or 0.0)
+        pub_min = float(actions.get("public_minutes") or 0.0)
+        lines.append(
+            f"  (private: {priv_min:,.1f} min quota-counted · public: {pub_min:,.1f} min free)"
+        )
+    lines.append("")
+    return lines
 
 
 def _format_copilot_section(data: dict) -> list[str]:
@@ -355,10 +363,12 @@ def _format_forecast_section(
     if forecast is None:
         return []
 
+    has_split = "public_minutes" in forecast
+    scope = " — private repos" if has_split else ""
     lines = [
-        f"Monthly Forecast (day {forecast['day_of_month']} of {forecast['days_in_month']})",
-        "───────────────────────────────────────────",
-        "Metric              Current    Projected  Limit    Run-out",
+        f"Monthly Forecast{scope} (day {forecast['day_of_month']} of {forecast['days_in_month']})",
+        "───────────────────────────────────────────────────",
+        "Metric               Current    Projected     Limit  Run-out",
     ]
 
     def _limit(value: float | None) -> str:
@@ -374,9 +384,17 @@ def _format_forecast_section(
     ]
     for label, metric in rows:
         lines.append(
-            f"{label:19} {metric['current']:>9,.1f} {metric['projected']:>10,.1f} "
-            f"{_limit(metric['limit']):>8} {_run_out(metric['run_out_day']):>8}"
+            f"{label:20} {metric['current']:>9,.1f} {metric['projected']:>10,.1f} "
+            f"{_limit(metric['limit']):>9} {_run_out(metric['run_out_day']):>8}"
         )
+    if has_split:
+        pub_min = float(forecast.get("public_minutes") or 0.0)
+        pub_mb = float(forecast.get("public_storage_avg_mb") or 0.0)
+        if pub_min > 0 or pub_mb > 0:
+            lines.append(
+                f"  + Public repos (free): {pub_min:,.1f} min"
+                + (f" · {pub_mb:,.1f} MB avg storage" if pub_mb > 0 else "")
+            )
     lines.append("")
     return lines
 
