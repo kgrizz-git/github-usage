@@ -75,7 +75,7 @@ jobs:
           python-version: '3.12'
       # Editable install of this repo's own package; transitive versions are
       # constrained by pyproject/uv.lock, not resolved freely at CI time.
-      - run: pip install -e .  # NOSONAR(githubactions:S8541,githubactions:S8544)
+      - run: pip install -e .  # NOSONAR
       - name: Send email report
         env:
           GH_USAGE_TOKEN: ${{ secrets.GH_USAGE_TOKEN }}

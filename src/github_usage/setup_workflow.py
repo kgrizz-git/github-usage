@@ -180,7 +180,7 @@ def write_workflow(
             tmp_path.unlink()
     # 0o644 (owner write, world read) is the correct mode for a workflow file
     # that gets committed to the repo and read by CI; it holds no secrets.
-    os.chmod(dest, 0o644)  # NOSONAR(python:S2612): intended non-sensitive perms
+    os.chmod(dest, 0o644)  # NOSONAR
 
 
 def diff_workflow(
