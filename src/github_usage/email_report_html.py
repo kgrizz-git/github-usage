@@ -303,6 +303,16 @@ def _format_html_errors_section(data: dict) -> list[str]:
     return parts
 
 
+def _public_repos_html_note(forecast: dict) -> str:
+    """Return the HTML public-repos note element, or empty string when data is absent/zero."""
+    pub_min = float(forecast.get("public_minutes") or 0.0)
+    pub_mb = float(forecast.get("public_storage_avg_mb") or 0.0)
+    if pub_min <= 0 and pub_mb <= 0:
+        return ""
+    storage_part = f" · {pub_mb:,.1f} MB avg storage" if pub_mb > 0 else ""
+    return f'<p class="visibility-tag">+ Public repos (free): {pub_min:,.1f} min{storage_part}</p>'
+
+
 def _format_html_forecast_section(
     data: dict,
     *,
@@ -327,6 +337,11 @@ def _format_html_forecast_section(
     def _run_out(value: int | None) -> str:
         return f"day {value}" if value is not None else "--"
 
+    has_split = "public_minutes" in forecast
+    scope_note = (
+        ' <span class="visibility-tag">(private repos — quota-counted)</span>' if has_split else ""
+    )
+
     rows = [
         ("Actions Minutes", forecast["minutes"]),
         ("Storage (avg MB)", forecast["storage_avg_mb"]),
@@ -334,8 +349,8 @@ def _format_html_forecast_section(
     ]
 
     parts = [
-        "<h2>Monthly Forecast</h2>",
-        (f"<p>Day {forecast['day_of_month']} of {forecast['days_in_month']}</p>"),
+        f"<h2>Monthly Forecast{scope_note}</h2>",
+        f"<p>Day {forecast['day_of_month']} of {forecast['days_in_month']}</p>",
         "<table>",
         "<tr><th>Metric</th><th>Current</th><th>Projected</th><th>Limit</th><th>Run-out</th></tr>",
     ]
@@ -346,10 +361,14 @@ def _format_html_forecast_section(
             f"<td>{metric['current']:,.1f}</td>"
             f"<td>{metric['projected']:,.1f}</td>"
             f"<td>{_limit(metric['limit'])}</td>"
-            f"<td>{html.escape(_run_out(metric['run_out_day']))}</td>"
+            f"<td>{_run_out(metric['run_out_day'])}</td>"
             "</tr>"
         )
     parts.append("</table>")
+    if has_split:
+        note = _public_repos_html_note(forecast)
+        if note:
+            parts.append(note)
     return parts
 
 

@@ -8,7 +8,7 @@ from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, ContentSwitcher, Input, Label, RichLog, Static
+from textual.widgets import Button, Checkbox, ContentSwitcher, Input, Label, RichLog, Select, Static
 
 from ..errors import format_error
 from ..layout import FormGrid
@@ -108,6 +108,16 @@ class SetupWizardScreen(ModalScreen[bool]):
                     with FormGrid():
                         yield Label("Max repos:")
                         yield Input(value="100", id="wizard-max-repos")
+                        yield Label("Email format:")
+                        yield Select(
+                            [
+                                ("Plain text (safe for all clients)", "text"),
+                                ("HTML (styled tables)", "html"),
+                            ],
+                            value="text",
+                            id="wizard-email-format",
+                            allow_blank=False,
+                        )
                         yield Label("target_email:")
                         yield Input(
                             placeholder="Optional — uses REPORT_EMAIL when blank",
@@ -184,6 +194,7 @@ class SetupWizardScreen(ModalScreen[bool]):
         self.query_one("#wizard-only-public", Checkbox).value = self._data.only_public
         self.query_one("#wizard-only-private", Checkbox).value = self._data.only_private
         self.query_one("#wizard-max-repos", Input).value = str(self._data.max_repos)
+        self.query_one("#wizard-email-format", Select).value = self._data.email_format
         self.query_one("#wizard-target-email", Input).value = self._data.target_email
 
     def _read_secrets_from_form(self) -> None:
@@ -204,6 +215,8 @@ class SetupWizardScreen(ModalScreen[bool]):
         self._data.include_release_assets = self.query_one("#wizard-release", Checkbox).value
         self._data.only_public = self.query_one("#wizard-only-public", Checkbox).value
         self._data.only_private = self.query_one("#wizard-only-private", Checkbox).value
+        fmt = self.query_one("#wizard-email-format", Select).value
+        self._data.email_format = str(fmt) if fmt in ("text", "html") else "text"
         self._data.target_email = self.query_one("#wizard-target-email", Input).value.strip()
 
     def _read_local_from_form(self) -> bool:

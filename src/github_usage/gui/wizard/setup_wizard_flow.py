@@ -48,6 +48,7 @@ class WizardData:
     only_public: bool = False
     only_private: bool = False
     max_repos: int = 100
+    email_format: str = "text"
     target_email: str = ""
     local_weekday: int = 1
     local_hour: int = 9
@@ -78,6 +79,8 @@ def load_initial_data(paths: SetupPaths) -> WizardData:
     data.only_public = bool(email.get("only_public"))
     data.only_private = bool(email.get("only_private"))
     data.max_repos = int(email.get("max_repos", 100))
+    raw = str(email.get("email_format", "text")).lower()
+    data.email_format = raw if raw in {"text", "html"} else "text"
     data.target_email = profile.get("target_email", "")
     sched = profile.get("schedule", {})
     data.local_weekday = int(sched.get("weekday", 1))
@@ -130,6 +133,7 @@ def save_options_step(paths: SetupPaths, data: WizardData) -> None:
     email["only_public"] = data.only_public
     email["only_private"] = data.only_private
     email["max_repos"] = data.max_repos
+    email["email_format"] = data.email_format
     profile["target_email"] = data.target_email
     update_profile(config, profile)
     save_profiles(paths, config)
@@ -190,6 +194,7 @@ def review_summary(data: WizardData) -> str:
         f"releases={data.include_release_assets}, "
         f"only_public={data.only_public}, only_private={data.only_private}",
         f"[b]Max repos[/b]: {data.max_repos}",
+        f"[b]Email format[/b]: {data.email_format}",
         f"[b]Local schedule[/b]: "
         f"{describe_local_schedule(data.local_weekday, data.local_hour, data.local_minute)}",
     ]

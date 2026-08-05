@@ -159,6 +159,14 @@ class RenderWorkflowTests(unittest.TestCase):
         rendered = render_workflow(self._config(cron="0 8 * * 5"), self.root)
         self.assertIn("cron: '0 8 * * 5'", rendered)
 
+    def test_email_format_html_appears_in_profile_args(self):
+        rendered = render_workflow({"email_report": {"email_format": "html"}}, self.root)
+        self.assertIn("--email-format html", rendered)
+
+    def test_email_format_text_appears_in_profile_args(self):
+        rendered = render_workflow({"email_report": {"email_format": "text"}}, self.root)
+        self.assertIn("--email-format text", rendered)
+
     def test_rendered_output_has_expected_yaml_structure(self):
         rendered = render_workflow(self._config(), self.root)
         self.assertIn("name:", rendered)
