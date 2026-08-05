@@ -892,7 +892,7 @@ class EmailReportTests(unittest.TestCase):
         from github_usage.email_report_text import _public_repos_text_note
 
         self.assertEqual(
-            "", _public_repos_text_note({"public_minutes": 0.0, "public_storage_avg_mb": 0.0})
+            _public_repos_text_note({"public_minutes": 0.0, "public_storage_avg_mb": 0.0}), ""
         )
 
     def test_public_repos_html_note_returns_html_with_data(self):
@@ -907,7 +907,7 @@ class EmailReportTests(unittest.TestCase):
         from github_usage.email_report_html import _public_repos_html_note
 
         self.assertEqual(
-            "", _public_repos_html_note({"public_minutes": 0.0, "public_storage_avg_mb": 0.0})
+            _public_repos_html_note({"public_minutes": 0.0, "public_storage_avg_mb": 0.0}), ""
         )
 
     def test_format_forecast_section_shows_private_scope_when_split_available(self):
