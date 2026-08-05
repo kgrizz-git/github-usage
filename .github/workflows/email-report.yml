@@ -102,7 +102,7 @@ jobs:
           if [ "${{ inputs.only_private }}" = "true" ]; then
             args+=(--only-private)
           fi
-          profile_args=(--max-repos 50 --email-format text --warn-over 25 --warn-over 80%)
+          profile_args=(--max-repos 50 --email-format html --warn-over 25 --warn-over 80%)
           if [ ${#profile_args[@]} -gt 0 ]; then
             args+=("${profile_args[@]}")
           fi
