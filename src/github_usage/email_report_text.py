@@ -345,6 +345,15 @@ def _format_errors_section(data: dict) -> list[str]:
     return lines
 
 
+def _public_repos_text_note(forecast: dict) -> str:
+    pub_min = float(forecast.get("public_minutes") or 0.0)
+    pub_mb = float(forecast.get("public_storage_avg_mb") or 0.0)
+    if pub_min <= 0 and pub_mb <= 0:
+        return ""
+    storage = f" · {pub_mb:,.1f} MB avg storage" if pub_mb > 0 else ""
+    return f"  + Public repos (free): {pub_min:,.1f} min{storage}"
+
+
 def _format_forecast_section(
     data: dict,
     *,
@@ -388,13 +397,9 @@ def _format_forecast_section(
             f"{_limit(metric['limit']):>9} {_run_out(metric['run_out_day']):>8}"
         )
     if has_split:
-        pub_min = float(forecast.get("public_minutes") or 0.0)
-        pub_mb = float(forecast.get("public_storage_avg_mb") or 0.0)
-        if pub_min > 0 or pub_mb > 0:
-            lines.append(
-                f"  + Public repos (free): {pub_min:,.1f} min"
-                + (f" · {pub_mb:,.1f} MB avg storage" if pub_mb > 0 else "")
-            )
+        note = _public_repos_text_note(forecast)
+        if note:
+            lines.append(note)
     lines.append("")
     return lines
 

@@ -303,6 +303,18 @@ def _format_html_errors_section(data: dict) -> list[str]:
     return parts
 
 
+def _public_repos_html_note(forecast: dict) -> str:
+    pub_min = float(forecast.get("public_minutes") or 0.0)
+    pub_mb = float(forecast.get("public_storage_avg_mb") or 0.0)
+    if pub_min <= 0 and pub_mb <= 0:
+        return ""
+    storage_part = f" · {pub_mb:,.1f} MB avg storage" if pub_mb > 0 else ""
+    return (
+        f'<p class="visibility-tag">+ Public repos (free): '
+        f"{pub_min:,.1f} min{html.escape(storage_part)}</p>"
+    )
+
+
 def _format_html_forecast_section(
     data: dict,
     *,
@@ -356,14 +368,9 @@ def _format_html_forecast_section(
         )
     parts.append("</table>")
     if has_split:
-        pub_min = float(forecast.get("public_minutes") or 0.0)
-        pub_mb = float(forecast.get("public_storage_avg_mb") or 0.0)
-        if pub_min > 0 or pub_mb > 0:
-            storage_part = f" · {pub_mb:,.1f} MB avg storage" if pub_mb > 0 else ""
-            parts.append(
-                f'<p class="visibility-tag">+ Public repos (free): '
-                f"{pub_min:,.1f} min{html.escape(storage_part)}</p>"
-            )
+        note = _public_repos_html_note(forecast)
+        if note:
+            parts.append(note)
     return parts
 
 
