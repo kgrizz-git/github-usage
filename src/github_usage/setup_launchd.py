@@ -36,8 +36,20 @@ def label_for(profile_name: str) -> str:
 
 
 def launch_agent_dest(profile_name: str) -> Path:
-    """Return the user LaunchAgents destination path for a profile."""
-    return Path.home() / "Library" / "LaunchAgents" / f"{label_for(profile_name)}.plist"
+    """Return the user LaunchAgents destination path for a profile.
+
+    The path is resolved and confirmed to live directly inside the user's
+    ``~/Library/LaunchAgents`` directory. Combined with the charset check in
+    :func:`label_for`, this guarantees a config-supplied profile name cannot
+    redirect writes elsewhere via path separators or ``..`` traversal.
+    """
+    base = (Path.home() / "Library" / "LaunchAgents").resolve()
+    dest = (base / f"{label_for(profile_name)}.plist").resolve()
+    if dest.parent != base:
+        raise ValueError(
+            f"Invalid profile name {profile_name!r}: resolved path {dest} escapes {base}."
+        )
+    return dest
 
 
 def legacy_launch_agent_dest() -> Path:

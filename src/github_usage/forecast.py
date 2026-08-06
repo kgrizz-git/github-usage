@@ -36,7 +36,7 @@ def compute_forecast(
     """
     if day_of_month < 1 or day_of_month > days_in_month or day_of_month < 3:
         return None
-    if minutes == 0.0 and storage_avg_mb == 0.0 and premium_requests == 0.0:
+    if not minutes and not storage_avg_mb and not premium_requests:
         return None
 
     ratio = days_in_month / day_of_month

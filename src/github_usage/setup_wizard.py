@@ -106,7 +106,7 @@ def _regenerate_scheduled_artifacts(paths: SetupPaths) -> None:
     _render_and_offer_commit(paths)
 
 
-def _manage_profiles(paths: SetupPaths) -> int:
+def _manage_profiles(paths: SetupPaths) -> None:
     config = _load_or_create_config(paths)
     while True:
         config = load_config(paths.config_file) if paths.config_file.is_file() else config
@@ -129,7 +129,7 @@ def _manage_profiles(paths: SetupPaths) -> int:
         print("  q) Back")
         action = input("Action [q]: ").strip().lower() or "q"
         if action in {"q", "quit", "back"}:
-            return 0
+            return
         if action in {"a", "add"}:
             config = ensure_profiles(config)
             name = input("New profile name: ").strip()
@@ -199,7 +199,7 @@ def _manage_profiles(paths: SetupPaths) -> int:
             _regenerate_scheduled_artifacts(paths)
             if sys.platform == "darwin" and launch_agent_status(paths) != "not installed":
                 print(_REINSTALL_REMINDER)
-            return 0
+            return
         print("Unknown action.")
 
 
