@@ -70,10 +70,28 @@ def _write_sections(
     if include_forecast:
         _write_forecast_section(writer, data, premium_requests_limit=premium_requests_limit)
 
+    _write_warnings_section(writer, data)
+    _write_actions_section(writer, data)
+    _write_storage_summary_section(writer, data)
+    _write_copilot_section(writer, data)
+    _write_git_lfs_section(writer, data)
+    _write_monthly_costs_section(writer, data)
+    _write_repo_consumers_sections(writer, data)
+    _write_artifact_storage_section(writer, data)
+    _write_storage_analysis_section(writer, data)
+    _write_release_assets_section(writer, data)
+    _write_key_insights_section(writer, data)
+    _write_unavailable_data_section(writer, data)
+    _write_sources_section(writer, data)
+
+
+def _write_warnings_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Warnings")
     for warning in data.get("warnings") or []:
         writer.writerow([warning])
 
+
+def _write_actions_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Actions Usage")
     actions = _coerce_section(data.get("actions"), {})
     for key, value in actions.items():
@@ -97,12 +115,16 @@ def _write_sections(
         for row in vis_rows:
             writer.writerow(row)
 
+
+def _write_storage_summary_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     storage_summary = _coerce_section(data.get("storage_summary"), {})
     if storage_summary:
         _write_section_header(writer, "Storage Summary")
         for key, value in storage_summary.items():
             writer.writerow([key, value])
 
+
+def _write_copilot_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Copilot Usage")
     copilot = _coerce_section(data.get("copilot"), {})
     for key, value in copilot.items():
@@ -111,11 +133,15 @@ def _write_sections(
         else:
             writer.writerow([key, value])
 
+
+def _write_git_lfs_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Git LFS")
     git_lfs = _coerce_section(data.get("git_lfs"), {})
     for key, value in git_lfs.items():
         writer.writerow([key, value])
 
+
+def _write_monthly_costs_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Monthly Costs")
     costs = _coerce_section(data.get("monthly_costs"), {})
     for category, amounts in costs.items():
@@ -126,31 +152,31 @@ def _write_sections(
         else:
             writer.writerow([category, amounts])
 
-    _write_section_header(writer, "Top Repos by Minutes")
+
+def _write_consumer_row(writer, entry: dict) -> None:  # type: ignore[type-arg]
+    writer.writerow(
+        [
+            entry.get("repo", ""),
+            repo_visibility(entry),
+            entry.get("minutes", ""),
+            entry.get("gross", ""),
+            entry.get("storage_avg_mb", ""),
+        ]
+    )
+
+
+def _write_repo_consumers_sections(writer, data: dict) -> None:  # type: ignore[type-arg]
     consumers = _coerce_section(data.get("repo_consumers"), {})
+    _write_section_header(writer, "Top Repos by Minutes")
     for entry in consumers.get("by_minutes") or []:
-        writer.writerow(
-            [
-                entry.get("repo", ""),
-                repo_visibility(entry),
-                entry.get("minutes", ""),
-                entry.get("gross", ""),
-                entry.get("storage_avg_mb", ""),
-            ]
-        )
+        _write_consumer_row(writer, entry)
 
     _write_section_header(writer, "Top Repos by Cost")
     for entry in consumers.get("by_cost") or []:
-        writer.writerow(
-            [
-                entry.get("repo", ""),
-                repo_visibility(entry),
-                entry.get("minutes", ""),
-                entry.get("gross", ""),
-                entry.get("storage_avg_mb", ""),
-            ]
-        )
+        _write_consumer_row(writer, entry)
 
+
+def _write_artifact_storage_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Artifact Storage")
     artifacts = _coerce_section(data.get("artifact_storage"), {})
     for entry in artifacts.get("top_repos") or []:
@@ -158,12 +184,16 @@ def _write_sections(
             [entry.get("repo", ""), repo_visibility(entry), entry.get("artifact_bytes", "")]
         )
 
+
+def _write_storage_analysis_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     analysis_rows = storage_analysis_export_rows(data.get("storage_analysis"))
     if analysis_rows:
         _write_section_header(writer, "Storage Analysis")
         for row in analysis_rows:
             writer.writerow(row)
 
+
+def _write_release_assets_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Release Assets")
     releases = _coerce_section(data.get("release_assets"), {})
     for entry in releases.get("top_repos") or []:
@@ -175,14 +205,20 @@ def _write_sections(
             ]
         )
 
+
+def _write_key_insights_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Key Insights")
     for insight in data.get("insights") or []:
         writer.writerow([insight])
 
+
+def _write_unavailable_data_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     _write_section_header(writer, "Unavailable Data")
     for error_key, error_msg in (data.get("errors") or {}).items():
         writer.writerow([error_key, error_msg])
 
+
+def _write_sources_section(writer, data: dict) -> None:  # type: ignore[type-arg]
     sources = data.get("sources")
     source_rows = sources_rows(sources if isinstance(sources, dict) else None)
     if source_rows:
