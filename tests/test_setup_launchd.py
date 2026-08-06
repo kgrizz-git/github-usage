@@ -24,6 +24,14 @@ class ProfileNameValidationTest(unittest.TestCase):
         dest = launch_agent_dest("default")
         self.assertEqual(dest.parent.name, "LaunchAgents")
 
+    def test_dest_resolves_inside_launch_agents_dir(self) -> None:
+        from pathlib import Path
+
+        base = (Path.home() / "Library" / "LaunchAgents").resolve()
+        dest = launch_agent_dest("default")
+        self.assertEqual(dest, dest.resolve())
+        self.assertEqual(dest.parent, base)
+
 
 if __name__ == "__main__":
     unittest.main()
