@@ -17,6 +17,10 @@ if TYPE_CHECKING:
     from .setup_view import SetupView
 
 
+# Repeated selector/label literals, hoisted to satisfy S1192.
+_VERIFY_LOG = "#verify-log"
+
+
 class SetupVerifyPanel(VerticalScroll):
     """Dry-run verification and configuration status."""
 
@@ -50,12 +54,12 @@ class SetupVerifyPanel(VerticalScroll):
 
         status = self.query_one("#status-panel", Static)
         status.update(f"[red]Error: {message}[/red]")
-        log = self.query_one("#verify-log", RichLog)
+        log = self.query_one(_VERIFY_LOG, RichLog)
         write_log(log, format_simple(message), level="error")
 
     def show_verify_result(self, result: VerifyResult) -> None:
         """Render dry-run verification output."""
-        log = self.query_one("#verify-log", RichLog)
+        log = self.query_one(_VERIFY_LOG, RichLog)
         if result.output.strip():
             log.write(result.output.rstrip())
         if result.exit_code == 0:
@@ -70,7 +74,7 @@ class SetupVerifyPanel(VerticalScroll):
 
     @property
     def log(self) -> RichLog:  # type: ignore[override]
-        return self.query_one("#verify-log", RichLog)
+        return self.query_one(_VERIFY_LOG, RichLog)
 
     @on(Button.Pressed, "#verify-btn")
     def _verify_pressed(self) -> None:

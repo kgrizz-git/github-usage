@@ -79,7 +79,7 @@ run_github_usage() {
 CLI_MODE=0
 FILTERED=()
 for arg in "$@"; do
-  if [ "$arg" = "--cli" ]; then
+  if [[ "$arg" == "--cli" ]]; then
     CLI_MODE=1
   else
     FILTERED+=("$arg")
@@ -97,14 +97,14 @@ case "$COMMAND" in
     exit 0
     ;;
   "")
-    if [ "$CLI_MODE" = "1" ]; then
-      if [ -t 0 ] || [ "${FORCE_INTERACTIVE:-}" = "1" ]; then
+    if [[ "$CLI_MODE" == "1" ]]; then
+      if [[ -t 0 || "${FORCE_INTERACTIVE:-}" == "1" ]]; then
         show_menu
       else
         show_help
         exit 0
       fi
-    elif [ -t 0 ]; then
+    elif [[ -t 0 ]]; then
       run_github_usage
     else
       show_help
@@ -182,7 +182,7 @@ case "$COMMAND" in
     run_github_usage runs --diff "$@"
     ;;
   *)
-    if [ "$CLI_MODE" = "1" ]; then
+    if [[ "$CLI_MODE" == "1" ]]; then
       run_github_usage --cli "$COMMAND" "${@:2}"
     else
       echo "Error: Unknown command '$COMMAND'" >&2

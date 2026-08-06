@@ -13,6 +13,9 @@ from ..errors import format_error, format_simple
 from ..layout import FormGrid, ViewActions, ViewOutput, ViewSection
 from ..log_utils import write_log
 
+# Repeated selector/label literals, hoisted to satisfy S1192.
+_EMAIL_PREVIEW = "#email-preview"
+
 
 class EmailReportView(VerticalScroll, AsyncViewMixin):
     """Dry-run preview and send for email reports."""
@@ -55,7 +58,7 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
         self._reload_profiles()
 
     def _show_error(self, message: str) -> None:
-        preview = self.query_one("#email-preview", RichLog)
+        preview = self.query_one(_EMAIL_PREVIEW, RichLog)
         write_log(preview, format_simple(message), level="error")
 
     def _finish_reload(self) -> None:
@@ -102,7 +105,7 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
     @work(thread=True)
     def _run_preview(self) -> None:
         button = self.query_one("#preview-btn", Button)
-        preview = self.query_one("#email-preview", RichLog)
+        preview = self.query_one(_EMAIL_PREVIEW, RichLog)
         self._call_ui(
             self._begin_async,
             button,
@@ -133,7 +136,7 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
             self._call_ui(self._end_async, button, "Preview (dry-run)")
 
     def _show_preview(self, code: int, body: str) -> None:
-        preview = self.query_one("#email-preview", RichLog)
+        preview = self.query_one(_EMAIL_PREVIEW, RichLog)
         preview.clear()
         if body.strip():
             preview.write(body.rstrip())
@@ -156,7 +159,7 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
     @work(thread=True)
     def _run_send(self) -> None:
         button = self.query_one("#send-btn", Button)
-        preview = self.query_one("#email-preview", RichLog)
+        preview = self.query_one(_EMAIL_PREVIEW, RichLog)
         self._call_ui(
             self._begin_async,
             button,
@@ -186,7 +189,7 @@ class EmailReportView(VerticalScroll, AsyncViewMixin):
             self._call_ui(self._end_async, button, "Send Email")
 
     def _show_send_result(self, code: int, message: str) -> None:
-        preview = self.query_one("#email-preview", RichLog)
+        preview = self.query_one(_EMAIL_PREVIEW, RichLog)
         if code == 0:
             write_log(preview, message, level="success")
         else:

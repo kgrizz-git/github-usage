@@ -9,6 +9,9 @@ from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 from .visibility import repo_visibility, visibility_label
 
+# Display label for the Git LFS product, repeated across summary rows.
+_GIT_LFS_LABEL = "Git LFS"
+
 
 def _section(title: str) -> tuple[str, str]:
     """Return a section header row for two-column tables."""
@@ -174,13 +177,13 @@ def _git_lfs_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     errors = data.get("errors") or {}
     billing = data.get("lfs_billing")
     if billing is None and errors.get("lfs_billing"):
-        return [("Git LFS", f"n/a ({errors['lfs_billing']})")]
+        return [(_GIT_LFS_LABEL, f"n/a ({errors['lfs_billing']})")]
     if not billing or not billing.get("items"):
         git_lfs = data.get("git_lfs")
         if git_lfs is None and errors.get("git_lfs"):
-            return [("Git LFS", f"n/a ({errors['git_lfs']})")]
+            return [(_GIT_LFS_LABEL, f"n/a ({errors['git_lfs']})")]
         if not git_lfs:
-            return [("Git LFS", "No usage")]
+            return [(_GIT_LFS_LABEL, "No usage")]
         return [("Git LFS net", fmt_price(float(git_lfs.get("total_net", 0.0))))]
     rows: list[tuple[str, str]] = [
         ("Git LFS net", fmt_price(float(billing.get("total_net", 0.0)))),
@@ -259,7 +262,7 @@ def _monthly_cost_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     else:
         rows.append(("Actions", _format_cost_block(monthly, "actions")))
         rows.append(("Copilot", _format_cost_block(monthly, "copilot")))
-        rows.append(("Git LFS", _format_cost_block(monthly, "git_lfs")))
+        rows.append((_GIT_LFS_LABEL, _format_cost_block(monthly, "git_lfs")))
         rows.append(("Total", _format_cost_block(monthly, "total")))
     return rows
 
@@ -433,7 +436,7 @@ def _tail_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
 
     lfs_rows = _git_lfs_rows(data)
     if lfs_rows:
-        rows.append(_section("Git LFS"))
+        rows.append(_section(_GIT_LFS_LABEL))
         rows.extend(lfs_rows)
 
     insights = data.get("insights") or []

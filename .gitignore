@@ -50,3 +50,6 @@ tmp/
 
 # Transient pre-modification backups
 backups/*.bak
+
+# Local SonarCloud API token (never commit)
+.sonar_cloud_token

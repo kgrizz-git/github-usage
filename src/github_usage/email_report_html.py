@@ -22,6 +22,11 @@ from .visibility import (
     visibility_group_header,
 )
 
+# Repeated HTML fragments, hoisted to satisfy S1192 and keep tag spelling in one place.
+_UL_CLOSE = "</ul>"
+_TABLE_OPEN = "<table>"
+_TABLE_CLOSE = "</table>"
+
 
 def _html_cost_row(label: str, cost: dict[str, float]) -> str:
     return (
@@ -42,7 +47,7 @@ def _format_html_billing_context_section(data: dict) -> list[str]:
         "<li>Actions minutes and storage are free for public repositories.</li>",
         "<li>Private and internal repositories consume your plan's monthly quota.</li>",
         f'<li>See <a href="{_BILLING_CONTEXT_URL}">GitHub Actions billing</a> for details.</li>',
-        "</ul>",
+        _UL_CLOSE,
     ]
 
 
@@ -53,7 +58,7 @@ def _format_html_actions_section(data: dict) -> list[str]:
     net = (data.get("monthly_costs") or {}).get("actions", {}).get("net", 0.0)
     return [
         "<h2>Actions</h2>",
-        "<table>",
+        _TABLE_OPEN,
         "<tr><th>Metric</th><th>Value</th></tr>",
         (
             f"<tr><td>Minutes</td><td>{actions.get('minutes', 0.0):,.1f} / "
@@ -66,7 +71,7 @@ def _format_html_actions_section(data: dict) -> list[str]:
             f"({actions.get('storage_percent', 0.0):.1f}%)</td></tr>"
         ),
         f"<tr><td>Net cost</td><td>{fmt_price(net)}</td></tr>",
-        "</table>",
+        _TABLE_CLOSE,
     ]
 
 
@@ -82,13 +87,13 @@ def _format_html_copilot_section(data: dict) -> list[str]:
     ]
     by_model = copilot.get("by_model") or {}
     if by_model:
-        parts.append("</ul>")
+        parts.append(_UL_CLOSE)
         parts.append("<h3>By model</h3>")
         parts.append("<ul>")
         for model, values in sorted(by_model.items()):
             requests = values.get("requests", values.get("total_requests", 0.0))
             parts.append(f"<li>{html.escape(model)}: {requests:,.1f} requests</li>")
-    parts.append("</ul>")
+    parts.append(_UL_CLOSE)
     return parts
 
 
@@ -116,10 +121,10 @@ def _format_html_monthly_costs_section(data: dict) -> list[str]:
         rows.append(_html_cost_row(label, monthly.get(key, {})))
     return [
         "<h2>Monthly Cost Estimate</h2>",
-        "<table>",
+        _TABLE_OPEN,
         "<tr><th>Category</th><th>Gross</th><th>Discount</th><th>Net</th></tr>",
         *rows,
-        "</table>",
+        _TABLE_CLOSE,
     ]
 
 
@@ -225,7 +230,7 @@ def _format_html_artifact_storage_section(data: dict) -> list[str]:
                 f"<li>{html_repo_cell(row)}: "
                 f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
             )
-        parts.append("</ul>")
+        parts.append(_UL_CLOSE)
     else:
         for vis, group_rows in groups.items():
             parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
@@ -235,7 +240,7 @@ def _format_html_artifact_storage_section(data: dict) -> list[str]:
                     f"<li>{html_repo_cell(row)}: "
                     f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
                 )
-            parts.append("</ul>")
+            parts.append(_UL_CLOSE)
     if artifact_storage.get("truncated"):
         parts.append(
             f"<p><em>Artifact scan truncated at "
@@ -258,7 +263,7 @@ def _format_html_release_assets_section(data: dict) -> list[str]:
                 f"<li>{html_repo_cell(row)}: "
                 f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets</li>"
             )
-        parts.append("</ul>")
+        parts.append(_UL_CLOSE)
     else:
         for vis, group_rows in groups.items():
             parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
@@ -268,7 +273,7 @@ def _format_html_release_assets_section(data: dict) -> list[str]:
                     f"<li>{html_repo_cell(row)}: "
                     f"{_bytes_to_mb(row['release_asset_bytes']):,.1f} MB release assets</li>"
                 )
-            parts.append("</ul>")
+            parts.append(_UL_CLOSE)
     if release_assets.get("truncated"):
         parts.append(
             f"<p><em>Release asset scan truncated at "
@@ -285,7 +290,7 @@ def _format_html_insights_section(data: dict) -> list[str]:
         "<h2>Key Insights</h2>",
         "<ul>",
         *[f"<li>{html.escape(insight)}</li>" for insight in insights],
-        "</ul>",
+        _UL_CLOSE,
     ]
 
 
@@ -299,7 +304,7 @@ def _format_html_errors_section(data: dict) -> list[str]:
             f"<li>{html.escape(section.replace('_', ' ').title())} "
             f"data unavailable - {html.escape(message)}</li>"
         )
-    parts.append("</ul>")
+    parts.append(_UL_CLOSE)
     return parts
 
 
@@ -351,7 +356,7 @@ def _format_html_forecast_section(
     parts = [
         f"<h2>Monthly Forecast{scope_note}</h2>",
         f"<p>Day {forecast['day_of_month']} of {forecast['days_in_month']}</p>",
-        "<table>",
+        _TABLE_OPEN,
         "<tr><th>Metric</th><th>Current</th><th>Projected</th><th>Limit</th><th>Run-out</th></tr>",
     ]
     for label, metric in rows:
@@ -364,7 +369,7 @@ def _format_html_forecast_section(
             f"<td>{_run_out(metric['run_out_day'])}</td>"
             "</tr>"
         )
-    parts.append("</table>")
+    parts.append(_TABLE_CLOSE)
     if has_split:
         note = _public_repos_html_note(forecast)
         if note:
@@ -431,7 +436,7 @@ def _html_api_notes_block(estimate: dict) -> list[str]:
     parts = ["<h2>REST API Quota Notes</h2>", "<ul>"]
     for note in notes:
         parts.append(f"<li>{html.escape(note)}</li>")
-    parts.append("</ul>")
+    parts.append(_UL_CLOSE)
     return parts
 
 
@@ -451,7 +456,7 @@ def _html_sources_block(sources: dict) -> list[str]:
             f"<li>{html.escape(label)}: "
             f'<a href="{html.escape(str(url))}">{html.escape(str(url))}</a></li>'
         )
-    parts.append("</ul>")
+    parts.append(_UL_CLOSE)
     return parts
 
 

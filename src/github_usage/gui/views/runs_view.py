@@ -13,6 +13,9 @@ from ..errors import format_error
 from ..layout import ViewActions, ViewOutput, ViewSection
 from ..log_utils import write_log
 
+# Repeated selector/label literals, hoisted to satisfy S1192.
+_RUNS_LOG = "#runs-log"
+
 
 class RunsView(VerticalScroll, AsyncViewMixin):
     """Read-only runs table and drift checker."""
@@ -59,17 +62,17 @@ class RunsView(VerticalScroll, AsyncViewMixin):
                     row["schedule"],
                 )
         except Exception as exc:
-            log = self.query_one("#runs-log", RichLog)
+            log = self.query_one(_RUNS_LOG, RichLog)
             write_log(log, format_error(exc, context="Failed to load runs"), level="error")
 
     @on(Button.Pressed, "#refresh-runs")
     def _refresh(self) -> None:
         self._load_runs()
-        write_log(self.query_one("#runs-log", RichLog), "Runs refreshed", level="success")
+        write_log(self.query_one(_RUNS_LOG, RichLog), "Runs refreshed", level="success")
 
     def action_refresh_runs(self) -> None:
         self._load_runs()
-        write_log(self.query_one("#runs-log", RichLog), "Runs refreshed", level="success")
+        write_log(self.query_one(_RUNS_LOG, RichLog), "Runs refreshed", level="success")
 
     @on(Button.Pressed, "#check-drift")
     def _check_drift(self) -> None:
@@ -80,7 +83,7 @@ class RunsView(VerticalScroll, AsyncViewMixin):
     @work(thread=True)
     def _run_drift(self) -> None:
         button = self.query_one("#check-drift", Button)
-        log = self.query_one("#runs-log", RichLog)
+        log = self.query_one(_RUNS_LOG, RichLog)
         self._call_ui(
             self._begin_async,
             button,
@@ -104,7 +107,7 @@ class RunsView(VerticalScroll, AsyncViewMixin):
             self._call_ui(self._end_async, button, "Check drift")
 
     def _show_drift(self, result) -> None:
-        log = self.query_one("#runs-log", RichLog)
+        log = self.query_one(_RUNS_LOG, RichLog)
         for message in result.messages:
             log.write(message)
         table = self.query_one("#drift-table", DataTable)
