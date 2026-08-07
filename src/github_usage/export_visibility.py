@@ -140,7 +140,7 @@ def storage_analysis_export_rows(storage_analysis: dict | None) -> list[list]:
 
 
 def per_visibility_sku_rows(actions: dict | None) -> list[list]:
-    """SKU × visibility table from ``actions['skus']`` when present."""
+    """SKU x visibility table from ``actions['skus']`` when present."""
     if not actions:
         return []
     skus = actions.get("skus") or {}

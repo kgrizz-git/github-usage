@@ -227,7 +227,7 @@ def _print_actions_compute_costs(actions_sku) -> None:
             price = item.get("pricePerUnit", 0)
             qty = item.get("grossQuantity", 0)
             net = item.get("netAmount", 0)
-            print(f"    {sku:<40} {fmt_price(price)}/min  × {qty:.1f} min  = {fmt_price(net)}")
+            print(f"    {sku:<40} {fmt_price(price)}/min  x {qty:.1f} min  = {fmt_price(net)}")
             found = True
     if not found:
         print("    No compute minutes billed.")
@@ -249,7 +249,7 @@ def _print_actions_storage_costs(actions_sku) -> None:
             net = item.get("netAmount", 0)
             avg_mb = gb_hours_to_avg_mb(qty)
             print(
-                f"    {sku:<40} {fmt_price(price)}/GB-hr  × {qty:.2f} GB-hrs "
+                f"    {sku:<40} {fmt_price(price)}/GB-hr  x {qty:.2f} GB-hrs "
                 f"({avg_mb:.0f} MB avg)  = {fmt_price(net)}"
             )
             found = True
@@ -271,7 +271,7 @@ def _print_copilot_base_costs(items) -> None:
             qty = item.get("grossQuantity", 0)
             net = item.get("netAmount", 0)
             if price > 0:
-                print(f"    {sku:<40} {fmt_price(price)}/req  × {qty:.0f} reqs  = {fmt_price(net)}")
+                print(f"    {sku:<40} {fmt_price(price)}/req  x {qty:.0f} reqs  = {fmt_price(net)}")
                 found = True
                 all_prices.add(price)
         if all_prices:
@@ -292,7 +292,7 @@ def _print_lfs_base_costs(items) -> None:
             qty = item.get("grossQuantity", 0)
             net = item.get("netAmount", 0)
             if price > 0:
-                print(f"    {sku:<40} {fmt_price(price)}/GB  × {qty:.2f} GB  = {fmt_price(net)}")
+                print(f"    {sku:<40} {fmt_price(price)}/GB  x {qty:.2f} GB  = {fmt_price(net)}")
                 found = True
     if not found:
         print("    No LFS storage billed.")

@@ -164,6 +164,7 @@ def render_final_summary_from_data(data: dict) -> None:
 
 
 def _print_cost_overview(total_gross, total_discount, total_net):
+    """Section 1: gross/discount/net cost summary line."""
     print("\n  1. COST OVERVIEW")
     print(f"  {'─' * 55}")
     print(f"    Total Gross:     {fmt_price(total_gross or 0):>12}")
@@ -289,6 +290,7 @@ def _print_top_consumers(
     repo_consumers=None,
     private_minutes=None,
 ):
+    """Section 2: biggest consumers by category (minutes, storage, Copilot)."""
     print("  2. BIGGEST CONSUMERS BY CATEGORY")
     print(f"  {'─' * 55}")
 
@@ -306,6 +308,7 @@ def _print_top_consumers(
 
 
 def _print_storage_breakdown(storage_analysis):
+    """Section 3: storage usage broken down by repository."""
     print("  3. STORAGE BREAKDOWN BY REPOSITORY")
     print(f"  {'─' * 55}")
 

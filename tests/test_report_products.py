@@ -45,3 +45,56 @@ class ProductsReportTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertIn("Base Costs", output)
+
+    def test_render_base_costs_with_items(self):
+        from github_usage.report_products import render_base_costs
+
+        actions = {
+            "sku_breakdown": {
+                "Linux": {
+                    "unitType": "minutes",
+                    "pricePerUnit": 0.008,
+                    "grossQuantity": 1000,
+                    "netAmount": 8.0,
+                }
+            }
+        }
+        copilot_billing = {
+            "items": {
+                "copilot": {
+                    "pricePerUnit": 0.04,
+                    "grossQuantity": 100,
+                    "netAmount": 4.0,
+                }
+            }
+        }
+        lfs_billing = {
+            "items": {
+                "git_lfs": {
+                    "pricePerUnit": 1.0,
+                    "grossQuantity": 2.5,
+                    "netAmount": 2.5,
+                }
+            }
+        }
+
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            render_base_costs(actions, copilot_billing, lfs_billing)
+
+        output = stdout.getvalue()
+        self.assertIn("Base Costs", output)
+        self.assertIn("Copilot Premium Requests", output)
+        self.assertIn("Git LFS", output)
+        self.assertIn("Linux", output)
+
+    def test_render_base_costs_handles_missing_items_key(self):
+        from github_usage.report_products import render_base_costs
+
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            # Pass billing dicts without "items" key to ensure no KeyError.
+            render_base_costs({}, {}, {})
+
+        output = stdout.getvalue()
+        self.assertIn("Base Costs", output)
