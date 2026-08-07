@@ -43,6 +43,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **SonarCloud reliability (S6466):** `get_key_insights` in `report_data.py` adds an explicit `None`-guard (`or []`) on `by_minutes` before indexing, satisfying SonarCloud's S6466 check; new test covers `by_minutes: None`.
 - **CodeRabbit follow-ups (PR #10):** Soft-fail `workflow_breakdown` fetch on `RuntimeError` (email + legacy paths) so partial reports still render; skip redundant private concentration recommendations when private top-2 matches overall top-2; share `repo_label` / `WORKFLOW_MINUTES_REQUEST_HEADROOM` / public `parse_iso_datetime`; narrow workflow-name-map soft-fail to `RuntimeError`; normalize non-UTC ISO offsets to UTC in `parse_iso_datetime` so expiry/retention day math stays calendar-stable.
 - **SonarCloud quality gate (PR #10):** Safer list indexing for private consumer findings and workflow breakdown (`S6466`); reduced cognitive complexity in `_format_consumers_section` and `_repo_rows`; deduplicated HTML `<table>` literals; consolidated repeated consumer test fixtures into `tests/_consumer_fixtures.py`.
 - **Calendar-dependent forecast export/email tests:** Pin `report_forecast_data.date.today` to a mid-month date in CSV/PDF/XLSX section-presence tests and the cached email-report CLI forecast assertion. Forecast is intentionally omitted when `day_of_month < 3`, so those tests failed on the 1st–2nd of each month without a date pin.

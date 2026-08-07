@@ -159,6 +159,18 @@ class ReportDataTests(unittest.TestCase):
 
         self.assertEqual(insights, ["Actions storage is below the free-tier limit."])
 
+    def test_get_key_insights_handles_none_by_minutes_without_index_error(self):
+        from github_usage.report_data import get_key_insights
+
+        report = {
+            "actions": {"minutes": 100.0, "storage_percent": 50.0},
+            "repo_consumers": {"by_minutes": None},
+        }
+
+        insights = get_key_insights(report)
+
+        self.assertEqual(insights, ["Actions storage is below the free-tier limit."])
+
     def test_get_key_insights_caps_at_three(self):
         from github_usage.report_data import get_key_insights
 
