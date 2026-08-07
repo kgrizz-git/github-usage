@@ -213,6 +213,12 @@ def _print_repo_consumer_breakdowns(repo_consumers, private_minutes, visibility_
         print()
 
     by_storage = repo_consumers.get("by_storage") or []
+    by_storage_private = repo_consumers.get("by_storage_private") or []
+    _print_repo_storage_breakdowns(by_storage, by_storage_private, visibility_by_repo)
+
+
+def _print_repo_storage_breakdowns(by_storage, by_storage_private, visibility_by_repo):
+    """(Private) storage breakdowns from repo_consumers."""
     if by_storage:
         print("    Actions Storage (top 5 repos, billed):")
         for row in by_storage[:5]:
@@ -220,8 +226,9 @@ def _print_repo_consumer_breakdowns(repo_consumers, private_minutes, visibility_
             print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
         print()
 
-    by_storage_private = repo_consumers.get("by_storage_private") or []
-    if by_storage_private and not private_list_is_redundant(by_storage[:5], by_storage_private[:5]):
+    if by_storage_private and not private_list_is_redundant(
+        (by_storage or [])[:5], by_storage_private[:5]
+    ):  # NOSONAR
         print("    Private Actions Storage (top 5 repos, billed):")
         for row in by_storage_private[:5]:
             label = repo_label(row["repo"], visibility_by_repo)
