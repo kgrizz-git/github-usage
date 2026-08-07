@@ -33,3 +33,15 @@ class ProductsReportTests(unittest.TestCase):
             output = stdout.getvalue()
             self.assertIn("gross: $10.0000", output)
             self.assertIn("net: $8.0000", output)
+
+    def test_show_base_costs_handles_missing_items_key(self):
+        from github_usage.report_products import show_base_costs
+
+        api = mock.Mock()
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            # Pass dicts without "items" key to ensure it doesn't raise KeyError
+            show_base_costs(api, "octocat", {}, {}, {})
+
+        output = stdout.getvalue()
+        self.assertIn("Base Costs", output)

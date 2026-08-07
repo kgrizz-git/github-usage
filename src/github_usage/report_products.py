@@ -309,8 +309,8 @@ def show_base_costs(api, username, actions_sku, copilot_summary, lfs_summary):
     print_section("Base Costs (Per-Unit Pricing)")
     _print_actions_compute_costs(actions_sku)
     _print_actions_storage_costs(actions_sku)
-    _print_copilot_base_costs(copilot_summary["items"] if copilot_summary else None)
-    _print_lfs_base_costs(lfs_summary["items"] if lfs_summary else None)
+    _print_copilot_base_costs(copilot_summary.get("items") if copilot_summary else None)
+    _print_lfs_base_costs(lfs_summary.get("items") if lfs_summary else None)
 
 
 def fetch_billing_history(api, username: str) -> list:

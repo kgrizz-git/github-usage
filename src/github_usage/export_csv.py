@@ -154,6 +154,7 @@ def _write_monthly_costs_section(writer, data: dict) -> None:  # type: ignore[ty
 
 
 def _write_consumer_row(writer, entry: dict) -> None:  # type: ignore[type-arg]
+    """Write a single repository consumer row (name, visibility, minutes, cost, storage) to the CSV."""
     writer.writerow(
         [
             entry.get("repo", ""),
