@@ -211,14 +211,16 @@ def get_key_insights(report_data: dict) -> list[str]:
                 f"Private repos used {pct:.0f}% of the 2,000 free Actions minutes this month."
             )
     consumers = report_data.get("repo_consumers")
-    if actions and consumers and consumers.get("by_minutes"):
-        top = consumers["by_minutes"][0]
-        minutes = float(actions.get("minutes", 0.0))
-        if minutes:
-            vis = visibility_label(repo_visibility(top))
-            insights.append(
-                f"{top['repo']}{vis} accounts for {top['minutes'] / minutes * 100:.0f}% of Actions minutes."
-            )
+    if actions and consumers:
+        by_minutes = consumers.get("by_minutes") or []
+        if by_minutes:
+            top = by_minutes[0]
+            minutes = float(actions.get("minutes", 0.0))
+            if minutes:
+                vis = visibility_label(repo_visibility(top))
+                insights.append(
+                    f"{top['repo']}{vis} accounts for {top['minutes'] / minutes * 100:.0f}% of Actions minutes."
+                )
     if actions and float(actions.get("storage_percent", 0.0)) < 100:
         insights.append("Actions storage is below the free-tier limit.")
     return insights[:3]
