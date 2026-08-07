@@ -11,6 +11,7 @@ from pathlib import Path
 from .setup_prompts import _prompt_int
 from .setup_workflow import DEFAULT_PROFILE_NAME, DEFAULT_WORKFLOW_CONFIG, workflow_path
 
+_REPORTS_TOML_PREFIX = "reports."
 DEFAULT_ENV_FILE = ".env.email-report"
 DEFAULT_CONFIG_DIR = ".github-usage"
 DEFAULT_CONFIG_FILE = "config.toml"
@@ -327,9 +328,13 @@ def write_config(path: Path, config: dict) -> None:
             if target_subject:
                 parts.append(f'target_subject = "{target_subject}"')
             parts.append("")
-            parts.append(_emit_email_report_block(profile["email_report"], prefix="reports."))
-            parts.append(_emit_schedule_block(profile["schedule"], prefix="reports."))
-            parts.append(_emit_github_actions_block(profile["github_actions"], prefix="reports."))
+            parts.append(
+                _emit_email_report_block(profile["email_report"], prefix=_REPORTS_TOML_PREFIX)
+            )
+            parts.append(_emit_schedule_block(profile["schedule"], prefix=_REPORTS_TOML_PREFIX))
+            parts.append(
+                _emit_github_actions_block(profile["github_actions"], prefix=_REPORTS_TOML_PREFIX)
+            )
         text = "\n".join(parts)
     else:
         profile = profiles[0]

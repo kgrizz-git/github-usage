@@ -28,6 +28,9 @@ from ..errors import format_error
 from ..layout import FormGrid, ViewActions, ViewOutput, ViewSection
 from ..log_utils import write_log
 
+# Repeated selector/label literals, hoisted to satisfy S1192.
+_REPORT_LOG = "#report-log"
+
 
 @dataclass(frozen=True)
 class _ReportRunParams:
@@ -105,7 +108,7 @@ class ReportView(VerticalScroll, AsyncViewMixin):
         if params is None:
             return
         button = self.query_one("#run-report", Button)
-        log = self.query_one("#report-log", RichLog)
+        log = self.query_one(_REPORT_LOG, RichLog)
         self._fetch_report(params, button, log)
 
     def action_run_report(self) -> None:
@@ -113,12 +116,12 @@ class ReportView(VerticalScroll, AsyncViewMixin):
             params = self._read_run_params()
             if params is not None:
                 button = self.query_one("#run-report", Button)
-                log = self.query_one("#report-log", RichLog)
+                log = self.query_one(_REPORT_LOG, RichLog)
                 self._fetch_report(params, button, log)
 
     def _read_run_params(self) -> _ReportRunParams | None:
         """Validate form fields on the UI thread."""
-        log = self.query_one("#report-log", RichLog)
+        log = self.query_one(_REPORT_LOG, RichLog)
         timeout_str = self.query_one("#timeout", Input).value.strip() or "30"
         max_retries_str = self.query_one("#max-retries", Input).value.strip() or "3"
 
@@ -245,7 +248,7 @@ class ReportView(VerticalScroll, AsyncViewMixin):
         username_or_err: str | None,
         cache_hit,
     ) -> None:
-        log = self.query_one("#report-log", RichLog)
+        log = self.query_one(_REPORT_LOG, RichLog)
         table = self.query_one("#summary-table", DataTable)
         table.clear()
 

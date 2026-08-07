@@ -26,6 +26,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 ### Changed
 
 - **Refactored reporting functions** (export CSV, rate limits, OS breakdown, report data fetching, base-cost and summary rendering) into smaller helpers to cut cognitive complexity and clear SonarCloud S3776 high-severity issues (batch 1/4).
+- **Refactored repeated string literals** (GUI selectors, HTML fragments, the `reports.` TOML prefix, the Git LFS label, and the workflows pathspec) into module-level constants to clear SonarCloud high-severity S1192/S7688 issues.
 - **GitHub Actions workflow now defaults to `--email-format html`:** The committed `email-report.yml` and its template were updated from `--email-format text` to `--email-format html`. Existing users who re-run setup (option 5 / wizard) will have their workflow re-rendered with this default. To keep plain-text output, set `email_format = "text"` in `.github-usage/config.toml` before re-running setup, or select **Text** in the wizard.
 - **Terminology:** the interactive CLI/TUI usage report is now called the **local full report** in user-facing copy (README, `start.sh`, CLI help, TUI). Internal `legacy_*` module names are unchanged for now (tracked in `TO_DO.md`).
 - **GitHub Actions `setup-python` v7:** Bump `actions/setup-python` from v6 to v7 in CI, security, email-report, and the email-report template (folds in Dependabot #7; no workflow input changes — this repo does not use the removed `pip-install` input).
