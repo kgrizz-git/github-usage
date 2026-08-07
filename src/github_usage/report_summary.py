@@ -164,6 +164,7 @@ def render_final_summary_from_data(data: dict) -> None:
 
 
 def _print_cost_overview(total_gross, total_discount, total_net):
+    """Section 1: gross/discount/net cost summary line."""
     print("\n  1. COST OVERVIEW")
     print(f"  {'─' * 55}")
     print(f"    Total Gross:     {fmt_price(total_gross or 0):>12}")
@@ -177,22 +178,8 @@ def _print_cost_overview(total_gross, total_discount, total_net):
     print()
 
 
-def _print_top_consumers(
-    user_minutes,
-    actions_gross,
-    repo_data,
-    premium_by_model,
-    lfs_summary,
-    visibility_by_repo=None,
-    *,
-    repo_consumers=None,
-    private_minutes=None,
-):
-    print("  2. BIGGEST CONSUMERS BY CATEGORY")
-    print(f"  {'─' * 55}")
-
-    # Actions — top repos by minutes
-    sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True) if repo_data else []
+def _print_actions_minutes_top(sorted_repos, user_minutes, visibility_by_repo):
+    """Actions minutes for the top 5 repos (section of BIGGEST CONSUMERS)."""
     print("\n    Actions Minutes (top 5 repos):")
     for full, mins, _gb, _avg_mb, gross, _ in sorted_repos[:5]:
         pct = mins / user_minutes * 100 if user_minutes and user_minutes > 0 else 0
@@ -202,8 +189,9 @@ def _print_top_consumers(
         print("      No Actions usage found.")
     print()
 
-    # Actions — top repos by cost
-    sorted_by_cost = sorted(repo_data, key=lambda x: x[4], reverse=True) if repo_data else []
+
+def _print_actions_cost_top(sorted_by_cost, actions_gross, visibility_by_repo):
+    """Actions cost for the top 5 repos (section of BIGGEST CONSUMERS)."""
     print("    Actions Cost (top 5 repos):")
     for full, _mins, _gb, _avg_mb, gross, _ in sorted_by_cost[:5]:
         pct = gross / actions_gross * 100 if (actions_gross or 0) > 0 else 0
@@ -211,43 +199,50 @@ def _print_top_consumers(
         print(f"      {label:<45} {fmt_price(gross):>10}  ({pct:5.1f}%)")
     print()
 
-    if repo_consumers:
-        by_minutes = repo_consumers.get("by_minutes") or []
-        by_minutes_private = repo_consumers.get("by_minutes_private") or []
-        if by_minutes_private and not private_list_is_redundant(
-            by_minutes[:5], by_minutes_private[:5]
-        ):
-            print("    Private Actions Minutes (top 5 repos):")
-            for row in by_minutes_private[:5]:
-                mins = row["minutes"]
-                pct = (
-                    mins / private_minutes * 100.0
-                    if private_minutes and private_minutes > 0
-                    else 0.0
-                )
-                label = repo_label(row["repo"], visibility_by_repo)
-                print(f"      {label:<45} {mins:>8.1f} min  ({pct:5.1f}% of private minutes)")
-            print()
 
-        by_storage = repo_consumers.get("by_storage") or []
-        if by_storage:
-            print("    Actions Storage (top 5 repos, billed):")
-            for row in by_storage[:5]:
-                label = repo_label(row["repo"], visibility_by_repo)
-                print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
-            print()
+def _print_repo_consumer_breakdowns(repo_consumers, private_minutes, visibility_by_repo):
+    """Private-minutes and (private) storage breakdowns from repo_consumers."""
+    by_minutes = repo_consumers.get("by_minutes") or []
+    by_minutes_private = repo_consumers.get("by_minutes_private") or []
+    if by_minutes_private and not private_list_is_redundant(by_minutes[:5], by_minutes_private[:5]):
+        print("    Private Actions Minutes (top 5 repos):")
+        for row in by_minutes_private[:5]:
+            mins = row["minutes"]
+            pct = mins / private_minutes * 100.0 if private_minutes and private_minutes > 0 else 0.0
+            label = repo_label(row["repo"], visibility_by_repo)
+            print(f"      {label:<45} {mins:>8.1f} min  ({pct:5.1f}% of private minutes)")
+        print()
 
-        by_storage_private = repo_consumers.get("by_storage_private") or []
-        if by_storage_private and not private_list_is_redundant(
-            by_storage[:5], by_storage_private[:5]
-        ):
-            print("    Private Actions Storage (top 5 repos, billed):")
-            for row in by_storage_private[:5]:
-                label = repo_label(row["repo"], visibility_by_repo)
-                print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
-            print()
+    by_storage = repo_consumers.get("by_storage") or []
+    by_storage_private = repo_consumers.get("by_storage_private") or []
+    _print_repo_storage_breakdowns(by_storage, by_storage_private, visibility_by_repo)
 
-    # Copilot — by model
+
+def _print_repo_storage_breakdowns(by_storage, by_storage_private, visibility_by_repo):
+    """(Private) storage breakdowns from repo_consumers."""
+    if by_storage:
+        print("    Actions Storage (top 5 repos, billed):")
+        for row in by_storage[:5]:
+            label = repo_label(row["repo"], visibility_by_repo)
+            print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
+        print()
+
+    if not by_storage_private:
+        return
+
+    top_storage = by_storage[:5] if by_storage else []
+    top_private = by_storage_private[:5]
+
+    if not private_list_is_redundant(top_storage, top_private):
+        print("    Private Actions Storage (top 5 repos, billed):")
+        for row in top_private:
+            label = repo_label(row["repo"], visibility_by_repo)
+            print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
+        print()
+
+
+def _print_copilot_by_model(premium_by_model):
+    """Copilot premium requests grouped by model (section of BIGGEST CONSUMERS)."""
     print("    Copilot Premium Requests (by model):")
     if premium_by_model:
         for model, data in sorted(
@@ -266,7 +261,9 @@ def _print_top_consumers(
         print("      No model-level data available.")
     print()
 
-    # Git LFS
+
+def _print_lfs_storage(lfs_summary):
+    """Git LFS storage rows (section of BIGGEST CONSUMERS)."""
     if lfs_summary and lfs_summary.get("items"):
         print("    Git LFS Storage:")
         for sku, item in lfs_summary["items"].items():
@@ -282,7 +279,36 @@ def _print_top_consumers(
     print()
 
 
+def _print_top_consumers(
+    user_minutes,
+    actions_gross,
+    repo_data,
+    premium_by_model,
+    lfs_summary,
+    visibility_by_repo=None,
+    *,
+    repo_consumers=None,
+    private_minutes=None,
+):
+    """Section 2: biggest consumers by category (minutes, storage, Copilot)."""
+    print("  2. BIGGEST CONSUMERS BY CATEGORY")
+    print(f"  {'─' * 55}")
+
+    sorted_repos = sorted(repo_data, key=lambda x: x[1], reverse=True) if repo_data else []
+    _print_actions_minutes_top(sorted_repos, user_minutes, visibility_by_repo)
+
+    sorted_by_cost = sorted(repo_data, key=lambda x: x[4], reverse=True) if repo_data else []
+    _print_actions_cost_top(sorted_by_cost, actions_gross, visibility_by_repo)
+
+    if repo_consumers:
+        _print_repo_consumer_breakdowns(repo_consumers, private_minutes, visibility_by_repo)
+
+    _print_copilot_by_model(premium_by_model)
+    _print_lfs_storage(lfs_summary)
+
+
 def _print_storage_breakdown(storage_analysis):
+    """Section 3: storage usage broken down by repository."""
     print("  3. STORAGE BREAKDOWN BY REPOSITORY")
     print(f"  {'─' * 55}")
 

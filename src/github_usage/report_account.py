@@ -13,14 +13,8 @@ def fetch_rate_limits(api) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def render_rate_limits(data: dict) -> None:
-    """Print rate limits from a pre-fetched ``/rate_limit`` response."""
-    print_sep("API Rate Limit")
-    resources = data.get("resources", {})
-    if not isinstance(resources, dict):
-        resources = {}
-
-    # Standard limits
+def _print_standard_rate_limits(resources: dict) -> None:
+    """Print the core / GraphQL / search / code-scanning rate-limit rows."""
     print()
     for name, key in [
         ("Core API", "core"),
@@ -37,7 +31,6 @@ def render_rate_limits(data: dict) -> None:
         lim = r.get("limit")
         if lim is None:
             lim = "?"
-        used = r.get("used", 0)
         reset_ts = r.get("reset", 0)
         reset_str = ""
         if reset_ts:
@@ -46,7 +39,9 @@ def render_rate_limits(data: dict) -> None:
             )
         print(f"  {name:<25} {rem:>6} / {lim:<6} remaining{reset_str}")
 
-    # Premium / high-tier
+
+def _print_premium_rate_limits(resources: dict) -> None:
+    """Print the high-tier (limit > 5000) rate-limit rows."""
     print()
     print("  Premium API tiers:")
     for name, res in resources.items():
@@ -62,6 +57,16 @@ def render_rate_limits(data: dict) -> None:
             pct = (used / limit * 100) if limit else 0
             print(f"    {name:<35} {used:>6} / {limit:<6} ({pct:.1f}% used)")
     print()
+
+
+def render_rate_limits(data: dict) -> None:
+    """Print rate limits from a pre-fetched ``/rate_limit`` response."""
+    print_sep("API Rate Limit")
+    resources = data.get("resources", {})
+    if not isinstance(resources, dict):
+        resources = {}
+    _print_standard_rate_limits(resources)
+    _print_premium_rate_limits(resources)
 
 
 def fetch_account_info(api) -> dict:

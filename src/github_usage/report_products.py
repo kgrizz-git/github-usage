@@ -216,85 +216,97 @@ def show_monthly_costs(repo_data, username, api):
         print()
 
 
-def show_base_costs(api, username, actions_sku, copilot_summary, lfs_summary):
-    """Show per-unit base costs for all products."""
-    print_section("Base Costs (Per-Unit Pricing)")
-
-    # Actions base costs
+def _print_actions_compute_costs(actions_sku) -> None:
+    """Per-unit Actions compute (minutes) pricing rows."""
     print("\n  Actions Compute:")
-    actions_minutes_found = False
+    found = False
     for sku, item in (actions_sku or {}).items():
-        if sku.startswith("_"):
+        if str(sku).startswith("_"):
             continue
-        unit = item.get("unitType", "")
-        price = item.get("pricePerUnit", 0)
-        qty = item.get("grossQuantity", 0)
-        net = item.get("netAmount", 0)
-        if unit == "minutes":
-            print(f"    {sku:<40} {fmt_price(price)}/min  × {qty:.1f} min  = {fmt_price(net)}")
-            actions_minutes_found = True
-    if not actions_minutes_found:
+        if item.get("unitType", "") == "minutes":
+            price = item.get("pricePerUnit", 0)
+            qty = item.get("grossQuantity", 0)
+            net = item.get("netAmount", 0)
+            print(f"    {sku:<40} {fmt_price(price)}/min  x {qty:.1f} min  = {fmt_price(net)}")
+            found = True
+    if not found:
         print("    No compute minutes billed.")
     print("    Standard tier: ~$0.008/min (Linux), ~$0.016/min (Windows), ~$0.016/min (macOS)")
     print("    Free tier: 2,000 min/month for personal repos")
     print()
 
+
+def _print_actions_storage_costs(actions_sku) -> None:
+    """Per-unit Actions storage (GB-hours) pricing rows."""
     print("  Actions Storage:")
-    actions_storage_found = False
+    found = False
     for sku, item in (actions_sku or {}).items():
-        if sku.startswith("_"):
+        if str(sku).startswith("_"):
             continue
-        unit = item.get("unitType", "")
-        price = item.get("pricePerUnit", 0)
-        qty = item.get("grossQuantity", 0)
-        net = item.get("netAmount", 0)
-        if unit == "gigabyte-hours":
+        if item.get("unitType", "") == "gigabyte-hours":
+            price = item.get("pricePerUnit", 0)
+            qty = item.get("grossQuantity", 0)
+            net = item.get("netAmount", 0)
             avg_mb = gb_hours_to_avg_mb(qty)
             print(
-                f"    {sku:<40} {fmt_price(price)}/GB-hr  × {qty:.2f} GB-hrs ({avg_mb:.0f} MB avg)  = {fmt_price(net)}"
+                f"    {sku:<40} {fmt_price(price)}/GB-hr  x {qty:.2f} GB-hrs "
+                f"({avg_mb:.0f} MB avg)  = {fmt_price(net)}"
             )
-            actions_storage_found = True
-    if not actions_storage_found:
+            found = True
+    if not found:
         print("    No storage billed.")
     print("    Standard: ~$0.01/GB-month")
     print("    Free tier: 500 MB for personal repos")
     print()
 
+
+def _print_copilot_base_costs(items) -> None:
+    """Per-unit Copilot premium-request pricing rows from a billing items map."""
     print("  Copilot Premium Requests:")
-    copilot_found = False
-    if copilot_summary and copilot_summary["items"]:
+    found = False
+    if items:
         all_prices = set()
-        for sku, item in copilot_summary["items"].items():
+        for sku, item in items.items():
             price = item.get("pricePerUnit", 0)
             qty = item.get("grossQuantity", 0)
+            net = item.get("netAmount", 0)
             if price > 0:
-                print(
-                    f"    {sku:<40} {fmt_price(price)}/req  × {qty:.0f} reqs  = {fmt_price(item.get('netAmount', 0))}"
-                )
-                copilot_found = True
+                print(f"    {sku:<40} {fmt_price(price)}/req  x {qty:.0f} reqs  = {fmt_price(net)}")
+                found = True
                 all_prices.add(price)
         if all_prices:
             print(f"    Base rate: {max(all_prices):.4f}/req (highest observed)")
-    if not copilot_found:
+    if not found:
         print("    No premium requests billed.")
     print("    Copilot Pro: ~$0.04-0.08/request for premium features")
     print()
 
+
+def _print_lfs_base_costs(items) -> None:
+    """Per-unit Git LFS storage pricing rows from a billing items map."""
     print("  Git LFS:")
-    lfs_found = False
-    if lfs_summary and lfs_summary["items"]:
-        for sku, item in lfs_summary["items"].items():
+    found = False
+    if items:
+        for sku, item in items.items():
             price = item.get("pricePerUnit", 0)
             qty = item.get("grossQuantity", 0)
+            net = item.get("netAmount", 0)
             if price > 0:
-                print(
-                    f"    {sku:<40} {fmt_price(price)}/GB  × {qty:.2f} GB  = {fmt_price(item.get('netAmount', 0))}"
-                )
-                lfs_found = True
-    if not lfs_found:
+                print(f"    {sku:<40} {fmt_price(price)}/GB  x {qty:.2f} GB  = {fmt_price(net)}")
+                found = True
+    if not found:
         print("    No LFS storage billed.")
     print("    Standard: ~$1/GB-month after 1 GB free")
     print()
+
+
+def show_base_costs(api, username, actions_sku, copilot_summary, lfs_summary):
+    """Show per-unit base costs for all products."""
+    print_section("Base Costs (Per-Unit Pricing)")
+    _print_actions_compute_costs(actions_sku)
+    _print_actions_storage_costs(actions_sku)
+    _print_copilot_base_costs(copilot_summary.get("items") if copilot_summary else None)
+    _print_lfs_base_costs(lfs_summary.get("items") if lfs_summary else None)
 
 
 def fetch_billing_history(api, username: str) -> list:
@@ -491,77 +503,7 @@ def render_base_costs(
     """Print per-unit base costs from pre-fetched billing summaries."""
     actions_sku = (actions or {}).get("sku_breakdown") or {}
     print_section("Base Costs (Per-Unit Pricing)")
-    print("\n  Actions Compute:")
-    actions_minutes_found = False
-    for sku, item in actions_sku.items():
-        if str(sku).startswith("_"):
-            continue
-        unit = item.get("unitType", "")
-        price = item.get("pricePerUnit", 0)
-        qty = item.get("grossQuantity", 0)
-        net = item.get("netAmount", 0)
-        if unit == "minutes":
-            print(f"    {sku:<40} {fmt_price(price)}/min  × {qty:.1f} min  = {fmt_price(net)}")
-            actions_minutes_found = True
-    if not actions_minutes_found:
-        print("    No compute minutes billed.")
-    print("    Standard tier: ~$0.008/min (Linux), ~$0.016/min (Windows), ~$0.016/min (macOS)")
-    print("    Free tier: 2,000 min/month for personal repos")
-    print()
-    print("  Actions Storage:")
-    actions_storage_found = False
-    for sku, item in actions_sku.items():
-        if str(sku).startswith("_"):
-            continue
-        unit = item.get("unitType", "")
-        price = item.get("pricePerUnit", 0)
-        qty = item.get("grossQuantity", 0)
-        net = item.get("netAmount", 0)
-        if unit == "gigabyte-hours":
-            avg_mb = gb_hours_to_avg_mb(qty)
-            print(
-                f"    {sku:<40} {fmt_price(price)}/GB-hr  × {qty:.2f} GB-hrs "
-                f"({avg_mb:.0f} MB avg)  = {fmt_price(net)}"
-            )
-            actions_storage_found = True
-    if not actions_storage_found:
-        print("    No storage billed.")
-    print("    Standard: ~$0.01/GB-month")
-    print("    Free tier: 500 MB for personal repos")
-    print()
-    print("  Copilot Premium Requests:")
-    copilot_found = False
-    if copilot_billing and copilot_billing.get("items"):
-        all_prices = set()
-        for sku, item in copilot_billing["items"].items():
-            price = item.get("pricePerUnit", 0)
-            qty = item.get("grossQuantity", 0)
-            if price > 0:
-                print(
-                    f"    {sku:<40} {fmt_price(price)}/req  × {qty:.0f} reqs  "
-                    f"= {fmt_price(item.get('netAmount', 0))}"
-                )
-                copilot_found = True
-                all_prices.add(price)
-        if all_prices:
-            print(f"    Base rate: {max(all_prices):.4f}/req (highest observed)")
-    if not copilot_found:
-        print("    No premium requests billed.")
-    print("    Copilot Pro: ~$0.04-0.08/request for premium features")
-    print()
-    print("  Git LFS:")
-    lfs_found = False
-    if lfs_billing and lfs_billing.get("items"):
-        for sku, item in lfs_billing["items"].items():
-            price = item.get("pricePerUnit", 0)
-            qty = item.get("grossQuantity", 0)
-            if price > 0:
-                print(
-                    f"    {sku:<40} {fmt_price(price)}/GB  × {qty:.2f} GB  "
-                    f"= {fmt_price(item.get('netAmount', 0))}"
-                )
-                lfs_found = True
-    if not lfs_found:
-        print("    No LFS storage billed.")
-    print("    Standard: ~$1/GB-month after 1 GB free")
-    print()
+    _print_actions_compute_costs(actions_sku)
+    _print_actions_storage_costs(actions_sku)
+    _print_copilot_base_costs(copilot_billing.get("items") if copilot_billing else None)
+    _print_lfs_base_costs(lfs_billing.get("items") if lfs_billing else None)

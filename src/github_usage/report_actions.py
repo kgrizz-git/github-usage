@@ -90,6 +90,26 @@ def show_actions_top_consumers(repo_data, visibility_by_repo=None):
     print()
 
 
+def _print_repo_os_breakdown(owner, name, os_millis, total_os):
+    """Print one repo's per-OS minutes and accumulate its millis into ``total_os``."""
+    print(f"  {owner}/{name}:")
+    for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
+        mins = os_millis[os_name] / 60000
+        total_os[os_name] += os_millis[os_name]
+        if mins > 0:
+            print(f"    {os_name:<10} {mins:>8.1f} min")
+    print()
+
+
+def _print_os_totals(total_os):
+    """Print the aggregated per-OS minute totals across all repos."""
+    print("  TOTAL:")
+    for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
+        mins = total_os[os_name] / 60000
+        if mins > 0:
+            print(f"    {os_name:<10} {mins:>8.1f} min")
+
+
 def show_actions_os_breakdown(api, repos):
     """Show Ubuntu/Windows/macOS breakdown for top repos."""
     print_sep("Actions Compute by OS (from workflow runs)")
@@ -104,19 +124,9 @@ def show_actions_os_breakdown(api, repos):
         minutes, os_millis, _ = get_actions_from_runs(api, owner, name)
         if minutes > 0:
             found = True
-            print(f"  {owner}/{name}:")
-            for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
-                mins = os_millis[os_name] / 60000
-                total_os[os_name] += os_millis[os_name]
-                if mins > 0:
-                    print(f"    {os_name:<10} {mins:>8.1f} min")
-            print()
+            _print_repo_os_breakdown(owner, name, os_millis, total_os)
     if found:
-        print("  TOTAL:")
-        for os_name in ["UBUNTU", "WINDOWS", "MACOS"]:
-            mins = total_os[os_name] / 60000
-            if mins > 0:
-                print(f"    {os_name:<10} {mins:>8.1f} min")
+        _print_os_totals(total_os)
     else:
         print("  No detailed OS breakdown available from workflow runs API.")
         print("  (Use the Actions Summary above for total minutes by OS type)")

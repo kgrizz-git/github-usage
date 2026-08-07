@@ -237,6 +237,14 @@ def _rate_limit(api: GitHubAPIClient) -> tuple[int | None, int | None]:
     return core.get("limit"), core.get("remaining")
 
 
+def _try_section(report: dict, errors: dict, key: str, getter) -> None:
+    """Store ``getter()`` under ``report[key]``, or record its RuntimeError in ``errors``."""
+    try:
+        report[key] = getter()
+    except RuntimeError as exc:
+        errors[key] = str(exc)
+
+
 def _fetch_sections(
     api: GitHubAPIClient,
     username: str,
@@ -260,10 +268,7 @@ def _fetch_sections(
         ("git_lfs", include_lfs, lambda: get_gitlfs_usage(api, username)),
     ]:
         if enabled:
-            try:
-                report[key] = getter()
-            except RuntimeError as exc:
-                errors[key] = str(exc)
+            _try_section(report, errors, key, getter)
 
     try:
         report["monthly_costs"] = get_monthly_costs(api, username)
@@ -277,28 +282,36 @@ def _fetch_sections(
         }
 
     if include_consumers:
-        try:
-            report["repo_consumers"] = get_repo_consumers(api, repos, max_repos=max_repos)
-        except RuntimeError as exc:
-            errors["repo_consumers"] = str(exc)
+        _try_section(
+            report,
+            errors,
+            "repo_consumers",
+            lambda: get_repo_consumers(api, repos, max_repos=max_repos),
+        )
     if include_artifact_storage:
-        try:
-            report["artifact_storage"] = get_artifact_storage_details(api, repos, max_repos)
-        except RuntimeError as exc:
-            errors["artifact_storage"] = str(exc)
+        _try_section(
+            report,
+            errors,
+            "artifact_storage",
+            lambda: get_artifact_storage_details(api, repos, max_repos),
+        )
     if include_release_assets:
-        try:
-            report["release_assets"] = get_release_asset_details(api, repos, max_repos)
-        except RuntimeError as exc:
-            errors["release_assets"] = str(exc)
+        _try_section(
+            report,
+            errors,
+            "release_assets",
+            lambda: get_release_asset_details(api, repos, max_repos),
+        )
 
     if include_consumers and report.get("repo_consumers"):
-        try:
-            report["workflow_breakdown"] = workflow_breakdown_for_top_private(
+        _try_section(
+            report,
+            errors,
+            "workflow_breakdown",
+            lambda: workflow_breakdown_for_top_private(
                 api, report["repo_consumers"], runs_cache=runs_cache
-            )
-        except RuntimeError as exc:
-            errors["workflow_breakdown"] = str(exc)
+            ),
+        )
 
 
 def build_report_data(
