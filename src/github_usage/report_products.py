@@ -269,12 +269,9 @@ def _print_copilot_base_costs(items) -> None:
         for sku, item in items.items():
             price = item.get("pricePerUnit", 0)
             qty = item.get("grossQuantity", 0)
+            net = item.get("netAmount", 0)
             if price > 0:
-                # codeql[py/clear-text-logging-sensitive-data]
-                print(
-                    f"    {sku:<40} {fmt_price(price)}/req  × {qty:.0f} reqs  "
-                    f"= {fmt_price(item.get('netAmount', 0))}"
-                )
+                print(f"    {sku:<40} {fmt_price(price)}/req  × {qty:.0f} reqs  = {fmt_price(net)}")
                 found = True
                 all_prices.add(price)
         if all_prices:
@@ -293,12 +290,9 @@ def _print_lfs_base_costs(items) -> None:
         for sku, item in items.items():
             price = item.get("pricePerUnit", 0)
             qty = item.get("grossQuantity", 0)
+            net = item.get("netAmount", 0)
             if price > 0:
-                # codeql[py/clear-text-logging-sensitive-data]
-                print(
-                    f"    {sku:<40} {fmt_price(price)}/GB  × {qty:.2f} GB  "
-                    f"= {fmt_price(item.get('netAmount', 0))}"
-                )
+                print(f"    {sku:<40} {fmt_price(price)}/GB  × {qty:.2f} GB  = {fmt_price(net)}")
                 found = True
     if not found:
         print("    No LFS storage billed.")

@@ -226,11 +226,15 @@ def _print_repo_storage_breakdowns(by_storage, by_storage_private, visibility_by
             print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
         print()
 
-    if by_storage_private and not private_list_is_redundant(
-        (by_storage or [])[:5], by_storage_private[:5]
-    ):  # NOSONAR
+    if not by_storage_private:
+        return
+
+    top_storage = by_storage[:5] if by_storage else []
+    top_private = by_storage_private[:5]
+
+    if not private_list_is_redundant(top_storage, top_private):
         print("    Private Actions Storage (top 5 repos, billed):")
-        for row in by_storage_private[:5]:
+        for row in top_private:
             label = repo_label(row["repo"], visibility_by_repo)
             print(f"      {label:<45} {row['storage_avg_mb']:>8.1f} MB")
         print()
