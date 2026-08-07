@@ -25,6 +25,12 @@ from ..log_utils import write_log
 from ..modals import ConfirmScreen
 from ..widgets.schedule_picker import SchedulePicker
 
+# Repeated selector/label literals, hoisted to satisfy S1192.
+_SCHED_LOG = "#sched-log"
+_PROFILE_SELECT = "#profile-select"
+_SCHEDULE_PICKER = "#schedule-picker"
+_INSTALL_LA_LABEL = "Install LaunchAgent"
+
 
 class SchedulesView(VerticalScroll, AsyncViewMixin):
     """Local launchd and GitHub Actions schedule forms."""
@@ -85,7 +91,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             yield Button("Regenerate plist", id="regen-plist")
             yield Button("Regenerate workflow", id="regen-workflow")
             if sys.platform == "darwin":
-                yield Button("Install LaunchAgent", id="install-la", variant="success")
+                yield Button(_INSTALL_LA_LABEL, id="install-la", variant="success")
         if sys.platform != "darwin":
             yield Static(
                 "Local launchd scheduling is macOS-only. "
@@ -109,19 +115,19 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             self._on_state_changed()
         except FileNotFoundError:
             write_log(
-                self.query_one("#sched-log", RichLog),
+                self.query_one(_SCHED_LOG, RichLog),
                 "Config file not found. Run setup first.",
                 level="error",
             )
         except PermissionError:
             write_log(
-                self.query_one("#sched-log", RichLog),
+                self.query_one(_SCHED_LOG, RichLog),
                 "Permission denied reading config.",
                 level="error",
             )
         except Exception as exc:
             write_log(
-                self.query_one("#sched-log", RichLog),
+                self.query_one(_SCHED_LOG, RichLog),
                 format_error(exc, context="Failed to load schedules"),
                 level="error",
             )
@@ -144,7 +150,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         self.query_one("#dirty-indicator", Static).update("")
 
     def _profile_name(self) -> str:
-        value = self.query_one("#profile-select", Select).value
+        value = self.query_one(_PROFILE_SELECT, Select).value
         if value == Select.BLANK or str(value) == "Select.NULL" or value is None:
             return self.app.app_state.current_profile  # type: ignore[attr-defined]
         return str(value)
@@ -155,7 +161,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             state = self.app.app_state  # type: ignore[attr-defined]
             paths = state.paths
             names = list(state.profile_names)
-            select = self.query_one("#profile-select", Select)
+            select = self.query_one(_PROFILE_SELECT, Select)
             label = self.query_one("#profile-active-label", Static)
             if not names:
                 select.set_options([])
@@ -173,7 +179,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             profile = next(p for p in config["profiles"] if p["name"] == target)
             sched = profile["schedule"]
             ga = profile["github_actions"]
-            picker = self.query_one("#schedule-picker", SchedulePicker)
+            picker = self.query_one(_SCHEDULE_PICKER, SchedulePicker)
             picker.set_loading(True)
             try:
                 picker.set_local_schedule(
@@ -211,7 +217,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
             self._loading = False
             raise
 
-    @on(Select.Changed, "#profile-select")
+    @on(Select.Changed, _PROFILE_SELECT)
     def _profile_changed(self) -> None:
         if self._loading or self._applying_selection:
             return
@@ -231,7 +237,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
                 )
             )
             if not confirmed:
-                select = self.query_one("#profile-select", Select)
+                select = self.query_one(_PROFILE_SELECT, Select)
                 if self._previous_profile:
                     self._applying_selection = True
                     try:
@@ -246,7 +252,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
     def _on_schedule_picker_changed(self, event: SchedulePicker.Changed) -> None:
         if self._loading:
             return
-        picker = self.query_one("#schedule-picker", SchedulePicker)
+        picker = self.query_one(_SCHEDULE_PICKER, SchedulePicker)
         if getattr(event, "picker", None) is not picker:
             return
         self._mark_dirty()
@@ -259,7 +265,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         self._mark_dirty()
 
     def _validate_schedule_fields(self, log: RichLog) -> bool:
-        picker = self.query_one("#schedule-picker", SchedulePicker)
+        picker = self.query_one(_SCHEDULE_PICKER, SchedulePicker)
         error = picker.validate()
         if error:
             write_log(log, error, level="error")
@@ -271,11 +277,11 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         self.action_save_schedules()
 
     def action_save_schedules(self) -> None:
-        log = self.query_one("#sched-log", RichLog)
+        log = self.query_one(_SCHED_LOG, RichLog)
         if not self._validate_schedule_fields(log):
             return
         paths = self.app.app_state.paths  # type: ignore[attr-defined]
-        picker = self.query_one("#schedule-picker", SchedulePicker)
+        picker = self.query_one(_SCHEDULE_PICKER, SchedulePicker)
         local = picker.get_local_schedule()
         cron = picker.get_ga_cron()
         if local is None or cron is None:
@@ -307,7 +313,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
     def _regen_plist(self) -> None:
         if sys.platform != "darwin":
             return
-        log = self.query_one("#sched-log", RichLog)
+        log = self.query_one(_SCHED_LOG, RichLog)
         try:
             path = regenerate_launchd_plist(self.app.app_state.paths, self._profile_name())  # type: ignore[attr-defined]
             write_log(log, f"Generated {path}", level="success")
@@ -320,7 +326,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
 
     @work
     async def _confirm_regen_workflow(self) -> None:
-        log = self.query_one("#sched-log", RichLog)
+        log = self.query_one(_SCHED_LOG, RichLog)
         confirmed = await self.app.push_screen_wait(
             ConfirmScreen(
                 "Regenerate workflow file? This overwrites the existing workflow on disk.",
@@ -346,7 +352,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         confirmed = await self.app.push_screen_wait(
             ConfirmScreen(
                 "Install or update the LaunchAgent plist for this profile?",
-                title="Install LaunchAgent",
+                title=_INSTALL_LA_LABEL,
             )
         )
         if confirmed:
@@ -355,7 +361,7 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
     @work(thread=True)
     def _install_la(self) -> None:
         button = self.query_one("#install-la", Button)
-        log = self.query_one("#sched-log", RichLog)
+        log = self.query_one(_SCHED_LOG, RichLog)
         self._call_ui(
             self._begin_async,
             button,
@@ -378,4 +384,4 @@ class SchedulesView(VerticalScroll, AsyncViewMixin):
         except Exception as exc:
             self._call_ui(write_log, log, format_error(exc), level="error")
         finally:
-            self._call_ui(self._end_async, button, "Install LaunchAgent")
+            self._call_ui(self._end_async, button, _INSTALL_LA_LABEL)

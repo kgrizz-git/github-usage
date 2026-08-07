@@ -19,6 +19,11 @@ if TYPE_CHECKING:
     from .setup_view import SetupView
 
 
+# Repeated selector/label literals, hoisted to satisfy S1192.
+_ONLY_PUBLIC = "#only-public"
+_ONLY_PRIVATE = "#only-private"
+
+
 class SetupProfilesPanel(VerticalScroll):
     """Named profiles, report options, and save."""
 
@@ -135,8 +140,8 @@ class SetupProfilesPanel(VerticalScroll):
         self.query_one("#include-release", Checkbox).value = bool(
             email.get("include_release_assets")
         )
-        self.query_one("#only-public", Checkbox).value = bool(email.get("only_public"))
-        self.query_one("#only-private", Checkbox).value = bool(email.get("only_private"))
+        self.query_one(_ONLY_PUBLIC, Checkbox).value = bool(email.get("only_public"))
+        self.query_one(_ONLY_PRIVATE, Checkbox).value = bool(email.get("only_private"))
         self.query_one("#max-repos", Input).value = str(email.get("max_repos", 100))
         self.query_one("#target-email", Input).value = profile.get("target_email", "")
 
@@ -148,8 +153,8 @@ class SetupProfilesPanel(VerticalScroll):
             "include_consumers": self.query_one("#include-consumers", Checkbox).value,
             "include_artifact_storage": self.query_one("#include-artifact", Checkbox).value,
             "include_release_assets": self.query_one("#include-release", Checkbox).value,
-            "only_public": self.query_one("#only-public", Checkbox).value,
-            "only_private": self.query_one("#only-private", Checkbox).value,
+            "only_public": self.query_one(_ONLY_PUBLIC, Checkbox).value,
+            "only_private": self.query_one(_ONLY_PRIVATE, Checkbox).value,
             "max_repos_str": max_repos_str,
             "target_email": self.query_one("#target-email", Input).value.strip(),
         }
@@ -187,9 +192,9 @@ class SetupProfilesPanel(VerticalScroll):
         if self._coordinator.is_form_loading():
             return
         if event.checkbox.id == "only-public" and event.value:
-            self.query_one("#only-private", Checkbox).value = False
+            self.query_one(_ONLY_PRIVATE, Checkbox).value = False
         elif event.checkbox.id == "only-private" and event.value:
-            self.query_one("#only-public", Checkbox).value = False
+            self.query_one(_ONLY_PUBLIC, Checkbox).value = False
         self._coordinator.mark_dirty()
 
     @on(Input.Changed)

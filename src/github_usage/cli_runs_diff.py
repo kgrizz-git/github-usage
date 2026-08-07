@@ -22,6 +22,9 @@ from pathlib import Path
 # stable sort order in porcelain output regardless of the user's locale.
 GIT_ENV: dict[str, str] = {**os.environ, "LC_ALL": "C"}
 
+# Directory holding the email-report workflow files; used as a git pathspec.
+_WORKFLOWS_DIR = ".github/workflows/"
+
 # Valid drift categories. Asserted by tests.
 DRIFT_CATEGORIES: frozenset[str] = frozenset(
     {
@@ -191,7 +194,7 @@ def _normalize_path(p: str | Path, repo_root: Path) -> str:
     return pp.as_posix()
 
 
-def _git_status_porcelain(repo_root: Path, pathspec: str = ".github/workflows/") -> dict[str, str]:
+def _git_status_porcelain(repo_root: Path, pathspec: str = _WORKFLOWS_DIR) -> dict[str, str]:
     """Run ``git status --porcelain=v1 -- <pathspec>`` and return ``{path: line}``.
 
     Skipped (returns ``{}``) if the subprocess fails for any reason;
@@ -302,7 +305,7 @@ def _list_local_paths(repo_root: Path) -> list[str]:
     paths: set[str] = set()
     try:
         proc = _run_git(
-            ["ls-tree", "-r", "HEAD", "--", ".github/workflows/"],
+            ["ls-tree", "-r", "HEAD", "--", _WORKFLOWS_DIR],
             cwd=repo_root,
         )
         if proc.returncode == 0:
@@ -351,7 +354,7 @@ def _list_remote_paths(repo_root: Path, remote: str, default_branch: str | None)
                 "-r",
                 f"{remote}/{default_branch}",
                 "--",
-                ".github/workflows/",
+                _WORKFLOWS_DIR,
             ],
             cwd=repo_root,
         )

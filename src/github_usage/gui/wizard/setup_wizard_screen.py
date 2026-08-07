@@ -30,6 +30,13 @@ from .setup_wizard_flow import (
     validate_secrets,
 )
 
+# Repeated selector/label literals, hoisted to satisfy S1192.
+_WIZ_LOCAL_PICKER = "#wizard-local-picker"
+_WIZ_GA_PICKER = "#wizard-ga-picker"
+_WIZ_ONLY_PUBLIC = "#wizard-only-public"
+_WIZ_ONLY_PRIVATE = "#wizard-only-private"
+_WIZ_VERIFY_LOG = "#wizard-verify-log"
+
 
 class SetupWizardScreen(ModalScreen[bool]):
     """Multi-step first-run and guided setup. Dismisses True when completed."""
@@ -172,13 +179,13 @@ class SetupWizardScreen(ModalScreen[bool]):
         self._data = load_initial_data(paths)
         self._populate_secrets()
         self._populate_options()
-        local_picker = self.query_one("#wizard-local-picker", SchedulePicker)
+        local_picker = self.query_one(_WIZ_LOCAL_PICKER, SchedulePicker)
         local_picker.set_local_schedule(
             self._data.local_weekday,
             self._data.local_hour,
             self._data.local_minute,
         )
-        ga_picker = self.query_one("#wizard-ga-picker", SchedulePicker)
+        ga_picker = self.query_one(_WIZ_GA_PICKER, SchedulePicker)
         ga_picker.set_ga_cron(self._data.ga_cron)
         self._update_progress()
 
@@ -191,8 +198,8 @@ class SetupWizardScreen(ModalScreen[bool]):
         self.query_one("#wizard-consumers", Checkbox).value = self._data.include_consumers
         self.query_one("#wizard-artifact", Checkbox).value = self._data.include_artifact_storage
         self.query_one("#wizard-release", Checkbox).value = self._data.include_release_assets
-        self.query_one("#wizard-only-public", Checkbox).value = self._data.only_public
-        self.query_one("#wizard-only-private", Checkbox).value = self._data.only_private
+        self.query_one(_WIZ_ONLY_PUBLIC, Checkbox).value = self._data.only_public
+        self.query_one(_WIZ_ONLY_PRIVATE, Checkbox).value = self._data.only_private
         self.query_one("#wizard-max-repos", Input).value = str(self._data.max_repos)
         self.query_one("#wizard-email-format", Select).value = self._data.email_format
         self.query_one("#wizard-target-email", Input).value = self._data.target_email
@@ -213,14 +220,14 @@ class SetupWizardScreen(ModalScreen[bool]):
         self._data.include_consumers = self.query_one("#wizard-consumers", Checkbox).value
         self._data.include_artifact_storage = self.query_one("#wizard-artifact", Checkbox).value
         self._data.include_release_assets = self.query_one("#wizard-release", Checkbox).value
-        self._data.only_public = self.query_one("#wizard-only-public", Checkbox).value
-        self._data.only_private = self.query_one("#wizard-only-private", Checkbox).value
+        self._data.only_public = self.query_one(_WIZ_ONLY_PUBLIC, Checkbox).value
+        self._data.only_private = self.query_one(_WIZ_ONLY_PRIVATE, Checkbox).value
         fmt = self.query_one("#wizard-email-format", Select).value
         self._data.email_format = str(fmt) if fmt in ("text", "html") else "text"
         self._data.target_email = self.query_one("#wizard-target-email", Input).value.strip()
 
     def _read_local_from_form(self) -> bool:
-        local = self.query_one("#wizard-local-picker", SchedulePicker).get_local_schedule()
+        local = self.query_one(_WIZ_LOCAL_PICKER, SchedulePicker).get_local_schedule()
         if local is None:
             return False
         self._data.local_weekday = local.weekday
@@ -229,7 +236,7 @@ class SetupWizardScreen(ModalScreen[bool]):
         return True
 
     def _read_ga_from_form(self) -> bool:
-        cron = self.query_one("#wizard-ga-picker", SchedulePicker).get_ga_cron()
+        cron = self.query_one(_WIZ_GA_PICKER, SchedulePicker).get_ga_cron()
         if cron is None:
             return False
         self._data.ga_cron = cron
@@ -275,9 +282,9 @@ class SetupWizardScreen(ModalScreen[bool]):
     @on(Checkbox.Changed, "#wizard-only-public, #wizard-only-private")
     def _toggle_wizard_visibility_filters(self, event: Checkbox.Changed) -> None:
         if event.checkbox.id == "wizard-only-public" and event.value:
-            self.query_one("#wizard-only-private", Checkbox).value = False
+            self.query_one(_WIZ_ONLY_PRIVATE, Checkbox).value = False
         elif event.checkbox.id == "wizard-only-private" and event.value:
-            self.query_one("#wizard-only-public", Checkbox).value = False
+            self.query_one(_WIZ_ONLY_PUBLIC, Checkbox).value = False
 
     @on(Button.Pressed, "#wizard-cancel")
     def _cancel_wizard(self) -> None:
@@ -316,7 +323,7 @@ class SetupWizardScreen(ModalScreen[bool]):
 
     def _validate_and_save_current_step(self) -> str | None:
         paths = self.app.app_state.paths  # type: ignore[attr-defined]
-        log = self.query_one("#wizard-verify-log", RichLog)
+        log = self.query_one(_WIZ_VERIFY_LOG, RichLog)
 
         if self._step == 1:
             self._read_secrets_from_form()
@@ -341,7 +348,7 @@ class SetupWizardScreen(ModalScreen[bool]):
                 write_log(log, format_error(exc), level="error")
                 return str(exc)
         elif self._step == 3:
-            picker = self.query_one("#wizard-local-picker", SchedulePicker)
+            picker = self.query_one(_WIZ_LOCAL_PICKER, SchedulePicker)
             error = picker.validate()
             if error:
                 write_log(log, error, level="error")
@@ -354,7 +361,7 @@ class SetupWizardScreen(ModalScreen[bool]):
                 write_log(log, format_error(exc), level="error")
                 return str(exc)
         elif self._step == 4:
-            picker = self.query_one("#wizard-ga-picker", SchedulePicker)
+            picker = self.query_one(_WIZ_GA_PICKER, SchedulePicker)
             error = picker.validate()
             if error:
                 write_log(log, error, level="error")
@@ -372,7 +379,7 @@ class SetupWizardScreen(ModalScreen[bool]):
         if self._verifying:
             return
         self._verifying = True
-        log = self.query_one("#wizard-verify-log", RichLog)
+        log = self.query_one(_WIZ_VERIFY_LOG, RichLog)
         log.clear()
         write_log(log, "Running email-report dry-run...", level="progress")
         self._run_verify_worker()
@@ -385,7 +392,7 @@ class SetupWizardScreen(ModalScreen[bool]):
             self._data.verify_result = result
 
             def _report() -> None:
-                log = self.query_one("#wizard-verify-log", RichLog)
+                log = self.query_one(_WIZ_VERIFY_LOG, RichLog)
                 if result.exit_code == 0:
                     write_log(log, "Verify passed", level="success")
                 else:
@@ -397,7 +404,7 @@ class SetupWizardScreen(ModalScreen[bool]):
 
             def _report_error() -> None:
                 write_log(
-                    self.query_one("#wizard-verify-log", RichLog),
+                    self.query_one(_WIZ_VERIFY_LOG, RichLog),
                     format_error(err, context="Verify failed"),
                     level="error",
                 )
@@ -408,7 +415,7 @@ class SetupWizardScreen(ModalScreen[bool]):
 
     def _finish(self) -> None:
         paths = self.app.app_state.paths  # type: ignore[attr-defined]
-        log = self.query_one("#wizard-verify-log", RichLog)
+        log = self.query_one(_WIZ_VERIFY_LOG, RichLog)
         if sys.platform == "darwin":
             install_box = self.query_one("#wizard-install-la", Checkbox)
             if install_box.value:
