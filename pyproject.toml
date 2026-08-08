@@ -30,8 +30,10 @@ dev = [
   "bandit>=1.7.10",
   "basedpyright>=1.30",
   "black>=24.0",
+  "coverage>=7.0",
   "pip-audit>=2.7",
   "pre-commit>=3.7",
+  "radon>=6.0",
   "ruff>=0.6",
 ]
 # Export-format optional dependencies. PEP 621 does not support nested extras,

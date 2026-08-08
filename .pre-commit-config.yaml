@@ -50,3 +50,17 @@ repos:
         stages: [pre-push]
         always_run: true
         pass_filenames: false
+      - id: coverage-check
+        name: Coverage check (fail-under 82%)
+        entry: scripts/coverage-check
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
+      - id: check-complexity
+        name: Complexity and module size guard
+        entry: scripts/check-complexity
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false

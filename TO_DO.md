@@ -8,8 +8,6 @@
   - absolute local paths (e.g. `/Users/`, `C:\`, `/tmp/`, `/var/`)
   - unredacted report output in **email bodies (plain-text + HTML)**, **text**, and **PDF** exports — email is the main gap today (`redact.py` covers file exports only, not email bodies; PDF output needs verification), plus generated report artifacts in any format (`.json`, `.txt`, `.pdf`, `.xlsx`, `.csv`)
 - [ ] Add a dependency/vulnerability CI step: run `pip-audit` (already a `[dev]` dep, currently only invoked implicitly via `scripts/security`) as an explicit always-failing job in `.github/workflows/security.yml`.
-- [ ] Add a code-complexity pre-commit hook (e.g. `xenon`/`radon` or ruff `C901`/`mccabe`) with a project-appropriate threshold, and fail CI on violations (watch `cli_runs.py` at 534 lines and `setup_config.py` at 507).
-- [ ] Add a coverage CI job: a new `scripts/coverage` (or extend `scripts/check`) using `coverage.py`, enforce a baseline threshold that ratchets up, and gate PRs on it.
 - [ ] Add tests for the above: content-check unit tests with absolute-path/report-artifact fixtures, redaction coverage for email/PDF output, and the dependency/complexity/coverage gates' behavior.
 - [ ] Add an inventoried `scripts/sonarqube` helper that runs a local SonarQube scan (Docker `sonarqube` container + `sonar-scanner`, token via env var, output under `tmp/` or `reports/`), documented in the README scripts section and `docs/repo-harness-guidance.md` alongside `scripts/security`.
 
