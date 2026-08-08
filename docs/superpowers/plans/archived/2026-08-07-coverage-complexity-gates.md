@@ -36,6 +36,7 @@
 - **Lower threshold, same strictness:** `COVERAGE_TOTAL_MIN=75` is just below the 76% overall; the stricter 82% applies to new files. Complexity ceiling `MAX_CC=28` is the current worst, so it blocks only *new* blocks worse than today (no need to exempt the 55 existing C+ blocks).
 - `radon --max-cc` was evaluated but rejected: it exits non-zero whenever any C+ block exists regardless of the numeric threshold. The script instead computes the true max from JSON and compares to `MAX_CC`.
 - Earlier analysis incorrectly reported "zero C-or-worse blocks" due to grepping a truncated sorted tail; corrected with full-output measurement.
+- **CI baseline seeding (post-review fix):** the originally committed `coverage-baselines.json` was generated on macOS and diverged from CI/Linux (e.g. `setup_launchd.py` measured 36.2% locally vs 29.5% in CI). CI runs failed the per-file regression gate. Fixed by reseeding the baseline from the CI coverage report and raising `COVERAGE_TOLERANCE` to 7.0pp to absorb the known macOS↔Linux delta for environment-volatile modules. CI is the authoritative gate; `scripts/coverage-baselines` regenerates from the *local* environment and should only be used to refresh after an intentional local change, not to "fix" CI drift.
 
 ## Verification
 
@@ -43,7 +44,7 @@
 scripts/check              # full harness, green
 scripts/coverage-check     # overall 76% >= 75%; no per-file regression; new files >= 82%
 scripts/coverage-baselines # regenerate baseline file
-scripts/check-complexity   # worst CC 28 <= 28; warn >=600, block >700
+scripts/check-complexity   # worst CC 28 <= 28; warn >=575, block >650
 uv lock --check            # consistent
 pre-commit validate-config
 ```

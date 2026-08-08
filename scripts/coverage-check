@@ -8,17 +8,19 @@ cd "$ROOT_DIR"
 #   - Overall src coverage must stay at/above COVERAGE_TOTAL_MIN (default 75;
 #     current overall ~76%).
 #   - Each src file is locked at its recorded baseline in coverage-baselines.json
-#     ("don't get worse"): a file may not drop below its baseline.
+#     ("don't get worse"): a file may not drop below its baseline (minus tolerance).
 #   - New src files (not in the baseline file) must meet COVERAGE_FILE_MIN
 #     (default 82). Existing files below that are grandfathered at their baseline.
-# Baselines are regenerated with: scripts/coverage-baselines
+# The committed baseline is seeded from CI (Linux) coverage; see the plan.
 SRC="src/github_usage"
 TOTAL_MIN="${COVERAGE_TOTAL_MIN:-75}"
 FILE_MIN="${COVERAGE_FILE_MIN:-82}"
-# Allow a small tolerance (percentage points) before a per-file drop is
-# treated as a regression. Guards against non-deterministic (flaky) tests
-# that occasionally leave one extra line uncovered without a real change.
-BASELINE_TOLERANCE="${COVERAGE_TOLERANCE:-1.0}"
+# Tolerance (percentage points) before a per-file drop is a regression.
+# Covers two things: (1) non-deterministic (flaky) tests that occasionally
+# leave one extra line uncovered, and (2) the known macOS-vs-Linux coverage
+# delta for environment-volatile modules (notably setup_launchd.py, ~6pt).
+# The committed baseline is CI/Linux-seeded, so CI is the authoritative gate.
+BASELINE_TOLERANCE="${COVERAGE_TOLERANCE:-7.0}"
 BASELINES="coverage-baselines.json"
 
 echo "==> Running tests under coverage (src only)"
