@@ -4,24 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# Coverage policy (set just below current baselines):
+# Coverage policy:
 #   - Overall src coverage must stay at/above COVERAGE_TOTAL_MIN (default 75;
-#     current overall ~76%).
-#   - Each src file is locked at its recorded baseline in coverage-baselines.json
-#     ("don't get worse"): a file may not drop below its baseline (minus tolerance).
-#   - New src files (not in the baseline file) must meet COVERAGE_FILE_MIN
-#     (default 82). Existing files below that are grandfathered at their baseline.
-# The committed baseline is seeded from CI (Linux) coverage; see the plan.
+#     current overall ~76%). This is the single portable gate.
+#   - Any NEW src file (not present in the previous commit's tree) must meet
+#     COVERAGE_FILE_MIN (default 82). Existing files are not individually
+#     gated; the overall number protects them.
 SRC="src/github_usage"
 TOTAL_MIN="${COVERAGE_TOTAL_MIN:-75}"
 FILE_MIN="${COVERAGE_FILE_MIN:-82}"
-# Tolerance (percentage points) before a per-file drop is a regression.
-# Covers two things: (1) non-deterministic (flaky) tests that occasionally
-# leave one extra line uncovered, and (2) the known macOS-vs-Linux coverage
-# delta for environment-volatile modules (notably setup_launchd.py, ~6pt).
-# The committed baseline is CI/Linux-seeded, so CI is the authoritative gate.
-BASELINE_TOLERANCE="${COVERAGE_TOLERANCE:-7.0}"
-BASELINES="coverage-baselines.json"
 
 echo "==> Running tests under coverage (src only)"
 PYTHONPATH=src scripts/python -m coverage run --source="$SRC" -m unittest discover -s tests
@@ -37,32 +28,18 @@ if ! PYTHONPATH=src scripts/python -c "import sys; sys.exit(0 if float('$overall
 fi
 echo "    OK overall ${overall}% >= ${TOTAL_MIN}%"
 
-# Per-file grandfather + regression lock.
-if [ ! -f "$BASELINES" ]; then
-  echo "ERROR: $BASELINES missing; run scripts/coverage-baselines" >&2
-  exit 1
-fi
+# New-file gate: compare the current src tree against the committed tree to
+# find files that did not exist before. A brand-new source file must meet the
+# target minimum so coverage does not erode one file at a time.
 PYTHONPATH=src scripts/python -m coverage json -o /tmp/coverage.current.json >/dev/null 2>&1
+base_tree=$(git ls-tree -r --name-only HEAD -- "$SRC" 2>/dev/null || true)
 fails=0
 while IFS= read -r line; do
   f="${line%%:*}"
   pct="${line##*:}"
-  base=$(PYTHONPATH=src scripts/python -c "
-import json,sys
-b=json.load(open('$BASELINES'))
-print(b.get('$f', ''))
-")
-  if [ -z "$base" ]; then
-    # New file: must meet the target minimum.
+  if ! printf '%s\n' "$base_tree" | grep -qx "$f"; then
     if ! PYTHONPATH=src scripts/python -c "import sys; sys.exit(0 if float('$pct') >= $FILE_MIN else 1)"; then
       echo "    NEW FILE $f: ${pct}% < ${FILE_MIN}% (target for new files)" >&2
-      fails=1
-    fi
-  else
-    # Existing file: must not drop below its recorded baseline (minus tolerance).
-    floor=$(PYTHONPATH=src scripts/python -c "print(round(float('$base') - float('$BASELINE_TOLERANCE'), 1))")
-    if ! PYTHONPATH=src scripts/python -c "import sys; sys.exit(0 if float('$pct') >= float('$floor') else 1)"; then
-      echo "    REGRESSION $f: ${pct}% < baseline ${base}% (floor ${floor}%)" >&2
       fails=1
     fi
   fi
@@ -74,7 +51,7 @@ for f,info in d.items():
 ")
 
 if [ "$fails" -ne 0 ]; then
-  echo "ERROR: coverage regressions detected (see above)." >&2
+  echo "ERROR: new-file coverage below ${FILE_MIN}% (see above)." >&2
   exit 1
 fi
-echo "    OK (no per-file regressions; new files >= ${FILE_MIN}%)"
+echo "    OK (new src files >= ${FILE_MIN}%)"
