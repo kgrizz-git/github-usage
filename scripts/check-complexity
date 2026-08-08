@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+# Complexity & module-size policy (thresholds set at current baselines):
+#   - Cyclomatic complexity: the worst existing block is 28
+#     (setup_wizard._manage_profiles). Any block exceeding MAX_CC fails.
+#     (No grandfather list needed: 28 is already the current max, so this
+#     blocks any new block worse than what exists today.)
+#   - Module size: WARN at WARN_LINES (default 575) but only BLOCK at
+#     BLOCK_LINES (default 650). Current largest module is 562 lines.
+# Run with: scripts/check-complexity
+
+MAX_CC="${MAX_CC:-28}"
+WARN_LINES="${WARN_LINES:-575}"
+BLOCK_LINES="${BLOCK_LINES:-650}"
+
+echo "==> Cyclomatic complexity (worst block must not exceed ${MAX_CC})"
+cc_json="$(PYTHONPATH=src scripts/python -m radon cc src/github_usage --json 2>/dev/null)"
+actual="$(printf '%s' "$cc_json" | scripts/python -c "
+import json,sys
+d=json.load(sys.stdin)
+mx=max((b.get('complexity',0) for bs in d.values() for b in bs), default=0)
+print(mx)
+")"
+if [ "$actual" -gt "$MAX_CC" ]; then
+  echo "ERROR: worst cyclomatic complexity is ${actual}, exceeds ${MAX_CC}." >&2
+  echo "       Current C-rank-or-worse blocks:" >&2
+  PYTHONPATH=src scripts/python -m radon cc src/github_usage -s 2>/dev/null \
+    | grep -E "\b[C-F] \(" >&2
+  exit 1
+fi
+echo "    OK (worst block = ${actual} <= ${MAX_CC})"
+
+echo "==> Module size (warn >= ${WARN_LINES}, block > ${BLOCK_LINES})"
+blocked=0
+warned=0
+while IFS= read -r line; do
+  file="${line%%:*}"
+  n="${line##*:}"
+  if [ "$n" -gt "$BLOCK_LINES" ]; then
+    echo "    BLOCK $file: ${n} lines (> ${BLOCK_LINES})" >&2
+    blocked=1
+  elif [ "$n" -ge "$WARN_LINES" ]; then
+    echo "    WARN  $file: ${n} lines (>= ${WARN_LINES})" >&2
+    warned=1
+  fi
+done < <(wc -l src/github_usage/*.py | sed '$d' | awk '{print $2":"$1}')
+if [ "$blocked" -ne 0 ]; then
+  echo "ERROR: source modules exceed ${BLOCK_LINES} lines" >&2
+  exit 1
+fi
+if [ "$warned" -ne 0 ]; then
+  echo "    (warnings above; not blocking)"
+fi
+echo "    OK (no module over ${BLOCK_LINES} lines)"

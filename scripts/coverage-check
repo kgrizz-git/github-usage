@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+# Coverage policy (set just below current baselines):
+#   - Overall src coverage must stay at/above COVERAGE_TOTAL_MIN (default 75;
+#     current overall ~76%).
+#   - Each src file is locked at its recorded baseline in coverage-baselines.json
+#     ("don't get worse"): a file may not drop below its baseline.
+#   - New src files (not in the baseline file) must meet COVERAGE_FILE_MIN
+#     (default 82). Existing files below that are grandfathered at their baseline.
+# Baselines are regenerated with: scripts/coverage-baselines
+SRC="src/github_usage"
+TOTAL_MIN="${COVERAGE_TOTAL_MIN:-75}"
+FILE_MIN="${COVERAGE_FILE_MIN:-82}"
+# Allow a small tolerance (percentage points) before a per-file drop is
+# treated as a regression. Guards against non-deterministic (flaky) tests
+# that occasionally leave one extra line uncovered without a real change.
+BASELINE_TOLERANCE="${COVERAGE_TOLERANCE:-1.0}"
+BASELINES="coverage-baselines.json"
+
+echo "==> Running tests under coverage (src only)"
+PYTHONPATH=src scripts/python -m coverage run --source="$SRC" -m unittest discover -s tests
+
+echo "==> Coverage report"
+PYTHONPATH=src scripts/python -m coverage report
+
+# Overall gate.
+overall=$(PYTHONPATH=src scripts/python -m coverage report --format=total | tail -1)
+if ! PYTHONPATH=src scripts/python -c "import sys; sys.exit(0 if float('$overall') >= $TOTAL_MIN else 1)"; then
+  echo "ERROR: overall src coverage ${overall}% is below minimum ${TOTAL_MIN}%." >&2
+  exit 1
+fi
+echo "    OK overall ${overall}% >= ${TOTAL_MIN}%"
+
+# Per-file grandfather + regression lock.
+if [ ! -f "$BASELINES" ]; then
+  echo "ERROR: $BASELINES missing; run scripts/coverage-baselines" >&2
+  exit 1
+fi
+PYTHONPATH=src scripts/python -m coverage json -o /tmp/coverage.current.json >/dev/null 2>&1
+fails=0
+while IFS= read -r line; do
+  f="${line%%:*}"
+  pct="${line##*:}"
+  base=$(PYTHONPATH=src scripts/python -c "
+import json,sys
+b=json.load(open('$BASELINES'))
+print(b.get('$f', ''))
+")
+  if [ -z "$base" ]; then
+    # New file: must meet the target minimum.
+    if ! PYTHONPATH=src scripts/python -c "import sys; sys.exit(0 if float('$pct') >= $FILE_MIN else 1)"; then
+      echo "    NEW FILE $f: ${pct}% < ${FILE_MIN}% (target for new files)" >&2
+      fails=1
+    fi
+  else
+    # Existing file: must not drop below its recorded baseline (minus tolerance).
+    floor=$(PYTHONPATH=src scripts/python -c "print(round(float('$base') - float('$BASELINE_TOLERANCE'), 1))")
+    if ! PYTHONPATH=src scripts/python -c "import sys; sys.exit(0 if float('$pct') >= float('$floor') else 1)"; then
+      echo "    REGRESSION $f: ${pct}% < baseline ${base}% (floor ${floor}%)" >&2
+      fails=1
+    fi
+  fi
+done < <(PYTHONPATH=src scripts/python -c "
+import json
+d=json.load(open('/tmp/coverage.current.json'))['files']
+for f,info in d.items():
+    print(f'{f}:{round(info[\"summary\"][\"percent_covered\"],1)}')
+")
+
+if [ "$fails" -ne 0 ]; then
+  echo "ERROR: coverage regressions detected (see above)." >&2
+  exit 1
+fi
+echo "    OK (no per-file regressions; new files >= ${FILE_MIN}%)"

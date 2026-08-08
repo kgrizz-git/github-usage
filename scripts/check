@@ -32,4 +32,10 @@ scripts/typecheck
 echo "==> Backup policy"
 scripts/check-backups
 
+echo "==> Coverage"
+scripts/coverage-check
+
+echo "==> Complexity and module size"
+scripts/check-complexity
+
 echo "check passed"
