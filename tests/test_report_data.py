@@ -3,6 +3,102 @@ from unittest import mock
 
 from tests._fakes import FakeAPI
 
+_PRIVATE_REPO = {
+    "full_name": "octocat/private-repo",
+    "owner": {"login": "octocat"},
+    "name": "private-repo",
+    "visibility": "private",
+}
+
+_PUBLIC_REPO = {
+    "full_name": "octocat/public-repo",
+    "owner": {"login": "octocat"},
+    "name": "public-repo",
+    "visibility": "public",
+}
+
+_TWO_REPOS = (_PRIVATE_REPO, _PUBLIC_REPO)
+
+_PRIVATE_ROW = {
+    "repo": "octocat/private-repo",
+    "minutes": 1000.0,
+    "storage_gb_hours": 0.0,
+    "avg_mb": 0.0,
+    "gross": 0.0,
+    "sku": {},
+    "visibility": "private",
+}
+
+_PUBLIC_ROW = {
+    "repo": "octocat/public-repo",
+    "minutes": 500.0,
+    "storage_gb_hours": 0.0,
+    "avg_mb": 0.0,
+    "gross": 0.0,
+    "sku": {},
+    "visibility": "public",
+}
+
+_DEFAULT_FAKE_ROWS = (_PRIVATE_ROW, _PUBLIC_ROW)
+
+_DEFAULT_KWARGS = {
+    "include_actions": True,
+    "include_copilot": False,
+    "include_lfs": False,
+    "include_consumers": False,
+    "include_artifact_storage": False,
+    "include_release_assets": False,
+    "max_repos": 100,
+    "warn_over": None,
+}
+
+
+def _make_billing_api(
+    actions_items=None,
+    copilot_items=None,
+    premium_items=None,
+    lfs_items=None,
+    rate_limit=None,
+    pages=None,
+    omit=(),
+):
+    """Return a FakeAPI pre-loaded with standard billing endpoints.
+
+    Pass ``omit=("actions",)`` to exclude the Actions endpoint.
+    """
+    responses = {}
+    default_rate = {"resources": {"core": {"limit": 5000, "remaining": 4900}}}
+
+    if "actions" not in omit:
+        responses[
+            ("GET", "/users/octocat/settings/billing/usage/summary", (("product", "Actions"),))
+        ] = {"usageItems": actions_items or []}
+
+    if "copilot" not in omit:
+        responses[
+            ("GET", "/users/octocat/settings/billing/usage/summary", (("product", "Copilot"),))
+        ] = {"usageItems": copilot_items or []}
+        responses[
+            (
+                "GET",
+                "/users/octocat/settings/billing/premium_request/usage",
+                (("product", "copilot"),),
+            )
+        ] = {"usageItems": premium_items or []}
+
+    if "lfs" not in omit:
+        responses[
+            ("GET", "/users/octocat/settings/billing/usage/summary", (("product", "git_lfs"),))
+        ] = {"usageItems": lfs_items or []}
+
+    if "rate_limit" not in omit:
+        responses[("GET", "/rate_limit", ())] = rate_limit or default_rate
+
+    return FakeAPI(
+        request_responses=responses,
+        pages_responses=pages or {},
+    )
+
 
 class ReportDataTests(unittest.TestCase):
     def test_build_report_data_captures_partial_endpoint_failure(self):
@@ -305,58 +401,18 @@ class ReportDataTests(unittest.TestCase):
     def test_consumers_enabled_reuses_rows_for_visibility_split(self):
         from github_usage.report_data import build_report_data
 
-        repos = [
-            {
-                "full_name": "octocat/private-repo",
-                "owner": {"login": "octocat"},
-                "name": "private-repo",
-                "visibility": "private",
-            },
-            {
-                "full_name": "octocat/public-repo",
-                "owner": {"login": "octocat"},
-                "name": "public-repo",
-                "visibility": "public",
-            },
-        ]
-        api = FakeAPI(
-            request_responses={
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Actions"),),
-                ): {
-                    "usageItems": [
-                        {
-                            "sku": "actions_linux",
-                            "unitType": "minutes",
-                            "grossQuantity": 1500.0,
-                            "grossAmount": 0.0,
-                            "discountAmount": 0.0,
-                            "netAmount": 0.0,
-                        }
-                    ],
-                },
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/premium_request/usage",
-                    (("product", "copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "git_lfs"),),
-                ): {"usageItems": []},
-                ("GET", "/rate_limit", ()): {
-                    "resources": {"core": {"limit": 5000, "remaining": 4900}}
-                },
-            },
-            pages_responses={"/user/repos": repos},
+        api = _make_billing_api(
+            actions_items=[
+                {
+                    "sku": "actions_linux",
+                    "unitType": "minutes",
+                    "grossQuantity": 1500.0,
+                    "grossAmount": 0.0,
+                    "discountAmount": 0.0,
+                    "netAmount": 0.0,
+                }
+            ],
+            pages={"/user/repos": _TWO_REPOS},
         )
         with (
             mock.patch(
@@ -371,16 +427,7 @@ class ReportDataTests(unittest.TestCase):
             ) as mock_fetch,
         ):
             report = build_report_data(
-                api,
-                "octocat",
-                include_actions=True,
-                include_copilot=False,
-                include_lfs=False,
-                include_consumers=True,
-                include_artifact_storage=False,
-                include_release_assets=False,
-                max_repos=100,
-                warn_over=None,
+                api, "octocat", **{**_DEFAULT_KWARGS, "include_consumers": True}
             )
         actions = report["actions"]
         self.assertEqual(actions["private_minutes"], 1000.0)
@@ -390,139 +437,38 @@ class ReportDataTests(unittest.TestCase):
     def test_actions_only_uses_fetch_repo_actions_table(self):
         from github_usage.report_data import build_report_data
 
-        repos = [
-            {
-                "full_name": "octocat/private-repo",
-                "owner": {"login": "octocat"},
-                "name": "private-repo",
-                "visibility": "private",
-            },
-            {
-                "full_name": "octocat/public-repo",
-                "owner": {"login": "octocat"},
-                "name": "public-repo",
-                "visibility": "public",
-            },
-        ]
-        api = FakeAPI(
-            request_responses={
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Actions"),),
-                ): {
-                    "usageItems": [
-                        {
-                            "sku": "actions_linux",
-                            "unitType": "minutes",
-                            "grossQuantity": 1500.0,
-                            "grossAmount": 0.0,
-                            "discountAmount": 0.0,
-                            "netAmount": 0.0,
-                        }
-                    ],
-                },
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/premium_request/usage",
-                    (("product", "copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "git_lfs"),),
-                ): {"usageItems": []},
-                ("GET", "/rate_limit", ()): {
-                    "resources": {"core": {"limit": 5000, "remaining": 4900}}
-                },
-            },
-            pages_responses={"/user/repos": repos},
+        api = _make_billing_api(
+            actions_items=[
+                {
+                    "sku": "actions_linux",
+                    "unitType": "minutes",
+                    "grossQuantity": 1500.0,
+                    "grossAmount": 0.0,
+                    "discountAmount": 0.0,
+                    "netAmount": 0.0,
+                }
+            ],
+            pages={"/user/repos": _TWO_REPOS},
         )
-        fake_rows = [
-            {
-                "repo": "octocat/private-repo",
-                "minutes": 1000.0,
-                "storage_gb_hours": 0.0,
-                "avg_mb": 0.0,
-                "gross": 0.0,
-                "sku": {},
-                "visibility": "private",
-            },
-            {
-                "repo": "octocat/public-repo",
-                "minutes": 500.0,
-                "storage_gb_hours": 0.0,
-                "avg_mb": 0.0,
-                "gross": 0.0,
-                "sku": {},
-                "visibility": "public",
-            },
-        ]
         with mock.patch(
             "github_usage.report_data.fetch_repo_actions_table",
-            return_value=(fake_rows, {}),
+            return_value=(list(_DEFAULT_FAKE_ROWS), {}),
         ) as mock_fetch:
-            report = build_report_data(
-                api,
-                "octocat",
-                include_actions=True,
-                include_copilot=False,
-                include_lfs=False,
-                include_consumers=False,
-                include_artifact_storage=False,
-                include_release_assets=False,
-                max_repos=100,
-                warn_over=None,
-            )
+            report = build_report_data(api, "octocat", **_DEFAULT_KWARGS)
         actions = report["actions"]
         self.assertEqual(actions["private_minutes"], 1000.0)
         self.assertEqual(actions["public_minutes"], 500.0)
-        mock_fetch.assert_called_once_with(api, repos)
+        mock_fetch.assert_called_once_with(api, _TWO_REPOS)
 
     def test_actions_disabled_skips_per_repo_fetch(self):
         from github_usage.report_data import build_report_data
 
-        api = FakeAPI(
-            request_responses={
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/premium_request/usage",
-                    (("product", "copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "git_lfs"),),
-                ): {"usageItems": []},
-                ("GET", "/rate_limit", ()): {
-                    "resources": {"core": {"limit": 5000, "remaining": 4900}}
-                },
-            },
-        )
+        api = _make_billing_api(omit=("actions",))
         with mock.patch(
             "github_usage.report_data.fetch_repo_actions_table",
         ) as mock_fetch:
             report = build_report_data(
-                api,
-                "octocat",
-                include_actions=False,
-                include_copilot=False,
-                include_lfs=False,
-                include_consumers=False,
-                include_artifact_storage=False,
-                include_release_assets=False,
-                max_repos=100,
-                warn_over=None,
+                api, "octocat", **{**_DEFAULT_KWARGS, "include_actions": False}
             )
         self.assertIsNone(report["actions"])
         mock_fetch.assert_not_called()
@@ -530,79 +476,19 @@ class ReportDataTests(unittest.TestCase):
     def test_consumers_error_falls_back_to_fetch_repo_actions_table(self):
         from github_usage.report_data import build_report_data
 
-        repos = [
-            {
-                "full_name": "octocat/private-repo",
-                "owner": {"login": "octocat"},
-                "name": "private-repo",
-                "visibility": "private",
-            },
-            {
-                "full_name": "octocat/public-repo",
-                "owner": {"login": "octocat"},
-                "name": "public-repo",
-                "visibility": "public",
-            },
-        ]
-        api = FakeAPI(
-            request_responses={
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Actions"),),
-                ): {
-                    "usageItems": [
-                        {
-                            "sku": "actions_linux",
-                            "unitType": "minutes",
-                            "grossQuantity": 1500.0,
-                            "grossAmount": 0.0,
-                            "discountAmount": 0.0,
-                            "netAmount": 0.0,
-                        }
-                    ],
-                },
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/premium_request/usage",
-                    (("product", "copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "git_lfs"),),
-                ): {"usageItems": []},
-                ("GET", "/rate_limit", ()): {
-                    "resources": {"core": {"limit": 5000, "remaining": 4900}}
-                },
-            },
-            pages_responses={"/user/repos": repos},
+        api = _make_billing_api(
+            actions_items=[
+                {
+                    "sku": "actions_linux",
+                    "unitType": "minutes",
+                    "grossQuantity": 1500.0,
+                    "grossAmount": 0.0,
+                    "discountAmount": 0.0,
+                    "netAmount": 0.0,
+                }
+            ],
+            pages={"/user/repos": _TWO_REPOS},
         )
-        fake_rows = [
-            {
-                "repo": "octocat/private-repo",
-                "minutes": 1000.0,
-                "storage_gb_hours": 0.0,
-                "avg_mb": 0.0,
-                "gross": 0.0,
-                "sku": {},
-                "visibility": "private",
-            },
-            {
-                "repo": "octocat/public-repo",
-                "minutes": 500.0,
-                "storage_gb_hours": 0.0,
-                "avg_mb": 0.0,
-                "gross": 0.0,
-                "sku": {},
-                "visibility": "public",
-            },
-        ]
         with (
             mock.patch(
                 "github_usage.report_data.get_repo_consumers",
@@ -610,104 +496,39 @@ class ReportDataTests(unittest.TestCase):
             ),
             mock.patch(
                 "github_usage.report_data.fetch_repo_actions_table",
-                return_value=(fake_rows, {}),
+                return_value=(list(_DEFAULT_FAKE_ROWS), {}),
             ) as mock_fetch,
         ):
             report = build_report_data(
-                api,
-                "octocat",
-                include_actions=True,
-                include_copilot=False,
-                include_lfs=False,
-                include_consumers=True,
-                include_artifact_storage=False,
-                include_release_assets=False,
-                max_repos=100,
-                warn_over=None,
+                api, "octocat", **{**_DEFAULT_KWARGS, "include_consumers": True}
             )
         actions = report["actions"]
         self.assertEqual(actions["private_minutes"], 1000.0)
         self.assertEqual(actions["public_minutes"], 500.0)
-        mock_fetch.assert_called_once_with(api, repos)
+        mock_fetch.assert_called_once_with(api, _TWO_REPOS)
 
     def test_only_public_passes_through_to_visibility_split(self):
         from github_usage.report_data import build_report_data
 
-        repos = [
-            {
-                "full_name": "octocat/public-repo",
-                "owner": {"login": "octocat"},
-                "name": "public-repo",
-                "visibility": "public",
-            },
-        ]
-        api = FakeAPI(
-            request_responses={
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Actions"),),
-                ): {
-                    "usageItems": [
-                        {
-                            "sku": "actions_linux",
-                            "unitType": "minutes",
-                            "grossQuantity": 500.0,
-                            "grossAmount": 0.0,
-                            "discountAmount": 0.0,
-                            "netAmount": 0.0,
-                        }
-                    ],
-                },
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "Copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/premium_request/usage",
-                    (("product", "copilot"),),
-                ): {"usageItems": []},
-                (
-                    "GET",
-                    "/users/octocat/settings/billing/usage/summary",
-                    (("product", "git_lfs"),),
-                ): {"usageItems": []},
-                ("GET", "/rate_limit", ()): {
-                    "resources": {"core": {"limit": 5000, "remaining": 4900}}
-                },
-            },
-            pages_responses={"/user/repos": repos},
+        api = _make_billing_api(
+            actions_items=[
+                {
+                    "sku": "actions_linux",
+                    "unitType": "minutes",
+                    "grossQuantity": 500.0,
+                    "grossAmount": 0.0,
+                    "discountAmount": 0.0,
+                    "netAmount": 0.0,
+                }
+            ],
+            pages={"/user/repos": (_PUBLIC_REPO,)},
         )
-        fake_rows = [
-            {
-                "repo": "octocat/public-repo",
-                "minutes": 500.0,
-                "storage_gb_hours": 0.0,
-                "avg_mb": 0.0,
-                "gross": 0.0,
-                "sku": {},
-                "visibility": "public",
-            },
-        ]
+        public_row = {**_PUBLIC_ROW, "minutes": 500.0}
         with mock.patch(
             "github_usage.report_data.fetch_repo_actions_table",
-            return_value=(fake_rows, {}),
+            return_value=([public_row], {}),
         ):
-            report = build_report_data(
-                api,
-                "octocat",
-                include_actions=True,
-                include_copilot=False,
-                include_lfs=False,
-                include_consumers=False,
-                include_artifact_storage=False,
-                include_release_assets=False,
-                max_repos=100,
-                warn_over=None,
-                only_public=True,
-            )
+            report = build_report_data(api, "octocat", **{**_DEFAULT_KWARGS, "only_public": True})
         self.assertTrue(report["actions"]["filtered"])
         self.assertEqual(report["actions"]["public_minutes"], 500.0)
         self.assertEqual(report["actions"]["private_minutes"], 0.0)
