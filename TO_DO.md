@@ -29,6 +29,8 @@
 - [ ] Refactor `src/github_usage/setup_config.py` (507 lines, over the 500-line limit per `scripts/check-sizes`). Extract a focused submodule — e.g. profile schema/loading (`load_report_profiles`, `find_profile`, `ensure_profiles`, `_default_profile`) and/or the TOML writer helpers (`_emit_*_block`, `write_config`) — to bring the file back under the threshold. Also watch `setup_wizard.py` (461 lines) and the `_manage_profiles()`/`_run_email_report()` functions, which are approaching their limits.
 - [ ] Rename internal `legacy_*` modules/symbols to “local full report” naming (`legacy_report_data` → e.g. `local_report_data`, cache `kind="legacy"`, CLI/TUI internals, tests). User-facing copy already says “local full report”; this is the code rename. Keep a thin `legacy` compatibility shim if external imports still need it.
 
+- [ ] Add tests to raise overall src coverage from the current ~76% to 80%. Update `scripts/coverage-check` default from `COVERAGE_TOTAL_MIN=75` to `80` once achieved.
+
 ## Configuration & Setup
 
 - [ ] Write Windows-compatible PowerShell versions of all scripts (setup, check, smoke, docs-check, etc.).
