@@ -1,6 +1,6 @@
 # Fix: Email report forecast should use private-only quota inputs
 
-> **Status:** IN PROGRESS
+> **Status:** COMPLETE
 
 ## Problem
 
@@ -64,15 +64,17 @@ When `include_consumers=True`, approach 1 reuses the consumers' existing per-rep
 
 ## Tasks
 
-- [ ] Expand `needs_repos` in `build_report_data()` to include `include_actions` so repos are always fetched when the split is needed
-- [ ] Extend `get_repo_consumers()` in `report_optional.py` to return raw per-repo rows (e.g. `_raw_rows` key) for reuse by the split
-- [ ] Add `attach_actions_visibility_split()` call to `build_report_data()` in `report_data.py`, using consumers raw rows when available, falling back to `fetch_repo_actions_table()` when not
-- [ ] Verify `get_key_insights()` and `get_warning_state()` need no changes (they already handle the fallback correctly — the fix just ensures the split keys are present)
-- [ ] Add test: email report path with `include_consumers=True` reuses consumer rows for the split (no duplicate API calls)
-- [ ] Add test: email report path with `include_actions=True` and `include_consumers=False` uses `fetch_repo_actions_table()` for the split
-- [ ] Add test: `include_actions=False` skips the per-repo fetch entirely
-- [ ] Run `scripts/check` and `scripts/smoke`
-- [ ] Update CHANGELOG.md
+- [x] Expand `needs_repos` in `build_report_data()` to include `include_actions` so repos are always fetched when the split is needed
+- [x] Extend `get_repo_consumers()` in `report_optional.py` to return raw per-repo rows (e.g. `_raw_rows` key) for reuse by the split
+- [x] Add `attach_actions_visibility_split()` call to `build_report_data()` in `report_data.py`, using consumers raw rows when available, falling back to `fetch_repo_actions_table()` when not
+- [x] Verify `get_key_insights()` and `get_warning_state()` need no changes (they already handle the fallback correctly — the fix just ensures the split keys are present)
+- [x] Add test: email report path with `include_consumers=True` reuses consumer rows for the split (no duplicate API calls)
+- [x] Add test: email report path with `include_actions=True` and `include_consumers=False` uses `fetch_repo_actions_table()` for the split
+- [x] Add test: `include_actions=False` skips the per-repo fetch entirely
+- [x] Run `scripts/check` and `scripts/smoke`
+- [x] Update CHANGELOG.md
+
+**Done:** 2026-08-10 — All tasks implemented and verified. `scripts/check` and `scripts/smoke` pass.
 
 ## Verification
 

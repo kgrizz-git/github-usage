@@ -53,6 +53,9 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
         **rankings,
         "errors": errors,
         "by_visibility": split_rows_by_visibility(rows, storage_key="storage_avg_mb", sku_key=None),
+        # Used by report_data.build_report_data() to pass per-repo rows to
+        # attach_actions_visibility_split() without duplicate API calls.
+        "_raw_rows": rows,
     }
 
 

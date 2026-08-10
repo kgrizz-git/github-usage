@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Protocol
 
+from .report_actions import fetch_repo_actions_table
 from .report_helpers import fmt_price, gb_hours_to_avg_mb, sanitize_item_amounts
 from .report_optional import (
     estimate_api_request_count,
@@ -13,7 +14,7 @@ from .report_optional import (
     get_repo_consumers,
 )
 from .report_workflow_minutes import workflow_breakdown_for_top_private
-from .usage_split import REPORT_SOURCES
+from .usage_split import REPORT_SOURCES, attach_actions_visibility_split
 from .visibility import filter_repos_by_visibility, repo_visibility, visibility_label
 
 
@@ -335,7 +336,9 @@ def build_report_data(
     errors = {}
     repos: list = []
     truncated = False
-    needs_repos = include_consumers or include_artifact_storage or include_release_assets
+    needs_repos = (
+        include_actions or include_consumers or include_artifact_storage or include_release_assets
+    )
     if needs_repos:
         repos, truncated = _limited_repos(api, max_repos)
         repos = filter_repos_by_visibility(
@@ -391,6 +394,20 @@ def build_report_data(
         errors=errors,
         runs_cache=runs_cache,
     )
+
+    if include_actions and report.get("actions") is not None:
+        consumers_rows = None
+        if include_consumers and report.get("repo_consumers"):
+            consumers_rows = report["repo_consumers"].get("_raw_rows")
+        if consumers_rows is not None:
+            attach_actions_visibility_split(
+                report, consumers_rows, only_public=only_public, only_private=only_private
+            )
+        else:
+            rows, _errors = fetch_repo_actions_table(api, repos)
+            attach_actions_visibility_split(
+                report, rows, only_public=only_public, only_private=only_private
+            )
 
     report["insights"] = get_key_insights(report)
     report["warnings"] = get_warning_state(report, warn_over)
