@@ -42,6 +42,7 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
                 "minutes": float(minutes),
                 "gross": sum(float(item.get("grossAmount", 0.0)) for item in sku.values()),
                 "storage_avg_mb": gb_hours_to_avg_mb(float(storage_gb_hours)),
+                "storage_gb_hours": float(storage_gb_hours),
                 "visibility": repo_visibility(repo),
             }
         )
@@ -53,6 +54,9 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
         **rankings,
         "errors": errors,
         "by_visibility": split_rows_by_visibility(rows, storage_key="storage_avg_mb", sku_key=None),
+        # Used by report_data.build_report_data() to pass per-repo rows to
+        # attach_actions_visibility_split() without duplicate API calls.
+        "_raw_rows": rows,
     }
 
 
@@ -120,6 +124,7 @@ def get_release_asset_details(api, repos: list[dict], max_repos: int = 100) -> d
 
 def estimate_api_request_count(
     repo_count: int,
+    include_actions: bool,
     include_consumers: bool,
     include_artifact_storage: bool,
     include_release_assets: bool,
@@ -129,7 +134,10 @@ def estimate_api_request_count(
 ) -> dict:
     """Estimate the number of additional API requests optional sections will make."""
     repos_considered = min(repo_count, max_repos)
-    per_repo_options = sum([include_consumers, include_artifact_storage, include_release_assets])
+    fallback_actions = include_actions and not include_consumers
+    per_repo_options = sum(
+        [include_consumers, include_artifact_storage, include_release_assets, fallback_actions]
+    )
     estimated = repos_considered * per_repo_options
     if include_consumers:
         estimated += WORKFLOW_MINUTES_REQUEST_HEADROOM

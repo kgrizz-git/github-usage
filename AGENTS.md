@@ -11,6 +11,7 @@
 - Use `./start.sh` as the primary entry point for setup, one-off reports, and email-report configuration.
 - The project uses `pyproject.toml` for all dependency declarations. Do not create a `requirements.txt` unless a specific tool requires it.
 - Do not print, commit, or store real GitHub tokens, raw private API responses, or generated billing reports.
+- **NEVER read or cat** `.env.email-report` or `.sonar_cloud_token` — these files contain sensitive credentials.
 - Tests should use fake tokens, mocks, and fixtures rather than live GitHub API calls.
 - Optional live checks must be gated behind an explicit environment variable.
 
