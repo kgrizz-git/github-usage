@@ -347,6 +347,7 @@ def build_report_data(
     core_limit, core_remaining = _rate_limit(api)
     api_estimate = estimate_api_request_count(
         repo_count=len(repos) + (1 if truncated else 0),
+        include_actions=include_actions,
         include_consumers=include_consumers,
         include_artifact_storage=include_artifact_storage,
         include_release_assets=include_release_assets,
@@ -404,7 +405,8 @@ def build_report_data(
                 report, consumers_rows, only_public=only_public, only_private=only_private
             )
         else:
-            rows, _errors = fetch_repo_actions_table(api, repos)
+            rows, fetch_errors = fetch_repo_actions_table(api, repos)
+            errors.update(fetch_errors)
             attach_actions_visibility_split(
                 report, rows, only_public=only_public, only_private=only_private
             )

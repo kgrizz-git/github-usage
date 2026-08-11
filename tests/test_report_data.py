@@ -155,6 +155,7 @@ class ReportDataTests(unittest.TestCase):
 
         estimate = estimate_api_request_count(
             repo_count=250,
+            include_actions=False,
             include_consumers=True,
             include_artifact_storage=True,
             include_release_assets=True,
@@ -166,6 +167,32 @@ class ReportDataTests(unittest.TestCase):
         self.assertEqual(estimate["repos_considered"], 25)
         self.assertEqual(estimate["estimated_incremental_requests"], 85)
         self.assertEqual(estimate["estimated_percent_of_remaining"], 85.0)
+
+    def test_estimate_includes_actions_fallback_when_consumers_disabled(self):
+        from github_usage.report_data import estimate_api_request_count
+
+        estimate = estimate_api_request_count(
+            repo_count=10,
+            include_actions=True,
+            include_consumers=False,
+            include_artifact_storage=False,
+            include_release_assets=False,
+            max_repos=100,
+        )
+        self.assertEqual(estimate["estimated_incremental_requests"], 10)
+
+    def test_estimate_skips_actions_fallback_when_consumers_enabled(self):
+        from github_usage.report_data import estimate_api_request_count
+
+        estimate = estimate_api_request_count(
+            repo_count=10,
+            include_actions=True,
+            include_consumers=True,
+            include_artifact_storage=False,
+            include_release_assets=False,
+            max_repos=100,
+        )
+        self.assertEqual(estimate["estimated_incremental_requests"], 20)
 
     def test_get_warning_state_handles_missing_monthly_costs(self):
         from github_usage.report_data import get_warning_state
@@ -507,6 +534,18 @@ class ReportDataTests(unittest.TestCase):
         self.assertEqual(actions["public_minutes"], 500.0)
         mock_fetch.assert_called_once_with(api, _TWO_REPOS)
 
+    def test_fallback_fetch_errors_propagated_into_report(self):
+        from github_usage.report_data import build_report_data
+
+        api = _make_billing_api(pages={"/user/repos": _TWO_REPOS})
+        fallback_errors = {"octocat/private-repo": "billing fetch failed"}
+        with mock.patch(
+            "github_usage.report_data.fetch_repo_actions_table",
+            return_value=([_PUBLIC_ROW], fallback_errors),
+        ):
+            report = build_report_data(api, "octocat", **_DEFAULT_KWARGS)
+        self.assertIn("octocat/private-repo", report["errors"])
+
     def test_only_public_passes_through_to_visibility_split(self):
         from github_usage.report_data import build_report_data
 
@@ -521,14 +560,15 @@ class ReportDataTests(unittest.TestCase):
                     "netAmount": 0.0,
                 }
             ],
-            pages={"/user/repos": (_PUBLIC_REPO,)},
+            pages={"/user/repos": _TWO_REPOS},
         )
         public_row = {**_PUBLIC_ROW, "minutes": 500.0}
         with mock.patch(
             "github_usage.report_data.fetch_repo_actions_table",
             return_value=([public_row], {}),
-        ):
+        ) as mock_fetch:
             report = build_report_data(api, "octocat", **{**_DEFAULT_KWARGS, "only_public": True})
+        mock_fetch.assert_called_once_with(api, [_PUBLIC_REPO])
         self.assertTrue(report["actions"]["filtered"])
         self.assertEqual(report["actions"]["public_minutes"], 500.0)
         self.assertEqual(report["actions"]["private_minutes"], 0.0)

@@ -447,6 +447,7 @@ class QuotaEstimateTests(unittest.TestCase):
 
         with_consumers = estimate_api_request_count(
             repo_count=5,
+            include_actions=False,
             include_consumers=True,
             include_artifact_storage=False,
             include_release_assets=False,
@@ -454,6 +455,7 @@ class QuotaEstimateTests(unittest.TestCase):
         )
         without = estimate_api_request_count(
             repo_count=5,
+            include_actions=False,
             include_consumers=False,
             include_artifact_storage=False,
             include_release_assets=False,
