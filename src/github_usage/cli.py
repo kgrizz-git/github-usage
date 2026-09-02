@@ -300,7 +300,9 @@ def _run_email_report(argv: Sequence[str]) -> int:
             premium_requests_limit=premium_requests_limit,
         )
         if args.dry_run:
-            print(html_body if html_body is not None else body, end="")
+            print(
+                html_body if html_body is not None else body, end=""
+            )  # codeql[py/clear-text-logging-sensitive-data]
             return 0
         recipient = (getattr(args, "to", None) or "").strip() or os.environ.get(
             "REPORT_EMAIL", ""

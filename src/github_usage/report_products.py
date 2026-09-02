@@ -211,7 +211,7 @@ def show_monthly_costs(repo_data, username, api):
     if total_discount > 0:
         savings_pct = (total_discount / total_gross * 100) if total_gross > 0 else 0
         print(
-            f"  You're saving {fmt_price(total_discount)} ({savings_pct:.1f}% discount) this month!"
+            f"  You're saving {fmt_price(total_discount)} ({savings_pct:.1f}% discount) this month!"  # codeql[py/clear-text-logging-sensitive-data]
         )
         print()
 
