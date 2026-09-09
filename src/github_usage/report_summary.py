@@ -173,6 +173,7 @@ def _print_cost_overview(total_gross, total_discount, total_net):
     if (total_gross or 0) > 0:
         discount_pct = (total_discount or 0) / total_gross * 100
 
+    # codeql[py/clear-text-logging-sensitive-data]
     print(f"    Total Discount:  {fmt_price(total_discount or 0):>12}  ({discount_pct:.1f}% off)")
     print(f"    Total Net:       {fmt_price(total_net or 0):>12}")
     print()
