@@ -34,8 +34,7 @@ def write(
             premium_requests_limit=premium_requests_limit,
         )
 
-    file_obj.write(
-        body
-    )  # codeql[py/clear-text-logging-sensitive-data] codeql[py/clear-text-storage-sensitive-data]
+    # codeql[py/clear-text-logging-sensitive-data] codeql[py/clear-text-storage-sensitive-data]
+    file_obj.write(body)
     if not body.endswith("\n"):
         file_obj.write("\n")

@@ -302,7 +302,8 @@ def _print_impactful_findings(
         repo_consumers=repo_consumers,
     )
     for i, finding in enumerate(findings[:3], 1):
-        print(f"\n    {i}. {finding}")  # codeql[py/clear-text-logging-sensitive-data]
+        # codeql[py/clear-text-logging-sensitive-data]
+        print(f"\n    {i}. {finding}")
     print()
 
 
