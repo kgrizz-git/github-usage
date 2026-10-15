@@ -456,7 +456,9 @@ Run local security checks:
 scripts/security
 ```
 
-The public GitHub repository also uses GitHub code scanning with CodeQL default setup. The local `Security` workflow covers repository-level checks that can run without uploading SARIF: Gitleaks, `pip-audit`, and Bandit.
+The public GitHub repository also uses GitHub code scanning with CodeQL default setup. The local `Security` workflow covers repository-level checks that can run without uploading SARIF: Gitleaks, `pip-audit`, Bandit, and a zizmor check that fails on GitHub Actions references with known security advisories (including SHA-pinned actions, which Dependabot alerts do not cover).
+
+`scripts/security` audits the full locked dependency set from `uv.lock` (all extras) when `uv` is installed; without `uv` it audits the current Python environment instead.
 
 Run documentation checks:
 
