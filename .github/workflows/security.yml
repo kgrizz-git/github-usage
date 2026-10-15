@@ -37,6 +37,7 @@ jobs:
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+          version: "0.13.1"
       - name: Install Gitleaks
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
@@ -88,10 +89,11 @@ jobs:
               if f["ident"] == "known-vulnerable-actions" and not f.get("ignored")
           ]
           for f in findings:
-              loc = f["locations"][0]
-              path = loc["symbolic"]["key"]["Local"]["verbatim_path"]
-              line = loc["concrete"]["location"]["start_point"]["row"] + 1
-              note = loc["symbolic"].get("annotation", "")
+              loc = (f.get("locations") or [{}])[0]
+              key = loc.get("symbolic", {}).get("key", {})
+              path = key.get("Local", {}).get("verbatim_path", "?") if isinstance(key, dict) else "?"
+              line = loc.get("concrete", {}).get("location", {}).get("start_point", {}).get("row", 0) + 1
+              note = loc.get("symbolic", {}).get("annotation", "")
               print(f"::error file={path},line={line}::{f['desc']}: {note}")
           print(f"{len(findings)} known-vulnerable action reference(s)")
           sys.exit(1 if findings else 0)
