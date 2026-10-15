@@ -23,23 +23,21 @@ else
   fi
 fi
 
-has_runtime_deps="$(python3 - <<'PY'
-import tomllib
-from pathlib import Path
-
-data = tomllib.loads(Path("pyproject.toml").read_text())
-deps = data.get("project", {}).get("dependencies", [])
-print("yes" if deps else "no")
-PY
-)"
-
-if [ "$has_runtime_deps" = "no" ]; then
-  echo "No runtime dependencies declared; skipping pip-audit."
-elif command -v pip-audit >/dev/null 2>&1; then
-  pip-audit --progress-spinner off .
-else
+# All third-party packages live in optional extras ([project].dependencies is
+# empty), so audit the full locked set from uv.lock when uv is available. Fall
+# back to auditing the installed environment rather than skipping the check.
+if ! command -v pip-audit >/dev/null 2>&1; then
   echo "Missing pip-audit. Install dev tools with: python3 -m pip install -e '.[dev]'"
   missing=1
+elif command -v uv >/dev/null 2>&1 && [ -f uv.lock ]; then
+  locked_reqs="$(mktemp)"
+  trap 'rm -f "$locked_reqs"' EXIT
+  echo "==> pip-audit (locked dependencies from uv.lock, all extras)"
+  uv export --frozen --all-extras --no-emit-project --quiet >"$locked_reqs"
+  pip-audit --progress-spinner off --require-hashes --disable-pip -r "$locked_reqs"
+else
+  echo "==> pip-audit (installed environment; install uv to audit uv.lock instead)"
+  pip-audit --progress-spinner off
 fi
 
 if command -v bandit >/dev/null 2>&1; then

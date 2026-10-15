@@ -27,12 +27,75 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install Python security tools
-        # Editable install of this repo's own package; transitive versions are
-        # constrained by pyproject/uv.lock, not resolved freely at CI time.
+        # Editable install of this repo's own package plus the dev tools. pip
+        # resolves these from the pyproject ranges at CI time; uv.lock is NOT
+        # consulted here. The dependency audit itself runs against uv.lock
+        # (via `uv export` in scripts/security), not this ad hoc environment.
         run: python -m pip install -e '.[dev]'  # NOSONAR
+      - name: Install uv
+        # Lets scripts/security export and audit the locked set in uv.lock.
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+          version: "0.13.1"
       - name: Install Gitleaks
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run repository security script
         run: GITHUB_USAGE_SKIP_GITLEAKS=1 scripts/security
+
+  # Dependabot alerts are never raised for actions pinned by commit SHA (only
+  # for semver tags), so check pinned actions against GitHub's advisory
+  # database here. zizmor resolves each SHA to its release tag. Only the
+  # known-vulnerable-actions audit fails the job; other zizmor findings are
+  # out of scope for this check.
+  vulnerable-actions:
+    name: Known-vulnerable actions (zizmor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install zizmor
+        run: "pip install --only-binary=:all: zizmor==1.31.0"
+      - name: Check actions against GitHub security advisories
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then echo "::error::GH_TOKEN is empty; zizmor would skip its online audits"; exit 1; fi
+          set +e
+          zizmor --format=json . > "$RUNNER_TEMP/zizmor.json"
+          rc=$?
+          set -e
+          # 0 = no findings, 10-14 = findings by severity; anything else
+          # (e.g. 1) means the audit itself failed, which must not pass.
+          if [ "$rc" -ne 0 ] && { [ "$rc" -lt 10 ] || [ "$rc" -gt 14 ]; }; then
+            echo "::error::zizmor failed (exit $rc)"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          findings = [
+              f for f in json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "zizmor.json")))
+              if f["ident"] == "known-vulnerable-actions" and not f.get("ignored")
+          ]
+          for f in findings:
+              loc = (f.get("locations") or [{}])[0]
+              key = loc.get("symbolic", {}).get("key", {})
+              path = key.get("Local", {}).get("verbatim_path", "?") if isinstance(key, dict) else "?"
+              line = loc.get("concrete", {}).get("location", {}).get("start_point", {}).get("row", 0) + 1
+              note = loc.get("symbolic", {}).get("annotation", "")
+              print(f"::error file={path},line={line}::{f['desc']}: {note}")
+          print(f"{len(findings)} known-vulnerable action reference(s)")
+          sys.exit(1 if findings else 0)
+          PY
