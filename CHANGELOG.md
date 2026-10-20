@@ -27,6 +27,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- Schedule routine Dependabot version updates for Python (uv) and GitHub Actions on the 10th of each month at 3 PM America/New_York (including daylight saving time). Security alerts and security updates remain enabled independently of this schedule.
 - **Dependabot now uses the `uv` ecosystem** (was `pip`, which never updated `uv.lock`). Both the `uv` and `github-actions` entries add a 7-day `cooldown` and group updates: one PR for routine minor+patch version updates and one for security updates, to cut down on separate (and often red) PRs.
 - **`Security` workflow comment corrected:** the `pip install -e '.[dev]'` step resolves from `pyproject.toml` ranges at CI time and does not use `uv.lock`; the comment previously claimed otherwise. The job now installs `uv` (`astral-sh/setup-uv`, SHA-pinned) so the audit can read the lockfile.
 - **Refactored reporting functions** (export CSV, rate limits, OS breakdown, report data fetching, base-cost and summary rendering) into smaller helpers to cut cognitive complexity and clear SonarCloud S3776 high-severity issues (batch 1/4).
@@ -47,6 +48,8 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- Update locked certifi to 2026.10.19 to remove the compromised emSign CA trust material identified by Dependabot alert #18.
+- Isolate backup-policy test repositories from inherited Git hook environment variables so pre-push checks cannot stage fixtures in the real worktree index.
 - **zizmor report written outside the checkout:** in `security.yml`'s known-vulnerable-actions step, the zizmor JSON report is now written to `$RUNNER_TEMP` instead of the checkout, so a PR that commits a `zizmor.json` symlink cannot make the shell redirect truncate a workflow file before zizmor scans it (hiding a vulnerable action).
 - **`pip-audit` never ran:** `scripts/security` skipped the dependency audit because `[project].dependencies` is empty, even though every third-party package lives in optional extras — so neither local runs nor the weekly `Security` workflow audited anything. It now audits the full locked set exported from `uv.lock` (all extras, hash-checked) when `uv` is available, and falls back to auditing the installed environment otherwise; it no longer skips.
 - **Email report forecast visibility split** ([plan](docs/superpowers/plans/archived/2026-08-10-fix-email-forecast-visibility-split.md)): `build_report_data()` now calls `attach_actions_visibility_split()` so the email report's Actions forecast, key insights, warning threshold, and text/HTML actions sub-line all use private-only minutes against the free-tier limit. When `include_consumers=True`, the consumers' existing per-repo rows are reused (zero extra API calls); when `include_consumers=False`, `fetch_repo_actions_table()` provides the per-repo data. `needs_repos` now includes `include_actions` so repos are always available for the split.

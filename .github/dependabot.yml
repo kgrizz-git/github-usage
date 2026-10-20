@@ -5,7 +5,10 @@ updates:
   - package-ecosystem: uv
     directory: /
     schedule:
-      interval: weekly
+      # Routine version checks only; security updates remain event-driven.
+      interval: cron
+      cronjob: "0 15 10 * *"
+      timezone: America/New_York
     open-pull-requests-limit: 5
     # Wait a week after a release before proposing a routine version update.
     # Security updates are not delayed by cooldown.
@@ -22,7 +25,10 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      # Routine version checks only; security updates remain event-driven.
+      interval: cron
+      cronjob: "0 15 10 * *"
+      timezone: America/New_York
     open-pull-requests-limit: 5
     cooldown:
       default-days: 7
