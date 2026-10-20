@@ -7,13 +7,37 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class BackupPolicyTests(unittest.TestCase):
     """Verify backup files stay out of commits."""
+
+    def test_temporary_repo_isolates_and_restores_hook_environment(self) -> None:
+        """Hook Git variables must not redirect fixture commands to the real repo."""
+        inherited = {
+            "GIT_DIR": "/nonexistent/hook-repo",
+            "GIT_INDEX_FILE": "/nonexistent/hook-index",
+            "GIT_WORK_TREE": "/nonexistent/hook-worktree",
+        }
+        with patch.dict(os.environ, inherited):
+            with temporary_git_repo() as repo:
+                local_vars = subprocess.check_output(
+                    ["git", "rev-parse", "--local-env-vars"], text=True
+                ).splitlines()
+                for name in local_vars:
+                    self.assertNotIn(name, os.environ)
+                result = subprocess.check_output(
+                    ["git", "rev-parse", "--show-toplevel"], cwd=repo, text=True
+                )
+                self.assertEqual(Path(result.strip()).resolve(), repo.resolve())
+            for key, value in inherited.items():
+                self.assertEqual(os.environ[key], value)
 
     def test_gitignore_ignores_transient_backup_files(self) -> None:
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
@@ -73,19 +97,23 @@ def install_check_backups(repo: Path) -> None:
     shutil.copy2(ROOT / "scripts" / "check-backups", scripts / "check-backups")
 
 
-class temporary_git_repo:
-    """Context manager for an isolated git repository."""
-
-    def __enter__(self) -> Path:
-        self._tmp = tempfile.TemporaryDirectory()
-        repo = Path(self._tmp.name)
-        git(repo, "init")
-        git(repo, "config", "user.email", "test@example.com")
-        git(repo, "config", "user.name", "Test User")
-        return repo
-
-    def __exit__(self, *exc_info: object) -> None:
-        self._tmp.cleanup()
+@contextmanager
+def temporary_git_repo() -> Iterator[Path]:
+    """Create an isolated Git fixture and restore the caller's hook environment."""
+    with patch.dict(os.environ):
+        # Hooks export repository-local variables, including the worktree index.
+        # Clear them for every fixture command, including spawned scripts.
+        local_vars = subprocess.check_output(
+            ["git", "rev-parse", "--local-env-vars"], text=True
+        ).splitlines()
+        for name in local_vars:
+            os.environ.pop(name, None)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            git(repo, "init")
+            git(repo, "config", "user.email", "test@example.com")
+            git(repo, "config", "user.name", "Test User")
+            yield repo
 
 
 def git(repo: Path, *args: str) -> None:
