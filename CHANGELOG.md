@@ -48,6 +48,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- Update locked certifi to 2026.10.19 to remove the compromised emSign CA trust material identified by Dependabot alert #18.
 - Isolate backup-policy test repositories from inherited Git hook environment variables so pre-push checks cannot stage fixtures in the real worktree index.
 - **zizmor report written outside the checkout:** in `security.yml`'s known-vulnerable-actions step, the zizmor JSON report is now written to `$RUNNER_TEMP` instead of the checkout, so a PR that commits a `zizmor.json` symlink cannot make the shell redirect truncate a workflow file before zizmor scans it (hiding a vulnerable action).
 - **`pip-audit` never ran:** `scripts/security` skipped the dependency audit because `[project].dependencies` is empty, even though every third-party package lives in optional extras — so neither local runs nor the weekly `Security` workflow audited anything. It now audits the full locked set exported from `uv.lock` (all extras, hash-checked) when `uv` is available, and falls back to auditing the installed environment otherwise; it no longer skips.
