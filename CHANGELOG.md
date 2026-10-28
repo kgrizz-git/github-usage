@@ -27,6 +27,10 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **README positioning and quick start:** refreshed the project overview around automated reporting, cost visibility, actionable repository detail, and flexible outputs. Added a scheduled-email quick start; clarified the independent GitHub Actions and local macOS launchd delivery paths, token permissions, platform scope, and planned work; and aligned the package description with this positioning.
+- **Scheduled-workflow guidance:** clarify that setup verification previews each profile's email settings and report options, not GitHub Actions defaults; scheduled workflows must be merged into the default branch (and enabled in forks); and workflow recipients come only from the `REPORT_EMAIL` secret.
+- **Quick-start verification:** use `./start.sh setup --verify` to preview with the local environment file and saved report-profile options instead of bypassing setup with a bare `email-report --dry-run` invocation.
+- **Email-delivery documentation accuracy:** distinguish the checked-in GitHub Actions workflow's HTML-plus-plain-text fallback from the text default used by the CLI, launchd, and newly rendered setup workflows. Clarified how to select HTML delivery and removed the unsupported claim that forecast settings are configured by the GitHub Actions workflow setup.
 - Schedule routine Dependabot version updates for Python (uv) and GitHub Actions on the 10th of each month at 3 PM America/New_York (including daylight saving time). Security alerts and security updates remain enabled independently of this schedule.
 - **Dependabot now uses the `uv` ecosystem** (was `pip`, which never updated `uv.lock`). Both the `uv` and `github-actions` entries add a 7-day `cooldown` and group updates: one PR for routine minor+patch version updates and one for security updates, to cut down on separate (and often red) PRs.
 - **`Security` workflow comment corrected:** the `pip install -e '.[dev]'` step resolves from `pyproject.toml` ranges at CI time and does not use `uv.lock`; the comment previously claimed otherwise. The job now installs `uv` (`astral-sh/setup-uv`, SHA-pinned) so the audit can read the lockfile.
@@ -47,6 +51,8 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 - **`github-usage runs` readability:** Text output now explains profile names (including what `default` means), translates common GitHub Actions cron expressions into plain language (e.g. `0 9 * * 1` → Mondays at 09:00 UTC), and labels launchd schedules with weekday names in local time.
 
 ### Fixed
+
+- **Workflow recipient privacy:** generated and checked-in GitHub Actions workflows always use `secrets.REPORT_EMAIL`; profile recipient literals are no longer rendered, and the `workflow_dispatch` `report_email` input has been removed. Remove `-f report_email=...` from existing dispatch commands; use the repository secret for Actions or a local `email-report --to` run for a one-off recipient. Setup prompts and summaries distinguish local/launchd recipients from the Actions secret. Profile recipients still apply to local reports. Regenerate older workflows to remove any previously embedded addresses (existing Git history is unaffected).
 
 - Update locked certifi to 2026.10.19 to remove the compromised emSign CA trust material identified by Dependabot alert #18.
 - Isolate backup-policy test repositories from inherited Git hook environment variables so pre-push checks cannot stage fixtures in the real worktree index.

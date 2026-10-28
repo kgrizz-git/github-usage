@@ -111,14 +111,14 @@ def _manage_profiles(paths: SetupPaths) -> None:
     while True:
         config = load_config(paths.config_file) if paths.config_file.is_file() else config
         profiles = config.get("profiles") or []
-        print("\nReport profiles:")
+        print("\nReport profiles (GitHub Actions uses the repository REPORT_EMAIL secret):")
         if not profiles:
             print("  (none)")
         for profile in profiles:
             schedule = profile["schedule"]
             target = profile.get("target_email") or "(env REPORT_EMAIL)"
             print(
-                f"  - {profile['name']}: to={target}, "
+                f"  - {profile['name']}: local/launchd to={target}, "
                 f"schedule weekday={schedule.get('weekday')} "
                 f"{schedule.get('hour'):02d}:{schedule.get('minute'):02d}"
             )
@@ -378,7 +378,8 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [  # type: ignore[type-arg
         "Manage report profiles",
         (
             "Add, edit, or delete named report profiles with separate schedules, "
-            "recipients, and GitHub Actions settings."
+            "local/launchd recipients, and GitHub Actions settings. Actions recipients "
+            "always come from the repository REPORT_EMAIL secret."
         ),
         _manage_profiles,
     ),

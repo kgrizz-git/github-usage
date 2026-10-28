@@ -188,7 +188,8 @@ def review_summary(data: WizardData) -> str:
     recipient = data.target_email or data.secrets.get("REPORT_EMAIL", "(not set)")
     lines = [
         "[b]Secrets[/b]: GitHub token, Resend key, and email addresses configured",
-        f"[b]Recipient[/b]: {recipient}",
+        f"[b]Local/launchd recipient[/b]: {recipient}",
+        "[b]GitHub Actions recipient[/b]: repository REPORT_EMAIL secret (set separately)",
         f"[b]Report sections[/b]: forecast={data.include_forecast}, "
         f"consumers={data.include_consumers}, artifacts={data.include_artifact_storage}, "
         f"releases={data.include_release_assets}, "

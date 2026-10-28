@@ -53,10 +53,6 @@ on:
         options:
           - 'false'
           - 'true'
-      report_email:
-        description: Override the REPORT_EMAIL secret for this manual run
-        required: false
-        type: string
 
 concurrency:
   group: github-usage-email-report__PROFILE_SUFFIX__
@@ -78,7 +74,7 @@ jobs:
         env:
           GH_USAGE_TOKEN: ${{ secrets.GH_USAGE_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          REPORT_EMAIL: __TARGET_EMAIL__
+          REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
         run: |
           args=()

@@ -140,7 +140,7 @@ class RenderWorkflowTests(unittest.TestCase):
                 {
                     "name": "weekly",
                     "target_email": "team@example.com",
-                    "target_subject": "",
+                    "target_subject": "Weekly Digest",
                     "email_report": {"max_repos": 50},
                     "schedule": {},
                     "github_actions": dict(DEFAULT_WORKFLOW_CONFIG),
@@ -149,11 +149,27 @@ class RenderWorkflowTests(unittest.TestCase):
         }
         rendered = render_workflow(config, self.root, "weekly")
         self.assertIn("group: github-usage-email-report-weekly", rendered)
-        self.assertIn("team@example.com", rendered)
+        self.assertNotIn("team@example.com", rendered)
+        self.assertIn("--subject 'Weekly Digest'", rendered)
         self.assertIn("--max-repos", rendered)
         dest = workflow_path(self.root, "weekly")
         write_workflow(self.root, rendered, "weekly")
         self.assertTrue(dest.is_file())
+
+    def test_recipient_uses_only_secret_for_default_and_named_profiles(self):
+        for name in ("default", "weekly"):
+            for recipient in ("", "team@example.com", "o'brien@example.com"):
+                with self.subTest(profile=name, recipient=recipient):
+                    config = {
+                        "profiles": [{"name": name, "target_email": recipient, "email_report": {}}]
+                    }
+                    rendered = render_workflow(config, self.root, name)
+                    self.assertIn("REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}", rendered)
+                    self.assertNotIn("inputs.report_email", rendered)
+                    self.assertNotIn("      report_email:", rendered)
+                    self.assertNotIn("--to", rendered)
+                    if recipient:
+                        self.assertNotIn(recipient, rendered)
 
     def test_custom_cron_appears_in_rendered_output(self):
         rendered = render_workflow(self._config(cron="0 8 * * 5"), self.root)

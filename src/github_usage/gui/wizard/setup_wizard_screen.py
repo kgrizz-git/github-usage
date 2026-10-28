@@ -125,7 +125,7 @@ class SetupWizardScreen(ModalScreen[bool]):
                             id="wizard-email-format",
                             allow_blank=False,
                         )
-                        yield Label("target_email:")
+                        yield Label("target_email (local/launchd only):")
                         yield Input(
                             placeholder="Optional — uses REPORT_EMAIL when blank",
                             id="wizard-target-email",

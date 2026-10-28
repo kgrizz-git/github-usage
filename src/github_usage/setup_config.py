@@ -484,7 +484,7 @@ def status_lines(paths: SetupPaths) -> list[str]:
                 plist_path = paths.launchd_plist_for(profile["name"])
                 target = profile.get("target_email") or "(env REPORT_EMAIL)"
                 lines.append(
-                    f"    - {profile['name']}: to={target}, "
+                    f"    - {profile['name']}: local/launchd to={target}, "
                     f"schedule=weekday {schedule.get('weekday')} "
                     f"{schedule.get('hour'):02d}:{schedule.get('minute'):02d}, "
                     f"GA cron={cron}, workflow={'present' if wf.is_file() else 'missing'}, "
@@ -493,6 +493,7 @@ def status_lines(paths: SetupPaths) -> list[str]:
     else:
         plist_exists = paths.launchd_plist.is_file()
         lines.append(f"LaunchAgent plist: {'generated' if plist_exists else 'not generated'}")
+    lines.append("GitHub Actions recipient: repository REPORT_EMAIL secret (set separately)")
     return lines
 
 
