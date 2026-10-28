@@ -71,6 +71,12 @@ class WizardEmailFormatFlowTests(unittest.TestCase):
         config = load_config(self.paths.config_file)
         self.assertEqual(config["email_report"]["email_format"], "text")
 
+    def test_review_summary_distinguishes_local_and_actions_recipients(self):
+        data = WizardData(target_email="local@example.com")
+        summary = review_summary(data)
+        self.assertIn("Local/launchd recipient[/b]: local@example.com", summary)
+        self.assertIn("GitHub Actions recipient[/b]: repository REPORT_EMAIL secret", summary)
+
     def test_review_summary_includes_email_format(self):
         data = WizardData(email_format="html")
         summary = review_summary(data)

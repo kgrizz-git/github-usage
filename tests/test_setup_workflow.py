@@ -140,7 +140,7 @@ class RenderWorkflowTests(unittest.TestCase):
                 {
                     "name": "weekly",
                     "target_email": "team@example.com",
-                    "target_subject": "",
+                    "target_subject": "Weekly Digest",
                     "email_report": {"max_repos": 50},
                     "schedule": {},
                     "github_actions": dict(DEFAULT_WORKFLOW_CONFIG),
@@ -150,6 +150,7 @@ class RenderWorkflowTests(unittest.TestCase):
         rendered = render_workflow(config, self.root, "weekly")
         self.assertIn("group: github-usage-email-report-weekly", rendered)
         self.assertNotIn("team@example.com", rendered)
+        self.assertIn("--subject 'Weekly Digest'", rendered)
         self.assertIn("--max-repos", rendered)
         dest = workflow_path(self.root, "weekly")
         write_workflow(self.root, rendered, "weekly")

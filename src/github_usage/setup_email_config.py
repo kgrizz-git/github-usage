@@ -22,9 +22,13 @@ def _prompt_email_format(default: str) -> str:
 
 
 def _prompt_target_fields(profile: dict) -> None:
-    """Prompt for per-profile recipient and subject."""
+    """Prompt for a local/launchd recipient and per-profile subject."""
+    print("  Profile recipients apply to local/launchd sends only.")
+    print("  GitHub Actions always uses the repository REPORT_EMAIL secret.")
     current_email = (profile.get("target_email") or "").strip()
-    raw = input(f"  Recipient email [{current_email or 'env REPORT_EMAIL'}]: ").strip()
+    raw = input(
+        f"  Local/launchd recipient email [{current_email or 'env REPORT_EMAIL'}]: "
+    ).strip()
     profile["target_email"] = raw or current_email
     current_subject = (profile.get("target_subject") or "").strip()
     raw = input(f"  Email subject [{current_subject or 'auto-generated'}]: ").strip()

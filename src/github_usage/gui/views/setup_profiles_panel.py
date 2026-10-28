@@ -60,17 +60,18 @@ class SetupProfilesPanel(VerticalScroll):
         )
         with Container(id="profiles-form", classes="profiles-form"):
             yield Static(
-                "Each profile has its own report options, optional recipient override, "
+                "Each profile has its own report options, optional local recipient override, "
                 "and schedule (Schedules tab). Changes apply to the selected profile only.",
                 classes="HelpText",
             )
             yield Static("Where profile options apply", classes="SectionTitle")
             yield Static(
                 "· [b]Email Report[/b], [b]Verify Email Setup[/b], and [b]scheduled sends[/b] "
-                "(launchd / GitHub Actions) use the options below.\n"
+                "(launchd / GitHub Actions) use the report section options below.\n"
                 "· [b]Local Full Report[/b] (main tab 2) is separate: fixed billing snapshot; "
                 "it does not read these options.\n"
-                "· [b]target_email[/b] overrides REPORT_EMAIL for this profile's email sends only.",
+                "· [b]target_email[/b] overrides REPORT_EMAIL for local/launchd sends only.\n"
+                "· [b]GitHub Actions[/b] always uses the repository REPORT_EMAIL secret.",
                 classes="HelpText",
             )
             yield Static("Report options (config.toml)", classes="SectionTitle")
@@ -90,7 +91,7 @@ class SetupProfilesPanel(VerticalScroll):
             with FormGrid():
                 yield Label("target_email", classes="field-key")
                 yield Static(
-                    "Optional per-profile recipient. Blank uses REPORT_EMAIL from Secrets.",
+                    "Local/launchd recipient only. Blank uses local REPORT_EMAIL. Actions uses its repository secret.",
                     classes="field-help",
                 )
             yield Input(
