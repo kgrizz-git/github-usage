@@ -5,7 +5,7 @@
 
 `github-usage` helps individuals and small teams understand GitHub billing before it becomes a surprise. It turns current-month GitHub Actions, Copilot, Git LFS, and storage data into actionable local reports, exportable files, and scheduled email digests.
 
-Run a local full report in the command line or Textual TUI, schedule delivery on a Mac with launchd, or send recurring HTML email reports through GitHub Actions and Resend. The report keeps public Actions usage distinct from private and internal usage, where plan quotas and most costs apply.
+Run a local full report in the command line or Textual TUI, schedule delivery on a Mac with launchd, or have GitHub Actions and Resend send recurring email reports. The report keeps public Actions usage distinct from private and internal usage, where plan quotas and most costs apply.
 
 ## What it helps you answer
 
@@ -18,7 +18,7 @@ Run a local full report in the command line or Textual TUI, schedule delivery on
 
 ### Automated reporting
 
-- Recurring HTML email reports with a plain-text fallback through GitHub Actions and Resend
+- Recurring scheduled email reports through GitHub Actions and Resend; HTML delivery includes a plain-text fallback
 - Local macOS delivery through launchd, plus named report profiles for different audiences or schedules
 - Guided setup for credentials, report options, schedules, GitHub Actions secrets, and verification
 - Scheduled-run inventory and workflow-drift checks
@@ -49,7 +49,7 @@ Run a local full report in the command line or Textual TUI, schedule delivery on
 - Optional: GitHub CLI (`gh`) for token discovery
 - Optional for email reports: a Resend API key and verified sending domain
 
-For a classic personal access token, use the `user` scope for user-level billing endpoints; repository access may also be needed for repository-level analysis. For a fine-grained token, grant your user account's **Plan: Read-only** permission and repository metadata access as described in [GitHub Actions setup](#github-actions-secrets). The core CLI runs wherever Python is available; local automated scheduling uses macOS launchd.
+For a classic personal access token, use the `user` scope for user-level billing endpoints and add `repo` when analyzing private repositories; `repo` alone does not grant access to user billing endpoints. For a fine-grained token, select all relevant repositories, grant your user account's **Plan: Read-only** permission, and grant the repository permissions required by the report sections you enable: **Actions: Read-only** for runs and artifacts, and **Contents: Read-only** for release inventory. See [GitHub Actions secrets](#github-actions-secrets) for the scheduled-workflow setup. The core CLI runs wherever Python is available; local automated scheduling uses macOS launchd.
 
 ## Install and first report
 
@@ -78,7 +78,7 @@ The root-level `github-usage` file is a compatibility wrapper for the packaged C
 
 ## Quick start: scheduled email reports
 
-1. Install the package, then run the guided setup:
+1. Install the package, then run the guided setup and choose **1** (*full setup*) from its menu:
 
    ```sh
    python3 -m pip install -e .
@@ -92,7 +92,7 @@ The root-level `github-usage` file is a compatibility wrapper for the packaged C
    ```
 
 3. Choose a delivery model:
-   - **GitHub Actions:** configure a UTC cron schedule, set the four required secrets, then commit and push the rendered workflow. The included workflow defaults to Mondays at 09:00 UTC and delivers HTML email with a plain-text fallback.
+   - **GitHub Actions:** configure a UTC cron schedule, set the four required secrets, then commit and push the rendered workflow. The checked-in workflow runs Mondays at 09:00 UTC and uses HTML with a plain-text fallback; the setup wizard defaults to text, so choose HTML in report options before rendering if you want the same format.
    - **macOS launchd:** choose a local day and time, then install the generated LaunchAgent. Your Mac must be available for the report to run.
 
 Both options can be configured through `./start.sh setup`; they are independent, so you can use either or both.
@@ -154,8 +154,8 @@ checked-in template:
 
 - **Cron schedule** — always UTC. Example: `0 9 * * 1` = every Monday at 09:00 UTC.
 - **Default report sections** — `include_consumers`, `include_artifact_storage`,
-  `include_release_assets`, and forecast settings. These become the fallback values for *scheduled* runs.
-- **Email format** — scheduled GitHub Actions delivery uses HTML email with a plain-text fallback by default. Select text in the setup wizard or set `email_format = "text"` before rendering the workflow to use plain text only.
+  and `include_release_assets`. These become the fallback values for *scheduled* runs.
+- **Email format** — the checked-in workflow uses HTML email with a plain-text fallback. A workflow rendered by setup follows `[email_report].email_format`, which defaults to `"text"`; choose HTML in report options or set `email_format = "html"` before rendering to use HTML delivery.
 - **`workflow_dispatch` manual runs** — the GitHub UI dropdowns still work as
   per-run overrides. The configured defaults are only used when the workflow
   fires on schedule (when `inputs.*` are `null`).
@@ -198,7 +198,7 @@ Passing a token as a command-line argument is supported, but it can expose the t
 
 Use `./start.sh setup` to configure recurring delivery, or configure the command manually. The report can run on a GitHub Actions cron schedule or through a local macOS LaunchAgent; named profiles support separate recipients, subjects, report options, and schedules.
 
-`github-usage email-report` collects current-month billing data, renders HTML email with a plain-text fallback by default, and sends both through Resend. Use `--dry-run` first to preview the message without requiring email settings:
+`github-usage email-report` collects current-month billing data and renders plain text by default. Pass `--email-format html` to render HTML; Resend then receives both HTML and a plain-text fallback. Use `--dry-run` first to preview the message without requiring email settings:
 
 ```sh
 GITHUB_TOKEN="<token>" github-usage email-report --dry-run
@@ -425,12 +425,14 @@ This repo includes [`.github/workflows/email-report.yml`](.github/workflows/emai
 
 - `GH_USAGE_TOKEN`: a personal access token that can read your personal repos
   and your user-level billing data
-  - Classic PAT: select the `repo` scope (it covers repos, releases, Actions
-    artifacts/runs, and the `/users/{username}/settings/billing/*` endpoints)
-  - Fine-grained PAT: create it with your user as the resource owner,
-    "All repositories" access, `Metadata: Read-only` (for `/user/repos` and
-    `/repos/{owner}/{repo}/...`) and the account permission `Plan: Read-only`
-    (for the billing endpoints). `read:user` alone is not enough.
+  - Classic PAT: select the `user` scope for the `/users/{username}/settings/billing/*`
+    endpoints, plus `repo` when analyzing private repositories. `repo` alone does not
+    grant the billing endpoints.
+  - Fine-grained PAT: create it with your user as the resource owner and
+    "All repositories" access. Grant `Metadata: Read-only` (for `/user/repos` and
+    `/repos/{owner}/{repo}/...`), the account permission `Plan: Read-only` (for
+    billing), `Actions: Read-only` (for runs and artifacts), and `Contents: Read-only`
+    when using release-asset inventory. `read:user` alone is not enough.
 - `RESEND_API_KEY`: your Resend API key
 - `REPORT_EMAIL`: the recipient address
 - `RESEND_FROM`: a sender address on your verified Resend domain
