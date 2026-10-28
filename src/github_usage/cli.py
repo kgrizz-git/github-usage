@@ -71,8 +71,12 @@ Cache:
   Recent report snapshots are stored under .github-usage/cache/ (gitignored).
   Configure TTL in .github-usage/config.toml: [cache] max_age_seconds = 3600
   Set max_age_seconds = 0 to disable caching.
+  Setup rewrites config.toml without preserving [cache]; reapply custom TTLs
+  or set GITHUB_USAGE_DISABLE_CACHE=1 to disable caching via environment.
 
 Email-report options:
+  --profile NAME, --to ADDRESS, --subject SUBJECT
+  --include-forecast, --no-include-forecast
   --export FORMAT         Export the report to a file in the given format
   --output PATH           Output file path (auto-generated if omitted)
   --email-format FMT      Email body format: text | html
@@ -82,7 +86,7 @@ Email-report options:
   --timeout SECONDS, --max-retries N, --refresh
 
 TUI optional dependency:
-  pip install 'github-usage[gui]'
+  From a checkout: scripts/python -m pip install -e '.[gui]'
 
 Note: a --month YYYY-MM flag for historical billing queries is planned but
 deferred. GitHub's billing endpoints do not currently support date-range
@@ -90,13 +94,14 @@ filtering; see docs/api-discovery-month.md.
 
 Token resolution:
   1. Command-line argument
-  2. GITHUB_TOKEN environment variable
-  3. gh auth token
-  4. ~/.config/github-cli/github.yaml
+  2. GH_USAGE_TOKEN environment variable
+  3. GITHUB_TOKEN environment variable
+  4. gh auth token
+  5. ~/.config/github-cli/github.yaml
 
 Export optional dependencies:
-  pip install github-usage[export-xlsx]   # for --export xlsx
-  pip install github-usage[export-pdf]    # for --export pdf
+  scripts/python -m pip install -e '.[export-xlsx]'   # for --export xlsx
+  scripts/python -m pip install -e '.[export-pdf]'    # for --export pdf
 """
 
 _EXPORT_PROMPT_CHOICES = {

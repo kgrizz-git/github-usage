@@ -27,13 +27,19 @@ PYTHONPATH=src scripts/python -m github_usage runs --json | grep -q '"source"'
 ./start.sh --version | grep -q "github-usage"
 
 # Bare-token & routing smoke tests
-./start.sh report ghp_fake --dry-run >/tmp/fake-dry.out 2>&1 || {
-  grep -q "not valid" /tmp/fake-dry.out || {
-    echo "Expected token validation failure"
-    cat /tmp/fake-dry.out
-    exit 1
+# This probe intentionally calls GitHub with an invalid fake token. Keep the
+# default smoke run offline; opt in explicitly when live auth checks are wanted.
+if [[ "${GITHUB_USAGE_LIVE_TESTS:-0}" == "1" ]]; then
+  ./start.sh report ghp_fake --dry-run >/tmp/fake-dry.out 2>&1 || {
+    grep -q "not valid" /tmp/fake-dry.out || {
+      echo "Expected token validation failure"
+      cat /tmp/fake-dry.out
+      exit 1
+    }
   }
-}
+else
+  echo "Skipping live invalid-token probe (set GITHUB_USAGE_LIVE_TESTS=1 to enable)."
+fi
 
 ./start.sh report ghp_fake -- --export json --dry-run >/tmp/fake-dash.out 2>&1 || {
   grep -q "unrecognized arguments" /tmp/fake-dash.out || {

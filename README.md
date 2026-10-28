@@ -19,7 +19,7 @@ Requires **Python 3.11+** and a GitHub token with access to your account's billi
 From a checkout:
 
 ```sh
-python3 -m pip install -e .
+scripts/python -m pip install -e .
 ./start.sh setup
 ```
 
@@ -34,7 +34,7 @@ gh auth login -h github.com -s user
 
 The local full report does not load the token saved by setup in `.env.email-report`.
 
-Prefer an interactive interface? Install `python3 -m pip install -e '.[gui]'`, then run `./start.sh` in a terminal. The core CLI works wherever Python is available; local scheduling requires macOS.
+Prefer an interactive interface? Install `scripts/python -m pip install -e '.[gui]'`, then run `./start.sh` in a terminal. `./start.sh` uses the repository’s `.venv`, managed by `scripts/python`. The core CLI works wherever Python is available; local scheduling requires macOS.
 
 ## Schedule email reports
 
@@ -43,7 +43,7 @@ Use `./start.sh setup` to configure either delivery path:
 | Delivery | What to configure |
 | --- | --- |
 | **GitHub Actions** | UTC schedule and the four repository secrets: `GH_USAGE_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`, `RESEND_FROM`. Merge the rendered workflow into the default branch; on a fork, enable it in the **Actions** tab. |
-| **macOS launchd** | Local day and time, then install the generated LaunchAgent. Your Mac must be available when the report runs. |
+| **macOS launchd** | Local day and time, local Resend credentials, then install the generated LaunchAgent. Your Mac must be available when the report runs. |
 
 Preview your local profile's email settings and report options before sending:
 
@@ -65,8 +65,8 @@ See the [email setup guide](docs/email-reports.md) for secrets, schedules, named
 | List schedules or compare workflows with GitHub | [Scheduled runs and workflow drift](docs/scheduled-runs.md) |
 | Contribute or run checks | [Development](docs/development.md) |
 
-For command options, run `github-usage --cli --help` or `github-usage email-report --help`. Planned work is tracked in [TO_DO.md](TO_DO.md).
+For command options, run `./start.sh report --help` or `./start.sh email-report --help`. Planned work is tracked in [TO_DO.md](TO_DO.md).
 
 ## Privacy
 
-Terminal output and email bodies contain account, repository, and billing details. Exported files are redacted; review them before sharing. Do not commit tokens, local environment files, or generated reports. See [privacy details](docs/reports.md#privacy).
+Terminal output and email bodies contain account, repository, and billing details. Export redaction is partial and depends on the format; review file contents and filenames before sharing. Do not commit tokens, local environment files, or generated reports. See [privacy details](docs/reports.md#privacy).

@@ -115,14 +115,14 @@ def _check_optional_deps(export_format: str) -> None:
             import openpyxl  # noqa: F401
         except ImportError as exc:
             raise RuntimeError(
-                "XLSX export requires openpyxl. Install with: pip install github-usage[export-xlsx]"
+                "XLSX export requires openpyxl. From a checkout, install with: scripts/python -m pip install -e '.[export-xlsx]'"
             ) from exc
     if export_format == "pdf":
         try:
             from fpdf import FPDF  # noqa: F401
         except ImportError as exc:
             raise RuntimeError(
-                "PDF export requires fpdf2. Install with: pip install github-usage[export-pdf]"
+                "PDF export requires fpdf2. From a checkout, install with: scripts/python -m pip install -e '.[export-pdf]'"
             ) from exc
 
 

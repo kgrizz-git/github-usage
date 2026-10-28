@@ -29,7 +29,11 @@ _DOLLAR_PATTERN = re.compile(r"\$[\d,]+\.?\d*")
 
 
 def redact_report_data(data: dict) -> dict:
-    """Return a deep-copied report data dict with sensitive fields redacted."""
+    """Copy data, masking top-level username, repo values, and dollar strings.
+
+    Embedded names, email addresses, and numeric cost fields are not masked.
+    This partial field redaction does not anonymize the report.
+    """
     redacted = copy.deepcopy(data)
     if "username" in redacted:
         redacted["username"] = REDACT_USERNAME

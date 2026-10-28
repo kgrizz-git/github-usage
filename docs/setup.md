@@ -13,25 +13,26 @@ For a classic personal access token, use the `user` scope for user-level billing
 
 ## Installation options
 
-For command-line reports from a checkout:
+Run checkout commands from the repository root. `./start.sh`, setup, and the check scripts use `.venv/bin/python`; `scripts/python` creates this environment if necessary. Install extras with that interpreter:
 
 ```sh
-python3 -m pip install -e .
-github-usage --cli --help
+scripts/python -m pip install -e .
+./start.sh report --help
 ```
 
-For the default interactive Textual TUI, install the GUI extra and run the command from an interactive terminal:
+For the interactive Textual TUI:
 
 ```sh
-python3 -m pip install -e '.[gui]'
-github-usage
+scripts/python -m pip install -e '.[gui]'
+./start.sh
 ```
 
-You can also run without installing:
+Alternatively, install into your own active Python environment with `python3 -m pip install -e .`, then use `github-usage --cli` there. That installation does not populate the separate `.venv` used by `./start.sh`. Install extras into whichever environment runs the command.
+
+For source-only CLI help without installing:
 
 ```sh
 PYTHONPATH=src python3 -m github_usage --cli --help
-PYTHONPATH=src python3 -m github_usage
 ```
 
 The root-level `github-usage` file is a compatibility wrapper for the packaged CLI.
@@ -46,7 +47,7 @@ Use one entry point to configure local secrets, named report profiles, report op
 ./start.sh setup
 ```
 
-In an interactive terminal, `./start.sh` with no arguments launches the **Textual TUI** (install `pip install -e '.[gui]'` first). Use `./start.sh --cli` for the numbered bash menu, or `./start.sh setup` directly for the setup wizard.
+In an interactive terminal, `./start.sh` with no arguments launches the **Textual TUI** (install `scripts/python -m pip install -e '.[gui]'` first). Use `./start.sh --cli` for the numbered bash menu, or `./start.sh setup` directly for the setup wizard.
 
 ### Interactive interfaces
 
@@ -56,7 +57,7 @@ The TUI and bash menu are separate interfaces; the setup wizard has its own choi
 |-----------|------------|---------|
 | **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Top tabs for Setup, Local Full Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs plus **Start guided setup**. Schedules use day/time pickers. Keys: **1**–**5** switch views, **j**/**k** line scroll, **PgUp**/**PgDn** page scroll, **Ctrl+Home**/**Ctrl+End** top/bottom, **Ctrl+S** save, **Ctrl+R** run/refresh, **Escape** cancel, **q** quit |
 | **CLI bash menu** | `./start.sh --cli` | **1** setup · **2** report · **3** email-report · **4** runs · **5** runs-diff · **6** help · **7** exit |
-| **Setup wizard** | `./start.sh setup` or bash menu **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify |
+| **Setup wizard** | `./start.sh setup` or bash menu **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify · **m** manage profiles · **0** status |
 
 Subcommand shortcuts (`./start.sh setup`, `github-usage runs`, etc.) work without `--cli`.
 

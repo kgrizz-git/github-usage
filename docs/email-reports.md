@@ -6,14 +6,14 @@
 
 Use `./start.sh setup` to configure recurring delivery, or configure the command manually. The report can run on a GitHub Actions cron schedule or through a local macOS LaunchAgent. GitHub Actions workflows always read the recipient from the `REPORT_EMAIL` secret, including manual runs; the renderer never copies a profile's `target_email` into YAML. Named profiles support separate subjects, report options, and schedules. Profile `target_email` values apply to local reports only; all generated Actions workflows use the same repository secret.
 
-The manual `workflow_dispatch` input `report_email` has been removed. Remove `-f report_email=...` from dispatch commands. For a one-off recipient, run `github-usage email-report --to you@example.com` locally; Actions always uses the repository secret.
+The manual `workflow_dispatch` input `report_email` has been removed. Remove `-f report_email=...` from dispatch commands. For a one-off recipient, run `./start.sh email-report --to you@example.com` locally; Actions always uses the repository secret.
 
 After upgrading, regenerate and review any previously rendered workflows before committing them. Older renderers could embed a non-empty profile `target_email` literally. Removing an address from a workflow does not remove it from existing Git history.
 
-`github-usage email-report` collects current-month billing data and renders plain text by default. Pass `--email-format html` to render HTML; Resend then receives both HTML and a plain-text fallback. Use `--dry-run` first to preview the message without requiring email settings:
+`./start.sh email-report` collects current-month billing data and renders plain text by default. Pass `--email-format html` to render HTML; Resend then receives both HTML and a plain-text fallback. Use `--dry-run` first to preview the message without requiring email settings:
 
 ```sh
-GITHUB_TOKEN="<token>" github-usage email-report --dry-run
+GITHUB_TOKEN="<token>" ./start.sh email-report --dry-run
 ```
 
 For manual delivery in Bash, run this single line on its own, enter the Resend key at the hidden prompt, and wait for your shell prompt to return before copying the next block:
@@ -28,14 +28,14 @@ Then set the remaining variables and send the report:
 export GITHUB_TOKEN="<token>"
 export REPORT_EMAIL="you@example.com"
 export RESEND_FROM="reports@your-verified-domain.example"
-github-usage email-report
+./start.sh email-report
 ```
 
 `RESEND_FROM` must be an address on a verified Resend sending domain. The placeholder `noreply@github-usage.example` will not work.
 
 ## GitHub Actions secrets
 
-This repo includes [`.github/workflows/email-report.yml`](../.github/workflows/email-report.yml) as a workflow template. Run `./start.sh setup` and choose **7** (GitHub Actions secrets) to set these with `gh secret set`:
+This repo includes a [ready-to-use workflow](../.github/workflows/email-report.yml) and a separate [renderer template](../.github/workflows/email-report.yml.template). Run `./start.sh setup` and choose **7** (GitHub Actions secrets) to set these with `gh secret set`:
 
 - `GH_USAGE_TOKEN`: a personal access token that can read your personal repos
   and your user-level billing data
@@ -43,7 +43,7 @@ This repo includes [`.github/workflows/email-report.yml`](../.github/workflows/e
     endpoints, plus `repo` when analyzing private repositories. `repo` alone does not
     grant the billing endpoints.
   - Fine-grained PAT: create it with your user as the resource owner and
-    "All repositories" access. Grant `Metadata: Read-only` (for `/user/repos` and
+    access to the repositories you want to inspect. Choose "All repositories" for account-wide repository coverage; repository-level results are limited by the token’s access. Grant `Metadata: Read-only` (for `/user/repos` and
     `/repos/{owner}/{repo}/...`), the account permission `Plan: Read-only` (for
     billing), `Actions: Read-only` (for runs and artifacts), and `Contents: Read-only`
     when using release-asset inventory. `read:user` alone is not enough.
@@ -68,7 +68,7 @@ checked-in template:
 
 - **Cron schedule** — always UTC. Example: `0 9 * * 1` = every Monday at 09:00 UTC.
 - **Default report sections** — `include_consumers`, `include_artifact_storage`,
-  and `include_release_assets`. These become the fallback values for *scheduled* runs.
+  `include_release_assets`, and `include_forecast`. Forecast defaults to enabled. These become the fallback values for *scheduled* runs.
 - **Email format** — the checked-in workflow uses HTML email with a plain-text fallback. A workflow rendered by setup follows `[email_report].email_format`, which defaults to `"text"`; choose HTML in report options or set `email_format = "html"` before rendering to use HTML delivery.
 - **`workflow_dispatch` manual runs** — the GitHub UI dropdowns still work as
   per-run overrides. The configured defaults are only used when the workflow
@@ -78,7 +78,7 @@ checked-in template:
 
 The local launchd schedule (setup wizard option **4**, *Report schedule only*) is independent of the GitHub Actions
 cron (setup wizard option **5**, *GitHub Actions workflow*) and the LaunchAgent install/remove flow (setup wizard option **6**, *macOS launchd schedule*). These options are stored in separate sections (`[schedule]`, `[github_actions]`, and launchd plist generation)
-of `.github-usage/config.toml` and drive separate scheduling systems.
+of `.github-usage/config.toml` and drive separate scheduling systems. Named profiles use `[reports.schedule]` and `[reports.github_actions]` instead of the top-level tables.
 
 The four `gh` secrets (`GH_USAGE_TOKEN`, `RESEND_API_KEY`, `REPORT_EMAIL`,
 `RESEND_FROM`) are not touched by the workflow renderer; use setup wizard option **7**
@@ -96,14 +96,24 @@ Scheduled runs invoke [`scripts/send-email-report.sh`](../scripts/send-email-rep
 
 The committed template at [`launchd/com.github.github-usage.email-report.plist`](../launchd/com.github.github-usage.email-report.plist) is reference-only; prefer the wizard-generated plist under `.github-usage/launchd/`.
 
-Your Mac must be available for a local scheduled report to run.
+Your Mac must be available for a local scheduled report to run. Local delivery also uses Resend and needs `RESEND_API_KEY`, `REPORT_EMAIL` (unless overridden locally), and `RESEND_FROM` in the local environment file, plus GitHub authentication.
+
+## Named profiles
+
+Run `./start.sh setup` and choose **m** (Manage report profiles) to add, edit, delete, or save profiles and regenerate their schedules/workflows. Choose **0** for status. The TUI also offers profile controls under Setup.
+
+Local `.github-usage/config.toml` stores profiles as `[[reports]]` entries. Each entry has a `name`, optional `target_email` and `target_subject`, and `[reports.email_report]`, `[reports.schedule]`, and `[reports.github_actions]` tables for report options, local timing, and Actions defaults respectively. The wizard writes this structure for you. Legacy single-profile configurations use the top-level `[email_report]`, `[schedule]`, and `[github_actions]` tables.
+
+Select a profile for a local preview with `./start.sh email-report --profile NAME --dry-run`. Its `target_email` affects local sends only. Generated Actions workflows all use the repository `REPORT_EMAIL` secret; subjects, report options, and schedules can vary by profile. Keep `config.toml` local; only the rendered workflows are committed.
 
 ## Email command reference
 
-The email command supports:
+The email command supports the options below. Run `./start.sh email-report --help` for parser defaults and descriptions:
 
 ```sh
-github-usage email-report \
+./start.sh email-report \
+  [--profile NAME] [--to ADDRESS] [--subject SUBJECT] \
+  [--timeout SECONDS] [--max-retries N] [--refresh] \
   [--include-consumers] \
   [--include-artifact-storage] \
   [--include-release-assets --yes-include-release-assets] \

@@ -4,7 +4,7 @@
 
 ## Viewing Configured Runs
 
-`github-usage runs` prints a consolidated, read-only summary of every currently
+`./start.sh runs` prints a consolidated, read-only summary of every currently
 configured scheduled run — both local launchd schedules and GitHub Actions
 workflow cron expressions — without needing an interactive terminal. The
 listing reflects local state: it reads every `config.toml` profile plus any
@@ -12,8 +12,7 @@ listing reflects local state: it reads every `config.toml` profile plus any
 what is on disk in this checkout:
 
 ```sh
-github-usage runs
-# or: ./start.sh runs
+./start.sh runs
 # or: ./start.sh --cli and choose 4 (View Scheduled Runs)
 ```
 
@@ -35,34 +34,30 @@ listed as `<unconfigured>` so drifted or externally added workflows are visible.
 
 Options:
 
-```sh
-github-usage runs \
-  [--profile NAME] \   # show only one profile (skips stray-workflow detection)
-  [--json] \           # structured JSON instead of human-readable text
-  [--api] \            # also query the GitHub API for each workflow's latest run
-  [--owner OWNER] \    # owner override for --api (default: parsed from git remote)
-  [--repo REPO]        # repo override for --api (default: parsed from git remote)
-```
+| Option | Purpose |
+| --- | --- |
+| `--profile NAME` | Show one profile; skips stray-workflow detection |
+| `--json` | Structured JSON output |
+| `--api` | Add each local workflow’s latest GitHub run |
+| `--owner OWNER`, `--repo REPO` | Override the remote-derived owner/repository for `--api` |
 
-`--api` requires a GitHub token (resolved from `GITHUB_TOKEN`, the `gh` CLI, or
+`--api` requires a GitHub token (resolved from `GH_USAGE_TOKEN`, then `GITHUB_TOKEN`, the `gh` CLI, or
 the GitHub CLI config) and annotates each GitHub Actions row with the latest
 run's timestamp and conclusion. The offline view never makes network requests.
 With or without `--api`, the listing reflects local state only — `--api`
 enriches the local rows with each workflow's latest run but does not enumerate
 workflows that exist on GitHub but not in this checkout. The view matches what
-is configured on GitHub only when every local `email-report*.yml` and
-`config.toml` profile has been pushed and no workflows have been added through
-the GitHub UI without being checked out locally.
+is configured on GitHub only when every local `email-report*.yml` has been pushed, each local profile has a corresponding workflow on GitHub, and remote workflows are present in this checkout. `config.toml` itself stays local and is never pushed or compared by `--diff`.
 
 ## Checking for Drift
 
-`github-usage runs --diff` answers a different question than `--api`:
+`./start.sh runs --diff` answers a different question than `--api`:
 "is what I have locally what GitHub has?" It compares each
 `.github/workflows/email-report*.yml` against the configured remote's default
 branch and reports per-file drift — no GitHub token required.
 
 ```sh
-github-usage runs --diff
+./start.sh runs --diff
 # or: ./start.sh runs-diff
 # or: ./start.sh --cli and choose 5 (Check Scheduled Runs Drift)
 ```
@@ -89,14 +84,13 @@ in scope (it is created by the setup wizard and is not pushed).
 
 Options:
 
-```sh
-github-usage runs --diff \
-  [--profile NAME] \     # scope to one profile's workflow file only
-  [--json] \             # structured JSON instead of human-readable text
-  [--no-fetch] \         # skip `git fetch <remote>`; equivalent to GITHUB_USAGE_SKIP_FETCH=1
-  [--owner OWNER] \      # (rejected with --diff; only applies to --api)
-  [--repo REPO]          # (rejected with --diff; only applies to --api)
-```
+| Option | Purpose |
+| --- | --- |
+| `--profile NAME` | Compare only that profile’s workflow |
+| `--json` | Structured JSON output |
+| `--no-fetch` | Skip fetching; equivalent to `GITHUB_USAGE_SKIP_FETCH=1` |
+
+`--owner` and `--repo` apply only to `--api` and are rejected with `--diff`.
 
 `--diff` and `--api` are mutually exclusive at parse time. A failed
 `git fetch` falls back to the cached `<remote>/<default-branch>` ref and
