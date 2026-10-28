@@ -19,6 +19,14 @@ class WorkflowTemplateTests(unittest.TestCase):
         self.assertIn("only_private:", workflow)
         self.assertIn("--only-public", workflow)
 
+    def test_checked_in_workflow_and_template_use_only_recipient_secret(self):
+        for name in ("email-report.yml", "email-report.yml.template"):
+            with self.subTest(file=name):
+                workflow = (Path(".github/workflows") / name).read_text()
+                self.assertIn("REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}", workflow)
+                self.assertNotIn("inputs.report_email", workflow)
+                self.assertNotIn("      report_email:", workflow)
+
     def test_launchd_email_report_runs_monday_morning(self):
         plist_path = Path("launchd/com.github.github-usage.email-report.plist")
         script_path = Path("scripts/send-email-report.sh")

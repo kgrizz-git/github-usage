@@ -111,7 +111,7 @@ def render_workflow(
     root: Path | None = None,
     profile_name: str = DEFAULT_PROFILE_NAME,
 ) -> str:
-    """Render an email-report workflow from the template for one profile."""
+    """Render a profile workflow whose recipient comes only from REPORT_EMAIL secrets."""
     actual_root = root if root is not None else Path(__file__).resolve().parents[2]
     template_path = workflow_path(actual_root, DEFAULT_PROFILE_NAME).with_suffix(".yml.template")
     if not template_path.is_file():
@@ -130,14 +130,6 @@ def render_workflow(
 
     suffix = _profile_suffix(profile_name)
     extra_args = profile_workflow_extra_args(config, profile_name)
-    target_email = (profile.get("target_email") or "").strip()
-    if target_email:
-        target_email_expr = (
-            f"${{{{ inputs.report_email || '{target_email}' || secrets.REPORT_EMAIL }}}}"
-        )
-    else:
-        target_email_expr = "${{ inputs.report_email || secrets.REPORT_EMAIL }}"
-
     display_name = (
         "GitHub Usage Report" if suffix == "" else f"GitHub Usage Report ({profile_name})"
     )
@@ -151,7 +143,6 @@ def render_workflow(
     )
     text = text.replace("__INCLUDE_RELEASE_ASSETS_DEFAULT__", bval(ga["include_release_assets"]))
     text = text.replace("__INCLUDE_FORECAST_DEFAULT__", bval(ga["include_forecast"]))
-    text = text.replace("__TARGET_EMAIL__", target_email_expr)
     text = text.replace("__PROFILE_ARGS__", _shell_quote_args(extra_args))
     return text
 

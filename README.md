@@ -196,7 +196,9 @@ Passing a token as a command-line argument is supported, but it can expose the t
 
 ## Scheduled Email Reports
 
-Use `./start.sh setup` to configure recurring delivery, or configure the command manually. The report can run on a GitHub Actions cron schedule or through a local macOS LaunchAgent. Named profiles support separate subjects, report options, and schedules, and can use separate recipients. For a GitHub Actions workflow, however, a non-empty profile `target_email` is embedded literally in the rendered YAML and is visible to anyone who can read the committed workflow. Leave `target_email` blank to use the `REPORT_EMAIL` secret instead, especially for public repositories.
+Use `./start.sh setup` to configure recurring delivery, or configure the command manually. The report can run on a GitHub Actions cron schedule or through a local macOS LaunchAgent. GitHub Actions workflows always read the recipient from the `REPORT_EMAIL` secret, including manual runs; the renderer never copies a profile's `target_email` into YAML. Named profiles support separate subjects, report options, and schedules. Profile `target_email` values apply to local reports only; all generated Actions workflows use the same repository secret.
+
+After upgrading, regenerate and review any previously rendered workflows before committing them. Older renderers could embed a non-empty profile `target_email` literally. Removing an address from a workflow does not remove it from existing Git history.
 
 `github-usage email-report` collects current-month billing data and renders plain text by default. Pass `--email-format html` to render HTML; Resend then receives both HTML and a plain-text fallback. Use `--dry-run` first to preview the message without requiring email settings:
 
