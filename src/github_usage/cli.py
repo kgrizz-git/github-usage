@@ -99,9 +99,12 @@ Token resolution:
   4. gh auth token
   5. ~/.config/github-cli/github.yaml
 
-Export optional dependencies:
+Export optional dependencies (checkout commands):
   scripts/python -m pip install -e '.[export-xlsx]'   # for --export xlsx
   scripts/python -m pip install -e '.[export-pdf]'    # for --export pdf
+  Outside a checkout, use the same Python environment running github-usage:
+  python3 -m pip install 'openpyxl>=3.1'              # XLSX
+  python3 -m pip install 'fpdf2>=2.7'                 # PDF
 """
 
 _EXPORT_PROMPT_CHOICES = {

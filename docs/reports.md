@@ -47,7 +47,7 @@ exporting). Export redaction is partial; see [Privacy](#privacy) before sharing 
 ./start.sh report --export csv --no-interactive --output report.csv
 ./start.sh report --export xlsx --no-interactive --output report.xlsx
 ./start.sh report --export pdf --no-interactive --output report.pdf
-./start.sh report --json --no-interactive          # JSON to stdout
+./start.sh report --json --no-interactive          # human-readable report, then JSON on stdout
 ./start.sh report --json --no-interactive --output report.json
 
 # Email report
@@ -55,7 +55,7 @@ exporting). Export redaction is partial; see [Privacy](#privacy) before sharing 
 ./start.sh email-report --export csv --output report.csv
 ```
 
-`./start.sh report` (or `github-usage --cli`) enters the local full report flow. In an interactive terminal without `--export` or `--no-interactive`, this flow prompts for a format (or `None` to skip). Bare `github-usage` in a terminal opens the TUI, so use the explicit report/CLI invocation for exports.
+`./start.sh report` enters the local full report flow. In an interactive terminal without `--export` or `--no-interactive`, this flow prompts for a format (or `None` to skip). Bare `github-usage` in a terminal opens the TUI, so use the explicit report/CLI invocation for exports.
 
 ### Format-specific notes
 
@@ -81,7 +81,9 @@ scripts/python -m pip install -e '.[export-pdf]'    # adds fpdf2
 ```
 
 `--export xlsx` and `--export pdf` produce a clear error with the install
-hint when the dependency is missing. This project provides separate extras; install both with `scripts/python -m pip install -e '.[export-xlsx,export-pdf]'` if needed.
+hint when the dependency is missing. Outside a checkout, install `openpyxl>=3.1` for XLSX or `fpdf2>=2.7` for PDF with the Python interpreter running `github-usage` (for example, `python3 -m pip install 'openpyxl>=3.1'` in that active environment). For a machine-readable JSON file, use `--output`; stdout also includes the human-readable report.
+
+This project provides separate extras; install both with `scripts/python -m pip install -e '.[export-xlsx,export-pdf]'` if needed.
 
 ### Historical month queries
 

@@ -25,7 +25,7 @@ scripts/python -m pip install -e .
 
 Choose **1** for guided setup. For email delivery, you will also need a Resend API key and an address on a verified sending domain.
 
-To run a local full report, authenticate with GitHub CLI first (or [set `GITHUB_TOKEN`](docs/setup.md#authentication)):
+To run a local full report, authenticate with GitHub CLI first (or [set `GH_USAGE_TOKEN` / `GITHUB_TOKEN`](docs/setup.md#authentication)):
 
 ```sh
 gh auth login -h github.com -s user

@@ -27,7 +27,7 @@ scripts/python -m pip install -e '.[gui]'
 ./start.sh
 ```
 
-Alternatively, install into your own active Python environment with `python3 -m pip install -e .`, then use `github-usage --cli` there. That installation does not populate the separate `.venv` used by `./start.sh`. Install extras into whichever environment runs the command.
+Alternatively, install into your own active Python environment with `python3 -m pip install -e .`, then use `github-usage --cli --help` there for CLI help. That installation does not populate the separate `.venv` used by `./start.sh`. Install extras into whichever environment runs the command.
 
 For source-only CLI help without installing:
 
@@ -55,7 +55,7 @@ The TUI and bash menu are separate interfaces; the setup wizard has its own choi
 
 | Interface | Invocation | Purpose |
 |-----------|------------|---------|
-| **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Top tabs for Setup, Local Full Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs plus **Start guided setup**. Schedules use day/time pickers. Keys: **1**–**5** switch views, **j**/**k** line scroll, **PgUp**/**PgDn** page scroll, **Ctrl+Home**/**Ctrl+End** top/bottom, **Ctrl+S** save, **Ctrl+R** run/refresh, **Escape** cancel, **q** quit |
+| **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Top tabs for Setup, Local Full Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs plus **Start guided setup**. Schedules use day/time pickers. Keys: **1**–**5** switch views, **j**/**k** line scroll, **PgUp**/**PgDn** page scroll, **Ctrl+Home**/**Ctrl+End** top/bottom, **Ctrl+S** save / **Ctrl+R** run/refresh (view-specific), **Escape** cancel, **q** quit |
 | **CLI bash menu** | `./start.sh --cli` | **1** setup · **2** report · **3** email-report · **4** runs · **5** runs-diff · **6** help · **7** exit |
 | **Setup wizard** | `./start.sh setup` or bash menu **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify · **m** manage profiles · **0** status |
 
@@ -89,7 +89,7 @@ The CLI resolves a token in this order:
 4. `gh auth token`
 5. `~/.config/github-cli/github.yaml`
 
-The local full report (`./start.sh report`) does not load `.env.email-report`. A token saved by guided setup is used by the scheduled email script, setup verification, and TUI email report; authenticate separately for the local full report using GitHub CLI or `GITHUB_TOKEN`.
+The local full report (`./start.sh report`) does not load `.env.email-report`. A token saved by guided setup is used by the scheduled email script, setup verification, and TUI email report; authenticate separately for the local full report using GitHub CLI, `GH_USAGE_TOKEN`, or `GITHUB_TOKEN`.
 
 Recommended setup for a local full report:
 
@@ -104,6 +104,6 @@ You can also pass a token through the environment:
 GITHUB_TOKEN="<token>" ./start.sh report
 ```
 
-Passing a token as a command-line argument is supported, but it can expose the token through shell history or process listings. Prefer `gh auth login` or `GITHUB_TOKEN`.
+Passing a token as a command-line argument is supported, but it can expose the token through shell history or process listings. Prefer `gh auth login` or an environment variable (`GH_USAGE_TOKEN` takes precedence over `GITHUB_TOKEN`).
 
 For recurring delivery, continue with [Email reports](email-reports.md).
