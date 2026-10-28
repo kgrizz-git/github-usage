@@ -85,14 +85,14 @@ The root-level `github-usage` file is a compatibility wrapper for the packaged C
    ./start.sh setup
    ```
 
-2. Configure your GitHub token, Resend API key, recipient, and verified sender. Preview the result before delivery:
+2. Configure your GitHub token, Resend API key, recipient, and verified sender. Preview each profile's email settings and report options before delivery; GitHub Actions schedule/default settings are configured separately:
 
    ```sh
    ./start.sh setup --verify
    ```
 
 3. Choose a delivery model:
-   - **GitHub Actions:** configure a UTC cron schedule, set the four required secrets, then commit and push the rendered workflow. The checked-in workflow runs Mondays at 09:00 UTC and uses HTML with a plain-text fallback; the setup wizard defaults to text, so choose HTML in report options before rendering if you want the same format.
+   - **GitHub Actions:** configure a UTC cron schedule, set the four required secrets, then commit, push, and merge the rendered workflow into the default branch. GitHub runs scheduled workflows only from that branch; on a fork, enable the workflow in the **Actions** tab after pushing. The checked-in workflow runs Mondays at 09:00 UTC and uses HTML with a plain-text fallback; the setup wizard defaults to text, so choose HTML in report options before rendering if you want the same format.
    - **macOS launchd:** choose a local day and time, then install the generated LaunchAgent. Your Mac must be available for the report to run.
 
 Both options can be configured through `./start.sh setup`; they are independent, so you can use either or both.
@@ -196,7 +196,7 @@ Passing a token as a command-line argument is supported, but it can expose the t
 
 ## Scheduled Email Reports
 
-Use `./start.sh setup` to configure recurring delivery, or configure the command manually. The report can run on a GitHub Actions cron schedule or through a local macOS LaunchAgent; named profiles support separate recipients, subjects, report options, and schedules.
+Use `./start.sh setup` to configure recurring delivery, or configure the command manually. The report can run on a GitHub Actions cron schedule or through a local macOS LaunchAgent. Named profiles support separate subjects, report options, and schedules, and can use separate recipients. For a GitHub Actions workflow, however, a non-empty profile `target_email` is embedded literally in the rendered YAML and is visible to anyone who can read the committed workflow. Leave `target_email` blank to use the `REPORT_EMAIL` secret instead, especially for public repositories.
 
 `github-usage email-report` collects current-month billing data and renders plain text by default. Pass `--email-format html` to render HTML; Resend then receives both HTML and a plain-text fallback. Use `--dry-run` first to preview the message without requiring email settings:
 
