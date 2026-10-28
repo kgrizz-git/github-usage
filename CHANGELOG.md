@@ -27,6 +27,8 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Shorter README:** focused the landing page on getting started and scheduled delivery; moved setup, email configuration, report/export reference, runs/drift, and development details into linked user guides under `docs/`.
+
 - **README positioning and quick start:** refreshed the project overview around automated reporting, cost visibility, actionable repository detail, and flexible outputs. Added a scheduled-email quick start; clarified the independent GitHub Actions and local macOS launchd delivery paths, token permissions, platform scope, and planned work; and aligned the package description with this positioning.
 - **Scheduled-workflow guidance:** clarify that setup verification previews each profile's email settings and report options, not GitHub Actions defaults; scheduled workflows must be merged into the default branch (and enabled in forks); and workflow recipients come only from the `REPORT_EMAIL` secret.
 - **Quick-start verification:** use `./start.sh setup --verify` to preview with the local environment file and saved report-profile options instead of bypassing setup with a bare `email-report --dry-run` invocation.
