@@ -27,6 +27,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **README positioning and quick start:** refreshed the project overview around automated reporting, cost visibility, actionable repository detail, and flexible outputs. Added a scheduled-email quick start; clarified the independent GitHub Actions and local macOS launchd delivery paths; documented HTML email with plain-text fallback as the default scheduled format; and made token permissions, platform scope, and planned work clearer.
 - Schedule routine Dependabot version updates for Python (uv) and GitHub Actions on the 10th of each month at 3 PM America/New_York (including daylight saving time). Security alerts and security updates remain enabled independently of this schedule.
 - **Dependabot now uses the `uv` ecosystem** (was `pip`, which never updated `uv.lock`). Both the `uv` and `github-actions` entries add a 7-day `cooldown` and group updates: one PR for routine minor+patch version updates and one for security updates, to cut down on separate (and often red) PRs.
 - **`Security` workflow comment corrected:** the `pip install -e '.[dev]'` step resolves from `pyproject.toml` ranges at CI time and does not use `uv.lock`; the comment previously claimed otherwise. The job now installs `uv` (`astral-sh/setup-uv`, SHA-pinned) so the audit can read the lockfile.

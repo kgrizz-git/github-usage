@@ -3,44 +3,68 @@
 [![CI](https://github.com/kgrizz-git/github-usage/actions/workflows/ci.yml/badge.svg)](https://github.com/kgrizz-git/github-usage/actions/workflows/ci.yml)
 [![Security](https://github.com/kgrizz-git/github-usage/actions/workflows/security.yml/badge.svg)](https://github.com/kgrizz-git/github-usage/actions/workflows/security.yml)
 
-`github-usage` is a Python command-line tool for reviewing GitHub billing and usage data from your account. It reports GitHub Actions minutes and storage, repository-level Actions usage, Copilot premium requests, Git LFS usage, billing history, limits, and the largest current-month resource consumers.
+`github-usage` helps individuals and small teams understand GitHub billing before it becomes a surprise. It turns current-month GitHub Actions, Copilot, Git LFS, and storage data into actionable local reports, exportable files, and scheduled email digests.
 
-The project started as a personal reporting script and is being shaped into a reusable Python package. The packaged CLI currently preserves the v3 report behavior while the internals are split into smaller, testable modules.
+Run a local full report in the command line or Textual TUI, schedule delivery on a Mac with launchd, or send recurring HTML email reports through GitHub Actions and Resend. The report keeps public Actions usage distinct from private and internal usage, where plan quotas and most costs apply.
+
+## What it helps you answer
+
+- Which private or internal repositories are consuming Actions minutes and storage?
+- Is current usage likely to exceed this month's Actions, storage, or Copilot limits?
+- Which repositories, workflows, artifacts, or release assets are the biggest contributors?
+- Are my scheduled reports active, and do the local workflow files match the remote?
 
 ## Features
 
-- Account and plan summary
-- GitHub Actions minutes, storage, and per-SKU cost breakdown
-- Per-repository Actions usage
-- Copilot premium request usage by model
-- Git LFS usage
-- Current-month net/gross cost estimate
-- Full billing history summary from the GitHub billing API
-- Scheduled plain-text email reports through Resend
-- Export reports to CSV, XLSX, PDF, JSON, or plain text files (with redaction)
-- Local smoke, security, and documentation checks for maintainers
+### Automated reporting
+
+- Recurring HTML email reports with a plain-text fallback through GitHub Actions and Resend
+- Local macOS delivery through launchd, plus named report profiles for different audiences or schedules
+- Guided setup for credentials, report options, schedules, GitHub Actions secrets, and verification
+- Scheduled-run inventory and workflow-drift checks
+
+### Cost and quota visibility
+
+- Account and plan summary, billing history, and current-month net/gross cost estimate
+- GitHub Actions minutes, storage, per-SKU costs, and private-first free-tier utilization
+- Copilot premium requests by model and Git LFS usage
+- End-of-month forecasts, run-out estimates, and configurable warning thresholds
+
+### Actionable repository detail
+
+- Visibility-aware repository tables, private-only rankings, and top resource consumers
+- Estimated minutes by workflow for the largest private Actions consumer
+- Optional artifact-storage and release-asset inventory, including retention and expiry signals
+
+### Flexible outputs and interfaces
+
+- Command-line reports and an optional Textual TUI for interactive use
+- CSV, XLSX, PDF, JSON, and text exports; written exports are redacted
+- Cached report data with explicit refresh controls to reduce repeat API calls
 
 ## Requirements
 
 - Python 3.11 or newer
-- A GitHub token with the `user` scope for billing endpoints
+- A GitHub token authorized for your account's billing endpoints
 - Optional: GitHub CLI (`gh`) for token discovery
 - Optional for email reports: a Resend API key and verified sending domain
 
-## Install
+For a classic personal access token, use the `user` scope for user-level billing endpoints; repository access may also be needed for repository-level analysis. For a fine-grained token, grant your user account's **Plan: Read-only** permission and repository metadata access as described in [GitHub Actions setup](#github-actions-secrets). The core CLI runs wherever Python is available; local automated scheduling uses macOS launchd.
 
-From a checkout:
+## Install and first report
+
+For command-line reports from a checkout:
 
 ```sh
 python3 -m pip install -e .
+github-usage --cli --help
 ```
 
-Then run:
+For the default interactive Textual TUI, install the GUI extra and run the command from an interactive terminal:
 
 ```sh
-pip install -e '.[gui]'   # optional: Textual TUI (default in interactive terminals)
-github-usage --cli --help # command-line mode
-github-usage              # Textual TUI (interactive TTY)
+python3 -m pip install -e '.[gui]'
+github-usage
 ```
 
 You can also run without installing:
@@ -52,9 +76,30 @@ PYTHONPATH=src python3 -m github_usage
 
 The root-level `github-usage` file is a compatibility wrapper for the packaged CLI.
 
-## Setup
+## Quick start: scheduled email reports
 
-Use one entry point to configure local secrets, report options, macOS launchd schedules, GitHub Actions secrets, and developer hooks:
+1. Install the package, then run the guided setup:
+
+   ```sh
+   python3 -m pip install -e .
+   ./start.sh setup
+   ```
+
+2. Configure your GitHub token, Resend API key, recipient, and verified sender. Preview the result before delivery:
+
+   ```sh
+   github-usage email-report --dry-run
+   ```
+
+3. Choose a delivery model:
+   - **GitHub Actions:** configure a UTC cron schedule, set the four required secrets, then commit and push the rendered workflow. The included workflow defaults to Mondays at 09:00 UTC and delivers HTML email with a plain-text fallback.
+   - **macOS launchd:** choose a local day and time, then install the generated LaunchAgent. Your Mac must be available for the report to run.
+
+Both options can be configured through `./start.sh setup`; they are independent, so you can use either or both.
+
+## Setup and interfaces
+
+Use one entry point to configure local secrets, named report profiles, report options, macOS launchd schedules, GitHub Actions secrets, and developer hooks:
 
 ```sh
 python3 -m pip install -e '.[dev]'
@@ -101,7 +146,7 @@ Example templates (safe to commit): [`.env.email-report.example`](.env.email-rep
 
 ## Configuration
 
-### GitHub Actions workflow
+### GitHub Actions delivery
 
 Run `./start.sh`, choose **1** (Run Guided Setup), then choose **5** (GitHub Actions workflow) — or run `./start.sh setup` and choose **5** — to configure the scheduled
 GitHub Actions report and render `.github/workflows/email-report.yml` from a
@@ -109,7 +154,8 @@ checked-in template:
 
 - **Cron schedule** — always UTC. Example: `0 9 * * 1` = every Monday at 09:00 UTC.
 - **Default report sections** — `include_consumers`, `include_artifact_storage`,
-  `include_release_assets`. These become the fallback values for *scheduled* runs.
+  `include_release_assets`, and forecast settings. These become the fallback values for *scheduled* runs.
+- **Email format** — scheduled GitHub Actions delivery uses HTML email with a plain-text fallback by default. Select text in the setup wizard or set `email_format = "text"` before rendering the workflow to use plain text only.
 - **`workflow_dispatch` manual runs** — the GitHub UI dropdowns still work as
   per-run overrides. The configured defaults are only used when the workflow
   fires on schedule (when `inputs.*` are `null`).
@@ -150,9 +196,9 @@ Passing a token as a command-line argument is supported, but it can expose the t
 
 ## Scheduled Email Reports
 
-Run `./start.sh` and choose **1** (Run Guided Setup), or run `./start.sh setup`, or configure manually.
+Use `./start.sh setup` to configure recurring delivery, or configure the command manually. The report can run on a GitHub Actions cron schedule or through a local macOS LaunchAgent; named profiles support separate recipients, subjects, report options, and schedules.
 
-`github-usage email-report` collects the current-month billing data, renders a plain-text email body, and sends it with Resend. Use `--dry-run` first to preview the message without requiring email settings:
+`github-usage email-report` collects current-month billing data, renders HTML email with a plain-text fallback by default, and sends both through Resend. Use `--dry-run` first to preview the message without requiring email settings:
 
 ```sh
 GITHUB_TOKEN="<token>" github-usage email-report --dry-run
@@ -189,6 +235,8 @@ github-usage email-report \
   [--output PATH] \
   [--email-format text|html]
 ```
+
+### API impact and detailed analysis
 
 `--include-consumers`, `--include-artifact-storage`, and `--include-release-assets` add repo-level API calls. They consume GitHub REST API request quota, not Actions minutes, Actions storage, Copilot requests, Git LFS quota, or billable GitHub usage. Use monthly schedules and conservative `--max-repos` values for accounts with many repositories.
 
@@ -371,7 +419,7 @@ confirmed that GitHub's billing endpoints ignore the `since`/`until`
 parameters and return the same shape with or without them, so historical
 queries are not feasible with the current GitHub API.
 
-### GitHub Actions Setup
+### GitHub Actions secrets
 
 This repo includes [`.github/workflows/email-report.yml`](.github/workflows/email-report.yml) as a workflow template. Run `./start.sh`, choose **1** (Run Guided Setup), then choose **7** (GitHub Actions secrets) — or run `./start.sh setup` and choose **7** — to set these with `gh secret set`:
 
@@ -395,7 +443,7 @@ personal token as `GH_USAGE_TOKEN` and exposes it to the CLI as `GITHUB_TOKEN`.
 
 After secrets are set, test with `gh workflow run email-report.yml`.
 
-### macOS launchd Setup
+### Local macOS launchd scheduling
 
 Run `./start.sh`, choose **1** (Run Guided Setup), then choose **6** (macOS launchd schedule) — or run `./start.sh setup` and choose **6** (or **1** for recommended full setup). The wizard writes `.github-usage/config.toml`, generates a LaunchAgent plist, and can install it for Monday 9:00 in your local timezone.
 
@@ -476,4 +524,4 @@ scripts/docs-check
 
 ## Roadmap
 
-See [TO_DO.md](TO_DO.md) for planned work, including historical email reports and renaming internal `legacy_*` modules to match the “local full report” name. Export formats (CSV, XLSX, PDF, JSON, text) are now implemented.
+See [TO_DO.md](TO_DO.md) for planned work, including historical email reports, deeper Actions analysis, and platform-specific setup improvements. Export formats (CSV, XLSX, PDF, JSON, text) are implemented.
