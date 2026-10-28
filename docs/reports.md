@@ -2,7 +2,7 @@
 
 [Back to README](../README.md)
 
-Run a local full report with `./start.sh report` or preview an email report with `./start.sh email-report --dry-run`. For all command options, use `github-usage --cli --help` and `github-usage email-report --help`.
+After [authenticating](setup.md#authentication), run a local full report with `./start.sh report` or preview an email report with `./start.sh email-report --dry-run`. For all command options, use `github-usage --cli --help` and `github-usage email-report --help`.
 
 ## API impact and billing interpretation
 

@@ -54,6 +54,8 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **Documentation review fixes:** authenticate explicitly before the first local full report (setup saves email credentials separately), and prompt for the Resend key in the manual email example instead of assigning a credential-shaped placeholder.
+
 - **Workflow recipient privacy:** generated and checked-in GitHub Actions workflows always use `secrets.REPORT_EMAIL`; profile recipient literals are no longer rendered, and the `workflow_dispatch` `report_email` input has been removed. Remove `-f report_email=...` from existing dispatch commands; use the repository secret for Actions or a local `email-report --to` run for a one-off recipient. Setup prompts and summaries distinguish local/launchd recipients from the Actions secret. Profile recipients still apply to local reports. Regenerate older workflows to remove any previously embedded addresses (existing Git history is unaffected).
 
 - Update locked certifi to 2026.10.19 to remove the compromised emSign CA trust material identified by Dependabot alert #18.

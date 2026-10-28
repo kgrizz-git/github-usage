@@ -25,11 +25,14 @@ python3 -m pip install -e .
 
 Choose **1** for guided setup. For email delivery, you will also need a Resend API key and an address on a verified sending domain.
 
-To run a local full report:
+To run a local full report, authenticate with GitHub CLI first (or [set `GITHUB_TOKEN`](docs/setup.md#authentication)):
 
 ```sh
+gh auth login -h github.com -s user
 ./start.sh report
 ```
+
+The local full report does not load the token saved by setup in `.env.email-report`.
 
 Prefer an interactive interface? Install `python3 -m pip install -e '.[gui]'`, then run `./start.sh` in a terminal. The core CLI works wherever Python is available; local scheduling requires macOS.
 

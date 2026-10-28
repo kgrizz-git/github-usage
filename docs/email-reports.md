@@ -16,11 +16,14 @@ After upgrading, regenerate and review any previously rendered workflows before 
 GITHUB_TOKEN="<token>" github-usage email-report --dry-run
 ```
 
-To send an email, set:
+For manual delivery, set the required environment variables. In Bash, enter the Resend key at a hidden prompt so it is not written literally in the command or shell history:
 
-```sh
+```bash
+printf 'Resend API key: ' >&2
+read -r -s RESEND_API_KEY
+printf '\n' >&2
+export RESEND_API_KEY
 export GITHUB_TOKEN="<token>"
-export RESEND_API_KEY="<resend-api-key>"
 export REPORT_EMAIL="you@example.com"
 export RESEND_FROM="reports@your-verified-domain.example"
 github-usage email-report

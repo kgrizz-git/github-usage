@@ -83,15 +83,18 @@ Example templates (safe to commit): [`.env.email-report.example`](../.env.email-
 The CLI resolves a token in this order:
 
 1. Command-line argument
-2. `GITHUB_TOKEN` environment variable
-3. `gh auth token`
-4. `~/.config/github-cli/github.yaml`
+2. `GH_USAGE_TOKEN` environment variable
+3. `GITHUB_TOKEN` environment variable
+4. `gh auth token`
+5. `~/.config/github-cli/github.yaml`
 
-Recommended setup:
+The local full report (`./start.sh report`) does not load `.env.email-report`. A token saved by guided setup is used by the scheduled email script and setup verification; authenticate separately for the local full report using GitHub CLI or `GITHUB_TOKEN`.
+
+Recommended setup for a local full report:
 
 ```sh
 gh auth login -h github.com -s user
-github-usage
+./start.sh report
 ```
 
 You can also pass a token through the environment:
