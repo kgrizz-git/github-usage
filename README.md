@@ -88,7 +88,7 @@ The root-level `github-usage` file is a compatibility wrapper for the packaged C
 2. Configure your GitHub token, Resend API key, recipient, and verified sender. Preview the result before delivery:
 
    ```sh
-   github-usage email-report --dry-run
+   ./start.sh setup --verify
    ```
 
 3. Choose a delivery model:
