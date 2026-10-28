@@ -16,13 +16,15 @@ After upgrading, regenerate and review any previously rendered workflows before 
 GITHUB_TOKEN="<token>" github-usage email-report --dry-run
 ```
 
-For manual delivery, set the required environment variables. In Bash, enter the Resend key at a hidden prompt so it is not written literally in the command or shell history:
+For manual delivery in Bash, run this single line on its own, enter the Resend key at the hidden prompt, and wait for your shell prompt to return before copying the next block:
 
 ```bash
-printf 'Resend API key: ' >&2
-read -r -s RESEND_API_KEY
-printf '\n' >&2
-export RESEND_API_KEY
+printf 'Resend API key: ' >&2; read -r -s RESEND_API_KEY; printf '\n' >&2; export RESEND_API_KEY
+```
+
+Then set the remaining variables and send the report:
+
+```sh
 export GITHUB_TOKEN="<token>"
 export REPORT_EMAIL="you@example.com"
 export RESEND_FROM="reports@your-verified-domain.example"
@@ -53,7 +55,8 @@ Do not use the automatic GitHub Actions `${{ github.token }}` for this report.
 The Actions-provided `GITHUB_TOKEN` is scoped to the repository's installation
 and cannot reach the user-billing endpoints that this report needs. The
 `GITHUB_` secret prefix is reserved by Actions, so the workflow stores the
-personal token as `GH_USAGE_TOKEN` and exposes it to the CLI as `GITHUB_TOKEN`.
+personal token as `GH_USAGE_TOKEN`. The workflow sets that environment variable,
+and the CLI reads it directly.
 
 After secrets are set, test with `gh workflow run email-report.yml`.
 

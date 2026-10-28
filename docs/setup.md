@@ -88,7 +88,7 @@ The CLI resolves a token in this order:
 4. `gh auth token`
 5. `~/.config/github-cli/github.yaml`
 
-The local full report (`./start.sh report`) does not load `.env.email-report`. A token saved by guided setup is used by the scheduled email script and setup verification; authenticate separately for the local full report using GitHub CLI or `GITHUB_TOKEN`.
+The local full report (`./start.sh report`) does not load `.env.email-report`. A token saved by guided setup is used by the scheduled email script, setup verification, and TUI email report; authenticate separately for the local full report using GitHub CLI or `GITHUB_TOKEN`.
 
 Recommended setup for a local full report:
 
@@ -100,7 +100,7 @@ gh auth login -h github.com -s user
 You can also pass a token through the environment:
 
 ```sh
-GITHUB_TOKEN="<token>" github-usage
+GITHUB_TOKEN="<token>" ./start.sh report
 ```
 
 Passing a token as a command-line argument is supported, but it can expose the token through shell history or process listings. Prefer `gh auth login` or `GITHUB_TOKEN`.
