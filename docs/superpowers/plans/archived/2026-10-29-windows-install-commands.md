@@ -11,3 +11,5 @@
 Delivery: the same Qoder reviewer must review committed changes before pushing.
 
 Verification: `scripts/check` passed (763 tests; two native Windows tests skipped on macOS), offline `scripts/smoke`, `scripts/docs-check`, focused rendering/integration tests, and 46 local links/anchors passed. The Windows-native tests run generated commands against a temporary fake pip module rather than installing packages; actual Windows shell execution remains unverified on this host. Rendering is based on Microsoft’s cmd.exe and PowerShell operator/quoting documentation.
+
+**Done:** 2026-10-29 — Follow-up review approved the renderer and identified uneven Windows missing-GUI message indentation. The message now indents all alternatives consistently, with a win32-mocked output regression test. Native Windows execution remains unverified on this host; no scanner suppressions were added.

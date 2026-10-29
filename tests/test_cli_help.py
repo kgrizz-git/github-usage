@@ -5,6 +5,7 @@ import io
 import shlex
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -71,8 +72,24 @@ class InterpreterInstallGuidanceTests(unittest.TestCase):
             contextlib.redirect_stderr(output),
         ):
             self.assertEqual(cli_gui.run_tui(), 1)
-            self.assertIn(pip_install_command("textual>=0.70.0"), output.getvalue())
+            self.assertIn(
+                textwrap.indent(pip_install_command("textual>=0.70.0"), "  "), output.getvalue()
+            )
         self.assertIn("scripts/python -m pip install -e '.[gui]'", output.getvalue())
+
+    def test_windows_missing_gui_labels_and_commands_have_consistent_indentation(self):
+        output = io.StringIO()
+        with (
+            mock.patch.object(sys, "platform", "win32"),
+            mock.patch.object(sys, "executable", self._python_in("GUI Env's Python")),
+            mock.patch.object(cli_gui.importlib.util, "find_spec", return_value=None),
+            contextlib.redirect_stderr(output),
+        ):
+            self.assertEqual(cli_gui.run_tui(), 1)
+        lines = output.getvalue().splitlines()
+        for label in ("  cmd.exe:", "  PowerShell:"):
+            self.assertIn(label, lines)
+            self.assertTrue(lines[lines.index(label) + 1].startswith("    "))
 
     def test_export_errors_target_the_running_interpreter(self):
         for kind, module, requirement in (

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import textwrap
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -17,7 +18,7 @@ Error: TUI dependencies are not installed.
 To launch the terminal interface, install the optional gui package:
   scripts/python -m pip install -e '.[gui]'
 For this running interpreter (GUI dependency):
-  {gui_install}
+{gui_install}
 Or if developing locally:
   uv pip install --python .venv -e '.[gui]'
 Or use command-line mode:
@@ -89,7 +90,9 @@ def run_tui() -> int:
     """Launch the Textual application or print install instructions."""
     if importlib.util.find_spec("textual") is None:
         print(
-            _MISSING_GUI_MESSAGE.format(gui_install=pip_install_command("textual>=0.70.0")),
+            _MISSING_GUI_MESSAGE.format(
+                gui_install=textwrap.indent(pip_install_command("textual>=0.70.0"), "  ")
+            ),
             file=sys.stderr,
         )
         return 1
