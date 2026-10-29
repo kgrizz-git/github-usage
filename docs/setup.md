@@ -37,6 +37,10 @@ PYTHONPATH=src python3 -m github_usage --cli --help
 
 The root-level `github-usage` file is a compatibility wrapper for the packaged CLI. Checkout commands here use `./start.sh` or `scripts/python -m github_usage` and do not require `.venv/bin` on PATH.
 
+### Windows shells
+
+The core Python CLI can run on Windows; checkout shell scripts such as `./start.sh` require Bash. Use your installation interpreter to run the `github_usage` module in a native Windows shell. Help and dependency errors show separately labeled **cmd.exe** and **PowerShell** installation commands on Windows. Copy only the command for your shell, without its label. PowerShell uses `&` to invoke the quoted interpreter path; cmd.exe uses double quotes around paths and requirement constraints. For argument characters that cmd.exe expands even inside quotes (`%` or `!`), the guidance offers only the PowerShell form.
+
 ## Setup and interfaces
 
 Run the shell commands in this guide from the repository root.

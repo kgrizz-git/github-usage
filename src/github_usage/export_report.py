@@ -118,8 +118,8 @@ def _check_optional_deps(export_format: str) -> None:
             raise RuntimeError(
                 "XLSX export requires openpyxl. From a checkout, install with: "
                 "scripts/python -m pip install -e '.[export-xlsx]'. "
-                "Otherwise, use the Python environment running github-usage: "
-                f"{pip_install_command('openpyxl>=3.1')}."
+                "Otherwise, use the Python environment running github-usage:\n"
+                f"{pip_install_command('openpyxl>=3.1')}"
             ) from exc
     if export_format == "pdf":
         try:
@@ -128,8 +128,8 @@ def _check_optional_deps(export_format: str) -> None:
             raise RuntimeError(
                 "PDF export requires fpdf2. From a checkout, install with: "
                 "scripts/python -m pip install -e '.[export-pdf]'. "
-                "Otherwise, use the Python environment running github-usage: "
-                f"{pip_install_command('fpdf2>=2.7')}."
+                "Otherwise, use the Python environment running github-usage:\n"
+                f"{pip_install_command('fpdf2>=2.7')}"
             ) from exc
 
 

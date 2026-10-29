@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import shlex
 import sys
+import textwrap
+from typing import Literal
 
 _HELP = """GitHub Monthly Usage Report
 
@@ -66,7 +68,7 @@ Email-report options:
 TUI optional dependency:
   From a checkout: scripts/python -m pip install -e '.[gui]'
   Add the GUI dependency to this running interpreter (equivalent to the gui extra):
-  {gui_install}
+{gui_install}
 
 Note: a --month YYYY-MM flag for historical billing queries is planned but
 deferred. GitHub's billing endpoints do not currently support date-range
@@ -83,20 +85,57 @@ Export optional dependencies (checkout commands):
   scripts/python -m pip install -e '.[export-xlsx]'   # for --export xlsx
   scripts/python -m pip install -e '.[export-pdf]'    # for --export pdf
   Outside a checkout, use the same Python environment running github-usage:
-  {xlsx_install}   # XLSX
-  {pdf_install}    # PDF
+  XLSX:
+{xlsx_install}
+  PDF:
+{pdf_install}
 """
 
 
-def pip_install_command(requirement: str) -> str:
-    """Return a POSIX-shell pip install command using this process's interpreter."""
-    return shlex.join([sys.executable, "-m", "pip", "install", requirement])
+InstallShell = Literal["posix", "cmd", "powershell"]
+
+
+def pip_install_command(requirement: str, *, target_shell: InstallShell | None = None) -> str:
+    """Render pip installation using the running interpreter for the selected shell.
+
+    With no shell specified, POSIX platforms retain shlex rendering. Windows
+    displays labeled cmd.exe and PowerShell alternatives rather than guessing
+    the parent shell. cmd.exe cannot safely represent quotes, percent signs,
+    exclamation marks, or line breaks here; explicit cmd requests reject those
+    arguments, and automatic Windows output gives PowerShell guidance instead.
+    """
+    if target_shell is None:
+        if sys.platform != "win32":
+            return pip_install_command(requirement, target_shell="posix")
+        powershell = pip_install_command(requirement, target_shell="powershell")
+        try:
+            cmd = pip_install_command(requirement, target_shell="cmd")
+        except ValueError:
+            return (
+                "PowerShell:\n  "
+                + powershell
+                + "\ncmd.exe: use PowerShell above for these argument characters."
+            )
+        return f"cmd.exe:\n  {cmd}\nPowerShell:\n  {powershell}"
+    if target_shell == "posix":
+        return shlex.join([sys.executable, "-m", "pip", "install", requirement])
+    if target_shell == "powershell":
+        executable = sys.executable.replace("'", "''")
+        package = requirement.replace("'", "''")
+        return f"& '{executable}' -m pip install '{package}'"
+    if target_shell == "cmd":
+        if any(character in sys.executable + requirement for character in '\r\n"%!'):
+            raise ValueError(
+                "Use PowerShell for arguments containing quotes, %, !, or line breaks."
+            )
+        return f'"{sys.executable}" -m pip install "{requirement}"'
+    raise ValueError(f"Unsupported installation shell: {target_shell}")
 
 
 def get_help() -> str:
-    """Render CLI help with installation commands for the current interpreter."""
+    """Render CLI help with installation commands for the current platform."""
     return _HELP.format(
-        gui_install=pip_install_command("textual>=0.70.0"),
-        xlsx_install=pip_install_command("openpyxl>=3.1"),
-        pdf_install=pip_install_command("fpdf2>=2.7"),
+        gui_install=textwrap.indent(pip_install_command("textual>=0.70.0"), "  "),
+        xlsx_install=textwrap.indent(pip_install_command("openpyxl>=3.1"), "  "),
+        pdf_install=textwrap.indent(pip_install_command("fpdf2>=2.7"), "  "),
     )

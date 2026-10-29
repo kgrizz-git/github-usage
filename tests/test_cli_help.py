@@ -25,7 +25,7 @@ class InterpreterInstallGuidanceTests(unittest.TestCase):
     def test_pip_command_preserves_interpreter_and_requirement_as_single_arguments(self):
         executable = self._python_in("Test Env's Python")
         with mock.patch.object(sys, "executable", executable):
-            command = pip_install_command("textual>=0.70.0")
+            command = pip_install_command("textual>=0.70.0", target_shell="posix")
         self.assertEqual(
             shlex.split(command),
             [executable, "-m", "pip", "install", "textual>=0.70.0"],
@@ -43,14 +43,25 @@ class InterpreterInstallGuidanceTests(unittest.TestCase):
                 ):
                     self.assertEqual(cli.main(args), 0)
                     for requirement in ("textual>=0.70.0", "openpyxl>=3.1", "fpdf2>=2.7"):
-                        self.assertIn(pip_install_command(requirement), output.getvalue())
+                        self.assertIn(
+                            "\n".join(
+                                line.strip()
+                                for line in pip_install_command(requirement).splitlines()
+                            ),
+                            "\n".join(line.strip() for line in output.getvalue().splitlines()),
+                        )
                 token.assert_not_called()
                 self.assertIn("scripts/python -m pip install -e '.[gui]'", output.getvalue())
 
     def test_help_generation_does_not_keep_an_old_interpreter(self):
         for executable in (self._python_in("first"), self._python_in("second")):
             with mock.patch.object(sys, "executable", executable):
-                self.assertIn(shlex.quote(executable), get_help())
+                self.assertIn(
+                    "\n".join(
+                        line.strip() for line in pip_install_command("textual>=0.70.0").splitlines()
+                    ),
+                    "\n".join(line.strip() for line in get_help().splitlines()),
+                )
 
     def test_missing_gui_error_targets_the_running_interpreter(self):
         output = io.StringIO()
@@ -75,7 +86,6 @@ class InterpreterInstallGuidanceTests(unittest.TestCase):
                     self.assertRaises(RuntimeError) as error,
                 ):
                     export_report.export({}, kind)
-                command = shlex.join(
-                    [self._python_in("Export Env's Python"), "-m", "pip", "install", requirement]
-                )
+                with mock.patch.object(sys, "executable", self._python_in("Export Env's Python")):
+                    command = pip_install_command(requirement)
                 self.assertIn(command, str(error.exception))
