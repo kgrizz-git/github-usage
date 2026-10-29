@@ -308,7 +308,10 @@ include_release_assets = {_bool(ga.get("include_release_assets"))}
 
 
 def write_config(path: Path, config: dict) -> None:
-    """Write config.toml from a nested dict (legacy or multi-profile)."""
+    """Rebuild report, schedule, and Actions tables for legacy or named profiles.
+
+    Other configuration tables, including ``[cache]``, are not preserved.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     profiles = config.get("profiles") or load_report_profiles(config)
     multi = bool(config.get("reports")) or len(profiles) > 1

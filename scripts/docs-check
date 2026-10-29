@@ -20,6 +20,7 @@ for path in "${required[@]}"; do
 done
 
 PYTHONPATH=src scripts/python -m github_usage --help | grep -q "GITHUB_TOKEN"
+PYTHONPATH=src scripts/python -m github_usage --help | grep -q "GH_USAGE_TOKEN"
 grep -q "github-usage" README.md
 grep -qE '(^|[[:space:]])\./start\.sh([[:space:]]|$)' README.md
 test -x start.sh

@@ -16,6 +16,8 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertIn("GitHub Monthly Usage Report", stdout.getvalue())
+        token_help = stdout.getvalue().split("Token resolution:", 1)[1]
+        self.assertLess(token_help.index("GH_USAGE_TOKEN"), token_help.index("GITHUB_TOKEN"))
         resolve_token.assert_not_called()
 
     def test_missing_token_exits_one_with_clear_message(self):
@@ -33,7 +35,7 @@ class CliTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn("Error: No GitHub token found.", output)
         self.assertIn("Usage: github-usage <token>", output)
-        self.assertIn("Or set GITHUB_TOKEN env var.", output)
+        self.assertIn("Or set GH_USAGE_TOKEN or GITHUB_TOKEN env var.", output)
         self.assertIn("Or run: gh auth login", output)
 
     def test_setup_help_exits_zero(self):

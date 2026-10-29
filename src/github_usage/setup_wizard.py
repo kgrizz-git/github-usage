@@ -261,7 +261,7 @@ def _status_only(paths: SetupPaths) -> int:
 
 
 _REINSTALL_REMINDER = (
-    "LaunchAgent is installed. Run option 5 (macOS launchd schedule) "
+    "LaunchAgent is installed. Run option 6 (macOS launchd schedule) "
     "and choose install to apply the new schedule."
 )
 

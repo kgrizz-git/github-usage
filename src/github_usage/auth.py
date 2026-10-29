@@ -12,15 +12,18 @@ from pathlib import Path
 
 
 def print_missing_token_error(usage_command="github-usage"):
-    """Print a human-readable error explaining how to supply a GitHub token."""
+    """Print token sources, including both supported environment variables."""
     print("Error: No GitHub token found.")
     print(f"  Usage: {usage_command} <token>")
-    print("  Or set GITHUB_TOKEN env var.")
+    print("  Or set GH_USAGE_TOKEN or GITHUB_TOKEN env var.")
     print("  Or run: gh auth login")
 
 
 def resolve_token(argv: Sequence[str] | None = None):
-    """Return the GitHub token from argv, env, gh CLI, or config file; None if not found."""
+    """Return argv, GH_USAGE_TOKEN, GITHUB_TOKEN, gh CLI, or config token in that order.
+
+    Return None when no source provides a token; this does not load local env files.
+    """
     if argv is None:
         argv = sys.argv[1:]
     if argv:

@@ -15,6 +15,20 @@ class AuthTests(unittest.TestCase):
         ):
             self.assertEqual(auth.resolve_token(), "arg-token")
 
+    def test_usage_token_takes_precedence_over_github_token(self):
+        from github_usage import auth
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"GH_USAGE_TOKEN": "usage-token", "GITHUB_TOKEN": "github-token"},
+                clear=True,
+            ),
+            mock.patch.object(auth.subprocess, "run") as run,
+        ):
+            self.assertEqual(auth.resolve_token(argv=[]), "usage-token")
+            run.assert_not_called()
+
     def test_environment_token_wins_over_gh_cli(self):
         from github_usage import auth
 

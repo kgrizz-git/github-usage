@@ -86,6 +86,9 @@ class ExportReportDependencyTests(unittest.TestCase):
             )
         self.assertIn("openpyxl", str(ctx.exception))
         self.assertIn("export-xlsx", str(ctx.exception))
+        from github_usage.cli_help import pip_install_command
+
+        self.assertIn(pip_install_command("openpyxl>=3.1"), str(ctx.exception))
 
     def test_raises_on_missing_pdf_dep(self):
         with (
@@ -95,6 +98,9 @@ class ExportReportDependencyTests(unittest.TestCase):
             export_report.export(self.data, "pdf", output_path=os.path.join(self.tmpdir, "out.pdf"))
         self.assertIn("fpdf2", str(ctx.exception))
         self.assertIn("export-pdf", str(ctx.exception))
+        from github_usage.cli_help import pip_install_command
+
+        self.assertIn(pip_install_command("fpdf2>=2.7"), str(ctx.exception))
 
 
 class ExportReportNoneAndRedactionTests(unittest.TestCase):

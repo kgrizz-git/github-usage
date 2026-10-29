@@ -302,6 +302,10 @@ class ScheduleMenuOptionTests(unittest.TestCase):
         regen.assert_called_once_with(self.paths)
         output = stdout.getvalue()
         self.assertIn(_REINSTALL_REMINDER, output)
+        launchd_key, launchd_label, *_ = next(
+            option for option in _MENU_OPTIONS if option[1] == "macOS launchd schedule"
+        )
+        self.assertIn(f"Run option {launchd_key} ({launchd_label})", output)
         self.assertEqual(output.count(_REINSTALL_REMINDER), 1)
 
     def test_schedule_only_skips_reminder_when_not_installed(self):
