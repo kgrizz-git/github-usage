@@ -8,12 +8,16 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from .cli_help import get_help, pip_install_command
+
 KNOWN_SUBCOMMANDS = frozenset({"setup", "email-report", "runs"})
 
 _MISSING_GUI_MESSAGE = """\
 Error: TUI dependencies are not installed.
 To launch the terminal interface, install the optional gui package:
-  .venv/bin/pip install -e '.[gui]'
+  scripts/python -m pip install -e '.[gui]'
+For this running interpreter (GUI dependency):
+  {gui_install}
 Or if developing locally:
   uv pip install --python .venv -e '.[gui]'
 Or use command-line mode:
@@ -49,8 +53,6 @@ def _wants_cli_help(argv: list[str]) -> bool:
 
 def route_entry(argv: Sequence[str]) -> RouteResult:
     """Decide whether to launch the TUI or continue with CLI dispatch."""
-    from .cli import HELP
-
     argv_list = list(argv)
     had_cli_flag = "--cli" in argv_list
     stripped, cli_mode = _strip_cli_flag(argv_list)
@@ -66,7 +68,7 @@ def route_entry(argv: Sequence[str]) -> RouteResult:
 
     if cli_mode and not stripped:
         if had_cli_flag:
-            print(HELP)
+            print(get_help())
             return RouteResult(handled=True, argv=[], exit_code=0)
         return RouteResult(handled=False, argv=[])
 
@@ -77,7 +79,7 @@ def route_entry(argv: Sequence[str]) -> RouteResult:
         return RouteResult(handled=True, argv=[], exit_code=run_tui())
 
     if not stripped:
-        print(HELP)
+        print(get_help())
         return RouteResult(handled=True, argv=[], exit_code=0)
 
     return RouteResult(handled=False, argv=stripped)
@@ -86,7 +88,10 @@ def route_entry(argv: Sequence[str]) -> RouteResult:
 def run_tui() -> int:
     """Launch the Textual application or print install instructions."""
     if importlib.util.find_spec("textual") is None:
-        print(_MISSING_GUI_MESSAGE, file=sys.stderr)
+        print(
+            _MISSING_GUI_MESSAGE.format(gui_install=pip_install_command("textual>=0.70.0")),
+            file=sys.stderr,
+        )
         return 1
     from .gui.app import GitHubUsageApp
 

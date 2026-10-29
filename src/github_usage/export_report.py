@@ -20,6 +20,7 @@ import sys
 import tempfile
 
 from . import export_csv, export_json, export_pdf, export_text, export_xlsx, redact
+from .cli_help import pip_install_command
 
 _STRUCTURED_FORMATS = {"csv", "xlsx", "pdf"}
 _BINARY_FORMATS = {"xlsx", "pdf"}
@@ -118,7 +119,7 @@ def _check_optional_deps(export_format: str) -> None:
                 "XLSX export requires openpyxl. From a checkout, install with: "
                 "scripts/python -m pip install -e '.[export-xlsx]'. "
                 "Otherwise, use the Python environment running github-usage: "
-                "python3 -m pip install 'openpyxl>=3.1'."
+                f"{pip_install_command('openpyxl>=3.1')}."
             ) from exc
     if export_format == "pdf":
         try:
@@ -128,7 +129,7 @@ def _check_optional_deps(export_format: str) -> None:
                 "PDF export requires fpdf2. From a checkout, install with: "
                 "scripts/python -m pip install -e '.[export-pdf]'. "
                 "Otherwise, use the Python environment running github-usage: "
-                "python3 -m pip install 'fpdf2>=2.7'."
+                f"{pip_install_command('fpdf2>=2.7')}."
             ) from exc
 
 

@@ -81,7 +81,7 @@ scripts/python -m pip install -e '.[export-pdf]'    # adds fpdf2
 ```
 
 `--export xlsx` and `--export pdf` produce a clear error with the install
-hint when the dependency is missing. Outside a checkout, install `openpyxl>=3.1` for XLSX or `fpdf2>=2.7` for PDF with the Python interpreter running `github-usage` (for example, `python3 -m pip install 'openpyxl>=3.1'` in that active environment). For a machine-readable JSON file, use `--output`; stdout also includes the human-readable report.
+hint when the dependency is missing. Outside a checkout, install `openpyxl>=3.1` for XLSX or `fpdf2>=2.7` for PDF with the Python interpreter running `github-usage` (the CLI help and missing-dependency errors print a shell-quoted command using the actual running interpreter). For a machine-readable JSON file, use `--output`; stdout also includes the human-readable report.
 
 This project provides separate extras; install both with `scripts/python -m pip install -e '.[export-xlsx,export-pdf]'` if needed.
 

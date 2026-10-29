@@ -54,6 +54,8 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **Interpreter-specific install help:** TUI/CLI help and export dependency errors use the running Python interpreter with shell-safe quoting, alongside checkout commands. Setup examples work without `.venv/bin` on PATH.
+
 - **Full documentation review follow-ups:** correct checkout installation and CLI export examples, document partial redaction and sensitive filenames, restore cache/refresh and named-profile guidance, and align token help and the LaunchAgent reinstall reminder with actual behavior. The smoke script’s live invalid-token probe now requires `GITHUB_USAGE_LIVE_TESTS=1`.
 
 - **Documentation review fixes:** authenticate explicitly before the first local full report (setup saves email credentials separately), and prompt for the Resend key in the manual email example instead of assigning a credential-shaped placeholder.

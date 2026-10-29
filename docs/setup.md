@@ -27,7 +27,7 @@ scripts/python -m pip install -e '.[gui]'
 ./start.sh
 ```
 
-Alternatively, install into your own active Python environment with `python3 -m pip install -e .`, then use `github-usage --cli --help` there for CLI help. That installation does not populate the separate `.venv` used by `./start.sh`. Install extras into whichever environment runs the command.
+Alternatively, install into your own active Python environment with `python3 -m pip install -e .`, then run `python3 -m github_usage --cli --help` with that same interpreter for CLI help. That installation does not populate the separate `.venv` used by `./start.sh`. Install extras into whichever environment runs the command.
 
 For source-only CLI help without installing:
 
@@ -35,7 +35,7 @@ For source-only CLI help without installing:
 PYTHONPATH=src python3 -m github_usage --cli --help
 ```
 
-The root-level `github-usage` file is a compatibility wrapper for the packaged CLI.
+The root-level `github-usage` file is a compatibility wrapper for the packaged CLI. Checkout commands here use `./start.sh` or `scripts/python -m github_usage` and do not require `.venv/bin` on PATH.
 
 ## Setup and interfaces
 
@@ -55,11 +55,11 @@ The TUI and bash menu are separate interfaces; the setup wizard has its own choi
 
 | Interface | Invocation | Purpose |
 |-----------|------------|---------|
-| **Textual TUI** (default) | `./start.sh` or `github-usage` in a TTY | Top tabs for Setup, Local Full Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs plus **Start guided setup**. Schedules use day/time pickers. Keys: **1**–**5** switch views, **j**/**k** line scroll, **PgUp**/**PgDn** page scroll, **Ctrl+Home**/**Ctrl+End** top/bottom, **Ctrl+S** save / **Ctrl+R** run/refresh (view-specific), **Escape** cancel, **q** quit |
+| **Textual TUI** (default) | `./start.sh` or `scripts/python -m github_usage` in a TTY | Top tabs for Setup, Local Full Report, Email Report, Schedules, Runs & Drift. Setup has sub-tabs plus **Start guided setup**. Schedules use day/time pickers. Keys: **1**–**5** switch views, **j**/**k** line scroll, **PgUp**/**PgDn** page scroll, **Ctrl+Home**/**Ctrl+End** top/bottom, **Ctrl+S** save / **Ctrl+R** run/refresh (view-specific), **Escape** cancel, **q** quit |
 | **CLI bash menu** | `./start.sh --cli` | **1** setup · **2** report · **3** email-report · **4** runs · **5** runs-diff · **6** help · **7** exit |
 | **Setup wizard** | `./start.sh setup` or bash menu **1** | **1** full setup · **2** secrets · **3** report options · **4** report schedule · **5** GitHub Actions workflow · **6** macOS launchd · **7** GitHub Actions secrets · **8** dev hooks · **9** verify · **m** manage profiles · **0** status |
 
-Subcommand shortcuts (`./start.sh setup`, `github-usage runs`, etc.) work without `--cli`.
+Subcommand shortcuts (`./start.sh setup`, `scripts/python -m github_usage runs`, etc.) work without `--cli`.
 
 The guided wizard can:
 
