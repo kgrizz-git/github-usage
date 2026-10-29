@@ -10,3 +10,5 @@
 - [x] Archive and commit the implementation for the same Qoder agent to review before push.
 
 Verification: `scripts/check` (754 tests and type/coverage/complexity gates), offline `scripts/smoke`, `scripts/docs-check`, 57 focused tests, and 46 local links/anchors passed. Regression cases cover current interpreter paths containing spaces/apostrophes, both help routes, missing GUI/XLSX/PDF dependencies, and no token resolution for help. The same Qoder DeepSeek reviewer must review this committed change before push.
+
+**Done:** 2026-10-28 — CodeFactor reported B108 on synthetic `/tmp` interpreter strings in test fixtures. The tests now derive fake interpreter paths from a managed `TemporaryDirectory`, preserving spaces/apostrophes coverage without hardcoded temporary-directory paths or scanner suppressions.

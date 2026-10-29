@@ -4,7 +4,9 @@ import contextlib
 import io
 import shlex
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from github_usage import cli, cli_gui, export_report
@@ -12,8 +14,16 @@ from github_usage.cli_help import get_help, pip_install_command
 
 
 class InterpreterInstallGuidanceTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+
+    def _python_in(self, environment):
+        return str(self.root / environment / "bin" / "python")
+
     def test_pip_command_preserves_interpreter_and_requirement_as_single_arguments(self):
-        executable = "/tmp/Test Env's Python/bin/python"
+        executable = self._python_in("Test Env's Python")
         with mock.patch.object(sys, "executable", executable):
             command = pip_install_command("textual>=0.70.0")
         self.assertEqual(
@@ -22,7 +32,7 @@ class InterpreterInstallGuidanceTests(unittest.TestCase):
         )
 
     def test_both_help_routes_render_commands_for_the_current_interpreter(self):
-        executable = "/tmp/Other Env's Python/bin/python"
+        executable = self._python_in("Other Env's Python")
         for args in (["--help"], ["--cli"]):
             with self.subTest(args=args):
                 output = io.StringIO()
@@ -38,14 +48,14 @@ class InterpreterInstallGuidanceTests(unittest.TestCase):
                 self.assertIn("scripts/python -m pip install -e '.[gui]'", output.getvalue())
 
     def test_help_generation_does_not_keep_an_old_interpreter(self):
-        for executable in ("/tmp/first/python", "/tmp/second/python"):
+        for executable in (self._python_in("first"), self._python_in("second")):
             with mock.patch.object(sys, "executable", executable):
                 self.assertIn(shlex.quote(executable), get_help())
 
     def test_missing_gui_error_targets_the_running_interpreter(self):
         output = io.StringIO()
         with (
-            mock.patch.object(sys, "executable", "/tmp/GUI Env's Python/bin/python"),
+            mock.patch.object(sys, "executable", self._python_in("GUI Env's Python")),
             mock.patch.object(cli_gui.importlib.util, "find_spec", return_value=None),
             contextlib.redirect_stderr(output),
         ):
@@ -60,12 +70,12 @@ class InterpreterInstallGuidanceTests(unittest.TestCase):
         ):
             with self.subTest(format=kind):
                 with (
-                    mock.patch.object(sys, "executable", "/tmp/Export Env's Python/bin/python"),
+                    mock.patch.object(sys, "executable", self._python_in("Export Env's Python")),
                     mock.patch.dict(sys.modules, {module: None}),
                     self.assertRaises(RuntimeError) as error,
                 ):
                     export_report.export({}, kind)
                 command = shlex.join(
-                    ["/tmp/Export Env's Python/bin/python", "-m", "pip", "install", requirement]
+                    [self._python_in("Export Env's Python"), "-m", "pip", "install", requirement]
                 )
                 self.assertIn(command, str(error.exception))
