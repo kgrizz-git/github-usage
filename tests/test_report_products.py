@@ -98,3 +98,24 @@ class ProductsReportTests(unittest.TestCase):
 
         output = stdout.getvalue()
         self.assertIn("Base Costs", output)
+
+    def test_render_copilot_summary_ai_credits_uses_metering_helpers(self):
+        from github_usage.report_products import render_copilot_summary
+
+        copilot = {
+            "metering": "ai_credits",
+            "total_credits_used": 42.5,
+            "total_net": 0.0,
+            "by_model": {
+                "gpt-4": {"requests": 30.0, "gross": 0.0, "discount": 0.0, "net": 0.0},
+                "gpt-3.5": {"requests": 12.5, "gross": 0.0, "discount": 0.0, "net": 0.0},
+            },
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            render_copilot_summary(copilot, None)
+
+        output = stdout.getvalue()
+        self.assertIn("AI credits used (quantity): 42.50", output)
+        self.assertIn("gpt-4: 30.00 credits (gross quantity)", output)
+        self.assertNotIn("Total requests:", output)

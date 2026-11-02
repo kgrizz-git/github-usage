@@ -5,6 +5,11 @@ from __future__ import annotations
 from collections import defaultdict
 
 from .billing import get_billing_summary, get_full_billing, get_premium_request_usage
+from .copilot_metering import (
+    _effective_metering,
+    copilot_model_detail_line,
+    copilot_usage_summary_lines,
+)
 from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .report_sources import print_premium_request_model_breakdown
 from .terminal import print_section
@@ -311,20 +316,32 @@ def render_copilot_summary(copilot: dict | None, premium_by_model: dict | None) 
         print("  No Copilot usage data found.")
         print()
         return
+    metering = _effective_metering(copilot)
     print("  Summary:")
-    total_requests = copilot.get("total_requests", 0)
-    print(
-        f"    {'TOTAL':<35} {total_requests:>10.2f} requests | "
-        f"gross: {fmt_price(copilot.get('total_gross', 0))} | "
-        f"discount: {fmt_price(copilot.get('total_discount', 0))} | "
-        f"net: {fmt_price(copilot.get('total_net', 0))}"
-    )
+    if metering == "ai_credits":
+        for line in copilot_usage_summary_lines(copilot):
+            print(f"  {line}")
+    else:
+        total_requests = copilot.get("total_requests", 0)
+        print(
+            f"    {'TOTAL':<35} {total_requests:>10.2f} requests | "
+            f"gross: {fmt_price(copilot.get('total_gross', 0))} | "
+            f"discount: {fmt_price(copilot.get('total_discount', 0))} | "
+            f"net: {fmt_price(copilot.get('total_net', 0))}"
+        )
     print()
     print("  By Model:")
     if not premium_by_model:
         by_model = copilot.get("by_model") or {}
         if not by_model:
             print("    No model-level data available.")
+            print()
+            return
+        if metering == "ai_credits":
+            for model, data in sorted(
+                by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
+            ):
+                print(copilot_model_detail_line(model, data, metering="ai_credits"))
             print()
             return
         for model, data in sorted(
