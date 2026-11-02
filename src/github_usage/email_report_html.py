@@ -11,6 +11,7 @@ from ._email_report_common import (
     email_actions_table_rows,
 )
 from .copilot_metering import (
+    _effective_metering,
     copilot_model_detail_line,
     copilot_section_title,
     copilot_usage_summary_lines,
@@ -81,7 +82,7 @@ def _format_html_copilot_section(data: dict) -> list[str]:
     copilot = data.get("copilot")
     if not copilot:
         return []
-    metering = copilot.get("metering") or "premium_requests"
+    metering = _effective_metering(copilot)
     parts = [
         f"<h2>{html.escape(copilot_section_title(copilot))}</h2>",
         "<ul>",
@@ -95,7 +96,9 @@ def _format_html_copilot_section(data: dict) -> list[str]:
         parts.append("<ul>")
         for model, values in sorted(by_model.items()):
             detail = copilot_model_detail_line(model, values, metering=metering).strip()
-            parts.append(f"<li>{html.escape(detail.removeprefix('- '))}</li>")
+            if detail.startswith("- "):
+                detail = detail[2:]
+            parts.append(f"<li>{html.escape(detail)}</li>")
     parts.append(_UL_CLOSE)
     return parts
 

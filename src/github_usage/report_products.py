@@ -318,45 +318,41 @@ def render_copilot_summary(copilot: dict | None, premium_by_model: dict | None) 
         return
     metering = _effective_metering(copilot)
     print("  Summary:")
-    if metering == "ai_credits":
-        for line in copilot_usage_summary_lines(copilot):
-            print(f"  {line}")
-    else:
-        total_requests = copilot.get("total_requests", 0)
-        print(
-            f"    {'TOTAL':<35} {total_requests:>10.2f} requests | "
-            f"gross: {fmt_price(copilot.get('total_gross', 0))} | "
-            f"discount: {fmt_price(copilot.get('total_discount', 0))} | "
-            f"net: {fmt_price(copilot.get('total_net', 0))}"
-        )
+    for line in copilot_usage_summary_lines(copilot):
+        print(f"  {line}")
     print()
     print("  By Model:")
-    if not premium_by_model:
+    if metering == "ai_credits":
         by_model = copilot.get("by_model") or {}
         if not by_model:
             print("    No model-level data available.")
             print()
             return
-        if metering == "ai_credits":
-            for model, data in sorted(
-                by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
-            ):
-                print(copilot_model_detail_line(model, data, metering="ai_credits"))
-            print()
-            return
         for model, data in sorted(
             by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
         ):
-            print(f"    {model}:")
-            print(f"      Total requests: {data.get('requests', 0):.2f}")
-            print(
-                f"      Gross: {fmt_price(data.get('gross', 0))} | "
-                f"Discount: {fmt_price(data.get('discount', 0))} | "
-                f"Net: {fmt_price(data.get('net', 0))}"
-            )
-            print()
+            print(copilot_model_detail_line(model, data, metering="ai_credits"))
+        print()
         return
-    print_premium_request_model_breakdown(premium_by_model)
+    if premium_by_model:
+        print_premium_request_model_breakdown(premium_by_model)
+        return
+    by_model = copilot.get("by_model") or {}
+    if not by_model:
+        print("    No model-level data available.")
+        print()
+        return
+    for model, data in sorted(
+        by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
+    ):
+        print(f"    {model}:")
+        print(f"      Total requests: {data.get('requests', 0):.2f}")
+        print(
+            f"      Gross: {fmt_price(data.get('gross', 0))} | "
+            f"Discount: {fmt_price(data.get('discount', 0))} | "
+            f"Net: {fmt_price(data.get('net', 0))}"
+        )
+        print()
 
 
 def render_gitlfs_summary(git_lfs: dict | None) -> None:

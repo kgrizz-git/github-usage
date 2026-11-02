@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import unittest
 
-from github_usage.copilot_metering import copilot_forecast_metric, copilot_usage_summary_lines
+from github_usage.copilot_metering import (
+    _effective_metering,
+    copilot_forecast_metric,
+    copilot_usage_summary_lines,
+)
 
 
 class CopilotMeteringTests(unittest.TestCase):
@@ -29,6 +33,22 @@ class CopilotMeteringTests(unittest.TestCase):
         joined = "\n".join(lines)
         self.assertIn("100.00", joined)
         self.assertNotIn("billing units", joined)
+
+    def test_effective_metering_returns_explicit_premium_requests(self):
+        copilot = {
+            "metering": "premium_requests",
+            "total_credits_used": 999.0,
+            "total_requests": 0.0,
+        }
+        self.assertEqual(_effective_metering(copilot), "premium_requests")
+
+    def test_effective_metering_unknown_infers_from_credits(self):
+        copilot = {
+            "metering": "unknown",
+            "total_credits_used": 12.0,
+            "total_requests": 100.0,
+        }
+        self.assertEqual(_effective_metering(copilot), "ai_credits")
 
 
 if __name__ == "__main__":

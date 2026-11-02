@@ -12,9 +12,8 @@ from .report_helpers import fmt_price
 def _effective_metering(copilot: dict) -> str:
     """Infer metering for cached reports that predate the ``metering`` field."""
     metering = copilot.get("metering")
-    if metering in ("ai_credits", "premium_requests", "unknown"):
-        if metering != "unknown":
-            return metering
+    if metering in ("ai_credits", "premium_requests"):
+        return metering
     if float(copilot.get("total_credits_used") or 0.0) > 0:
         return "ai_credits"
     if float(copilot.get("total_requests") or 0.0) > 0 or copilot.get("by_model"):

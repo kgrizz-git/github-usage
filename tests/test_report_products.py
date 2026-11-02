@@ -119,3 +119,29 @@ class ProductsReportTests(unittest.TestCase):
         self.assertIn("AI credits used (quantity): 42.50", output)
         self.assertIn("gpt-4: 30.00 credits (gross quantity)", output)
         self.assertNotIn("Total requests:", output)
+
+    def test_render_copilot_summary_ai_credits_ignores_premium_by_model(self):
+        from github_usage.report_products import render_copilot_summary
+
+        copilot = {
+            "metering": "ai_credits",
+            "total_credits_used": 10.0,
+            "total_net": 0.0,
+            "by_model": {"gpt-4": {"requests": 10.0}},
+        }
+        premium_by_model = {
+            "legacy": {
+                "total_requests": 999.0,
+                "total_gross": 1.0,
+                "total_discount": 0.0,
+                "total_net": 1.0,
+                "items": [],
+            }
+        }
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            render_copilot_summary(copilot, premium_by_model)
+
+        output = stdout.getvalue()
+        self.assertIn("10.00 credits (gross quantity)", output)
+        self.assertNotIn("999.00", output)

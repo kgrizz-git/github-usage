@@ -8,9 +8,9 @@ from ._email_report_common import (
     email_actions_minutes_lines,
     email_actions_net_cost_line,
     email_actions_storage_lines,
-    email_actions_table_rows,
 )
 from .copilot_metering import (
+    _effective_metering,
     copilot_model_detail_line,
     copilot_section_title,
     copilot_usage_summary_lines,
@@ -70,7 +70,7 @@ def _format_copilot_section(data: dict) -> list[str]:
     copilot = data.get("copilot")
     if not copilot:
         return []
-    metering = copilot.get("metering") or "premium_requests"
+    metering = _effective_metering(copilot)
     lines = [copilot_section_title(copilot), *copilot_usage_summary_lines(copilot)]
     by_model = copilot.get("by_model") or {}
     if by_model:
