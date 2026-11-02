@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .copilot_metering import _effective_metering
 from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
@@ -142,6 +143,35 @@ def _repo_billed_storage_rows(data: dict[str, Any], *, limit: int = 10) -> list[
     return rows
 
 
+def _copilot_rows_from_copilot_section(
+    copilot: dict[str, Any] | None, errors: dict[str, Any]
+) -> list[tuple[str, str]]:
+    if copilot is None and errors.get("copilot"):
+        return [("Copilot", f"n/a ({errors['copilot']})")]
+    if not copilot:
+        return [("Copilot", "No usage")]
+    return [
+        ("Copilot gross", fmt_price(float(copilot.get("total_gross", 0.0)))),
+        ("Copilot net", fmt_price(float(copilot.get("total_net", 0.0)))),
+    ]
+
+
+def _copilot_by_model_tui_rows(copilot: dict[str, Any], *, limit: int = 5) -> list[tuple[str, str]]:
+    by_model = copilot.get("by_model") or {}
+    metering = _effective_metering(copilot)
+    rows: list[tuple[str, str]] = []
+    for model, values in sorted(
+        by_model.items(), key=lambda item: float(item[1].get("requests", 0)), reverse=True
+    )[:limit]:
+        qty = float(values.get("requests", 0))
+        net = float(values.get("net", 0.0))
+        if metering == "ai_credits":
+            rows.append((f"  {model}", f"{qty:.2f} credits · {fmt_price(net)}"))
+        else:
+            rows.append((f"  {model}", f"{qty:.0f} reqs · {fmt_price(net)}"))
+    return rows
+
+
 def _copilot_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     """Copilot billing summary rows."""
     errors = data.get("errors") or {}
@@ -149,26 +179,13 @@ def _copilot_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     if billing is None and errors.get("copilot_billing"):
         return [("Copilot", f"n/a ({errors['copilot_billing']})")]
     if not billing:
-        copilot = data.get("copilot")
-        if copilot is None and errors.get("copilot"):
-            return [("Copilot", f"n/a ({errors['copilot']})")]
-        if not copilot:
-            return [("Copilot", "No usage")]
-        return [
-            ("Copilot gross", fmt_price(float(copilot.get("total_gross", 0.0)))),
-            ("Copilot net", fmt_price(float(copilot.get("total_net", 0.0)))),
-        ]
+        return _copilot_rows_from_copilot_section(data.get("copilot"), errors)
     rows = [
         ("Copilot gross", fmt_price(float(billing.get("total_gross", 0.0)))),
         ("Copilot net", fmt_price(float(billing.get("total_net", 0.0)))),
     ]
-    by_model = (data.get("copilot") or {}).get("by_model") or {}
-    for model, values in sorted(
-        by_model.items(), key=lambda item: float(item[1].get("requests", 0)), reverse=True
-    )[:5]:
-        reqs = float(values.get("requests", 0))
-        net = float(values.get("net", 0.0))
-        rows.append((f"  {model}", f"{reqs:.0f} reqs · {fmt_price(net)}"))
+    copilot = data.get("copilot") or {}
+    rows.extend(_copilot_by_model_tui_rows(copilot))
     return rows
 
 
@@ -229,13 +246,14 @@ def _forecast_rows(
     rows.append(("Projected storage at month end", storage_line))
 
     premium = forecast["premium_requests"]
+    copilot_label = forecast.get("copilot_metric_label", "Premium Requests")
     if premium_requests_limit is not None:
         premium_line = f"{premium['projected']:.1f} / {premium_requests_limit:.0f}"
         if premium_requests_limit > 0:
             premium_line += f" ({premium['projected'] / premium_requests_limit * 100:.1f}%)"
-        rows.append(("Projected premium requests at month end", premium_line))
+        rows.append((f"Projected {copilot_label.lower()} at month end", premium_line))
     else:
-        rows.append(("Projected premium requests at month end", f"{premium['projected']:.1f}"))
+        rows.append((f"Projected {copilot_label.lower()} at month end", f"{premium['projected']:.1f}"))
 
     return rows
 

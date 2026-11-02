@@ -76,7 +76,7 @@ class ExportCsvTests(unittest.TestCase):
             sub.append(row)
         self.assertIn(["by_model"], sub)
         header_idx = sub.index(["by_model"])
-        self.assertEqual(sub[header_idx + 1], ["model", "requests", "gross", "discount", "net"])
+        self.assertEqual(sub[header_idx + 1], ["model", "Requests", "gross", "discount", "net"])
         model_names = {r[0] for r in sub[header_idx + 2 :] if r}
         self.assertIn("gpt-4.1", model_names)
         self.assertIn("claude-sonnet-4", model_names)
@@ -152,9 +152,9 @@ class ExportCsvTests(unittest.TestCase):
         )
         data_rows = [r for r in rows[forecast_idx + 2 :] if r]
         metrics = {r[0] for r in data_rows}
-        self.assertIn("minutes", metrics)
-        self.assertIn("storage_avg_mb", metrics)
-        self.assertIn("premium_requests", metrics)
+        self.assertIn("Actions Minutes", metrics)
+        self.assertIn("Storage (avg MB)", metrics)
+        self.assertIn("Premium Requests", metrics)
 
     def test_write_nested_uses_canonical_column_order(self):
         # Fix #6: values must be looked up by key, not by .values() order,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .report_forecast_data import build_report_forecast
+from .report_forecast_data import build_report_forecast, forecast_metric_rows
 from .terminal import print_header, print_sep
 
 
@@ -34,11 +34,7 @@ def render_forecast(
     def _run_out(value: int | None) -> str:
         return f"day {value}" if value is not None else "--"
 
-    rows = [
-        ("Actions Minutes", forecast["minutes"]),
-        ("Storage (avg MB)", forecast["storage_avg_mb"]),
-        ("Premium Requests", forecast["premium_requests"]),
-    ]
+    rows = forecast_metric_rows(forecast)
     for label, metric in rows:
         print(
             f"  {label:18} "

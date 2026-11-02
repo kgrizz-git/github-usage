@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Protocol
 
+from .copilot_usage_fetch import resolve_copilot_usage_sources
 from .report_actions import fetch_repo_actions_table
 from .report_helpers import fmt_price, gb_hours_to_avg_mb, sanitize_item_amounts
 from .report_optional import (
@@ -94,34 +95,60 @@ def get_actions_usage(api: GitHubAPIClient, username: str) -> dict:
     }
 
 
+def _copilot_by_model_from_billing(by_model: dict | None) -> dict:
+    if not by_model:
+        return {}
+    shaped: dict = {}
+    for model, values in by_model.items():
+        shaped[model] = {
+            "requests": float(values.get("total_requests", 0.0)),
+            "billable_quantity": float(values.get("total_net_quantity", 0.0)),
+            "gross": float(values.get("total_gross", 0.0)),
+            "discount": float(values.get("total_discount", 0.0)),
+            "net": float(values.get("total_net", 0.0)),
+        }
+    return shaped
+
+
 def get_copilot_usage(api: GitHubAPIClient, username: str) -> dict:
-    """Return Copilot billing totals and per-model premium request breakdown."""
+    """Return Copilot billing totals and per-model usage (AI credits or premium requests)."""
     summary = _billing_summary(api, username, "Copilot")
-    premium = api.request(
-        "GET",
-        f"/users/{username}/settings/billing/premium_request/usage",
-        {"product": "copilot"},
+    metering, source, fetch_notes = resolve_copilot_usage_sources(api, username)
+    by_model = _copilot_by_model_from_billing(source)
+    total_credits_used = sum(float(model["requests"]) for model in by_model.values())
+    total_billable_credits = sum(
+        float(model.get("billable_quantity", 0.0)) for model in by_model.values()
     )
-    if not isinstance(premium, dict):
-        premium = {}
-    by_model = {}
-    for item in premium.get("usageItems", []):
-        model = item.get("model", "Unknown")
-        entry = by_model.setdefault(
-            model, {"requests": 0.0, "gross": 0.0, "discount": 0.0, "net": 0.0}
+    premium_request_total = (
+        sum(float(model["requests"]) for model in by_model.values())
+        if metering == "premium_requests"
+        else 0.0
+    )
+    usage_note = None
+    if fetch_notes:
+        usage_note = " ".join(fetch_notes)
+    if not by_model:
+        empty_msg = (
+            "No AI credit or premium-request usage line items returned for this personal "
+            "account. If Copilot is licensed through an organization, usage is billed there "
+            "and does not appear on user billing endpoints."
         )
-        sanitized = sanitize_item_amounts(item)
-        entry["requests"] += float(sanitized.get("grossQuantity", 0.0))
-        entry["gross"] += float(sanitized.get("grossAmount", 0.0))
-        entry["discount"] += float(sanitized.get("discountAmount", 0.0))
-        entry["net"] += float(sanitized.get("netAmount", 0.0))
+        if metering == "unknown":
+            empty_msg = (
+                "Copilot billing usage endpoints did not return usable data for this account."
+            )
+        usage_note = f"{usage_note} {empty_msg}".strip() if usage_note else empty_msg
     cost = _summary_cost(summary)
     return {
-        "total_requests": sum(model["requests"] for model in by_model.values()),
+        "metering": metering,
+        "total_requests": premium_request_total,
+        "total_credits_used": total_credits_used if metering == "ai_credits" else 0.0,
+        "total_billable_credits": total_billable_credits,
         "total_gross": cost["gross"],
         "total_discount": cost["discount"],
         "total_net": cost["net"],
         "by_model": by_model,
+        "usage_note": usage_note,
     }
 
 

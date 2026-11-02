@@ -30,6 +30,28 @@ class BuildReportForecastTests(unittest.TestCase):
         self.assertEqual(forecast["storage_avg_mb"]["current"], 50.0)
         self.assertEqual(forecast["premium_requests"]["current"], 25.0)
         self.assertEqual(forecast["premium_requests"]["limit"], 1000.0)
+        self.assertEqual(forecast["copilot_metric_label"], "Premium Requests")
+
+    def test_ai_credit_forecast_label_and_quantity(self):
+        report = {
+            "actions": {
+                "minutes": 100.0,
+                "storage_avg_mb": 50.0,
+                "minutes_limit": 2000.0,
+                "storage_limit_mb": 500.0,
+            },
+            "copilot": {
+                "metering": "ai_credits",
+                "total_credits_used": 3956.18,
+                "total_requests": 0.0,
+            },
+        }
+        forecast = build_report_forecast(
+            report, premium_requests_limit=1000.0, reference_date=date(2026, 7, 15)
+        )
+        assert forecast is not None
+        self.assertEqual(forecast["premium_requests"]["current"], 3956.18)
+        self.assertIn("AI Credits", forecast["copilot_metric_label"])
 
     def test_missing_sections_default_to_zero(self):
         forecast = build_report_forecast(

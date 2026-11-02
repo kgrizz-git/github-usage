@@ -29,7 +29,9 @@ def get_billing_summary(api, username, product):
         return None
     if not isinstance(billing, dict):
         return None
-    items = billing.get("usageItems", [])
+    items = billing.get("usageItems") or []
+    if not isinstance(items, list):
+        return None
     summary = {"raw": billing, "items": {}, "total_gross": 0, "total_discount": 0, "total_net": 0}
     for item in items:
         sku = item.get("sku", item.get("product", "unknown"))
@@ -41,42 +43,94 @@ def get_billing_summary(api, username, product):
     return summary
 
 
-def get_premium_request_usage(api, username, product="copilot", model=None):
-    """Get premium request usage breakdown by model."""
-    params = {"product": product}
+def _usage_items_by_model(items: list) -> dict:
+    """Aggregate billing ``usageItems`` into per-model totals."""
+    by_model: dict = {}
+    for item in items:
+        model = item.get("model", "Unknown")
+        if model not in by_model:
+            by_model[model] = {
+                "items": [],
+                "total_requests": 0.0,
+                "total_net_quantity": 0.0,
+                "total_gross": 0.0,
+                "total_discount": 0.0,
+                "total_net": 0.0,
+            }
+        sanitized = sanitize_item_amounts(item)
+        by_model[model]["items"].append(sanitized)
+        by_model[model]["total_requests"] += _safe_amount(sanitized, "grossQuantity")
+        by_model[model]["total_net_quantity"] += _safe_amount(sanitized, "netQuantity")
+        by_model[model]["total_gross"] += _safe_amount(sanitized, "grossAmount")
+        by_model[model]["total_discount"] += _safe_amount(sanitized, "discountAmount")
+        by_model[model]["total_net"] += _safe_amount(sanitized, "netAmount")
+    return by_model
+
+
+def fetch_metered_billing_usage(
+    api,
+    username: str,
+    usage_kind: str,
+    *,
+    product: str | None = None,
+    model: str | None = None,
+) -> tuple[dict | None, str | None]:
+    """Fetch metered usage grouped by model.
+
+    Returns ``(by_model, error)``. On success, ``by_model`` is a (possibly empty)
+    dict and ``error`` is ``None``. On failure, ``by_model`` is ``None`` and
+    ``error`` explains why — distinct from a successful empty ``usageItems`` list.
+    """
+    params: dict[str, str] = {}
+    if product:
+        params["product"] = product
     if model:
         params["model"] = model
     try:
         data = api.request(
             "GET",
-            f"/users/{username}/settings/billing/premium_request/usage",
+            f"/users/{username}/settings/billing/{usage_kind}/usage",
             params if params else None,
         )
-    except RuntimeError:
-        return None
+    except RuntimeError as exc:
+        return None, str(exc)
     if not data:
-        return None
+        return None, "billing usage endpoint returned no data"
     if not isinstance(data, dict):
+        return None, "billing usage endpoint returned an unexpected response"
+    items = data.get("usageItems") or []
+    if not isinstance(items, list):
+        return None, "billing usage endpoint returned an unexpected response"
+    return _usage_items_by_model(items), None
+
+
+def _metered_billing_usage(
+    api,
+    username: str,
+    usage_kind: str,
+    *,
+    product: str | None = None,
+    model: str | None = None,
+) -> dict | None:
+    """Fetch ``…/settings/billing/{usage_kind}/usage`` and group by model."""
+    by_model, error = fetch_metered_billing_usage(
+        api, username, usage_kind, product=product, model=model
+    )
+    if error:
         return None
-    items = data.get("usageItems", [])
-    by_model = {}
-    for item in items:
-        m = item.get("model", "Unknown")
-        if m not in by_model:
-            by_model[m] = {
-                "items": [],
-                "total_requests": 0,
-                "total_gross": 0,
-                "total_discount": 0,
-                "total_net": 0,
-            }
-        sanitized = sanitize_item_amounts(item)
-        by_model[m]["items"].append(sanitized)
-        by_model[m]["total_requests"] += _safe_amount(sanitized, "grossQuantity")
-        by_model[m]["total_gross"] += _safe_amount(sanitized, "grossAmount")
-        by_model[m]["total_discount"] += _safe_amount(sanitized, "discountAmount")
-        by_model[m]["total_net"] += _safe_amount(sanitized, "netAmount")
     return by_model
+
+
+def get_premium_request_usage(api, username, product="copilot", model=None):
+    """Get premium request usage breakdown by model."""
+    return _metered_billing_usage(
+        api, username, "premium_request", product=product, model=model
+    )
+
+
+def get_ai_credit_usage(api, username, product="copilot", model=None):
+    """Get AI credit usage breakdown by model (post-2026 Copilot metering)."""
+    return _metered_billing_usage(api, username, "ai_credit", product=product, model=model)
 
 
 def get_full_billing(api, username):
@@ -89,7 +143,10 @@ def get_full_billing(api, username):
         return None
     if not isinstance(data, dict):
         return None
-    return data.get("usageItems", [])
+    items = data.get("usageItems") or []
+    if not isinstance(items, list):
+        return None
+    return items
 
 
 def get_user_actions_billing(api, username):
@@ -128,7 +185,10 @@ def get_actions_per_repo(api, owner, repo):
     total_minutes = 0.0
     total_storage_gb_hours = 0.0
     sku_breakdown = {}
-    for item in billing.get("usageItems", []):
+    usage_items = billing.get("usageItems") or []
+    if not isinstance(usage_items, list):
+        return 0.0, 0.0, {}
+    for item in usage_items:
         sku = item.get("sku", "unknown")
         sanitized = sanitize_item_amounts(item)
         unit = sanitized.get("unitType", "")

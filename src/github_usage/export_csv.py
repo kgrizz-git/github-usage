@@ -25,7 +25,8 @@ from .export_visibility import (
     storage_analysis_export_rows,
     visibility_summary_rows,
 )
-from .report_forecast_data import build_report_forecast
+from .report_forecast_data import build_report_forecast, forecast_metric_rows
+from .copilot_metering import copilot_by_model_quantity_header
 from .visibility import repo_visibility
 
 
@@ -129,7 +130,7 @@ def _write_copilot_section(writer, data: dict) -> None:  # type: ignore[type-arg
     copilot = _coerce_section(data.get("copilot"), {})
     for key, value in copilot.items():
         if key == "by_model":
-            _write_copilot_by_model(writer, value)
+            _write_copilot_by_model(writer, value, copilot)
         else:
             writer.writerow([key, value])
 
@@ -240,13 +241,12 @@ def _write_forecast_section(
         return
     _write_section_header(writer, "Forecast")
     writer.writerow(["metric", "current", "projected", "limit", "run_out_day"])
-    for metric_name in ("minutes", "storage_avg_mb", "premium_requests"):
-        metric = forecast[metric_name]
+    for label, metric in forecast_metric_rows(forecast):
         limit = metric["limit"]
         run_out = metric["run_out_day"]
         writer.writerow(
             [
-                metric_name,
+                label,
                 metric["current"],
                 metric["projected"],
                 limit if limit is not None else "",
@@ -255,11 +255,12 @@ def _write_forecast_section(
         )
 
 
-def _write_copilot_by_model(writer: csv.writer, by_model) -> None:  # type: ignore[type-arg]
+def _write_copilot_by_model(writer: csv.writer, by_model, copilot: dict) -> None:  # type: ignore[type-arg]
     if not by_model:
         return
+    qty_header = copilot_by_model_quantity_header(copilot)
     writer.writerow(["by_model"])
-    writer.writerow(["model", "requests", "gross", "discount", "net"])
+    writer.writerow(["model", qty_header, "gross", "discount", "net"])
     for model_name, model_data in by_model.items():
         if isinstance(model_data, dict):
             writer.writerow(

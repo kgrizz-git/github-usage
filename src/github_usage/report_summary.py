@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from .billing import get_premium_request_usage
+from .copilot_metering import _effective_metering
 from .repo_consumers import private_list_is_redundant
 from .report_actions_limits import _print_usage_by_visibility
+from .report_data import get_copilot_usage
 from .report_helpers import fmt_price, repo_label
 from .report_summary_insights import (
     _print_impactful_findings,
@@ -46,7 +48,15 @@ def show_final_summary(
     _print_cost_overview(total_gross, total_discount, total_net)
 
     premium_by_model = get_premium_request_usage(api, username)
-    _print_top_consumers(user_minutes, actions_gross, repo_data, premium_by_model, lfs_summary)
+    copilot_usage = get_copilot_usage(api, username)
+    _print_top_consumers(
+        user_minutes,
+        actions_gross,
+        repo_data,
+        premium_by_model,
+        lfs_summary,
+        copilot=copilot_usage,
+    )
 
     _print_storage_breakdown(storage_analysis)
 
@@ -135,6 +145,7 @@ def render_final_summary_from_data(data: dict) -> None:
         visibility_by_repo,
         repo_consumers=data.get("repo_consumers"),
         private_minutes=actions.get("private_minutes"),
+        copilot=data.get("copilot"),
     )
     _print_storage_breakdown(storage_analysis)
     _print_utilization(user_minutes, user_storage_gb_hours, actions=actions)
@@ -242,25 +253,51 @@ def _print_repo_storage_breakdowns(by_storage, by_storage_private, visibility_by
         print()
 
 
-def _print_copilot_by_model(premium_by_model):
-    """Copilot premium requests grouped by model (section of BIGGEST CONSUMERS)."""
-    print("    Copilot Premium Requests (by model):")
-    if premium_by_model:
-        for model, data in sorted(
-            premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
-        ):
-            price = 0
-            for item in data.get("items", []):
-                pp = item.get("pricePerUnit", 0)
-                if pp > 0:
-                    price = pp
-                    break
-            print(
-                f"      {model:<30} {data['total_requests']:>10.0f} reqs  @ {fmt_price(price)}/req  = {fmt_price(data['total_net'])}"
-            )
-    else:
+def _print_copilot_ai_credits_by_model(copilot: dict | None) -> None:
+    """AI credit quantities by model (BIGGEST CONSUMERS subsection)."""
+    print("    Copilot AI Credits (by model):")
+    by_model = (copilot or {}).get("by_model") or {}
+    if not by_model:
         print("      No model-level data available.")
+        print()
+        return
+    for model, data in sorted(
+        by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
+    ):
+        qty = float(data.get("requests", 0.0))
+        print(f"      {model:<30} {qty:>10.2f} credits (gross qty)")
     print()
+
+
+def _print_copilot_premium_requests_by_model(premium_by_model) -> None:
+    """Premium request usage by model (BIGGEST CONSUMERS subsection)."""
+    print("    Copilot Premium Requests (by model):")
+    if not premium_by_model:
+        print("      No model-level data available.")
+        print()
+        return
+    for model, data in sorted(
+        premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
+    ):
+        price = 0
+        for item in data.get("items", []):
+            pp = item.get("pricePerUnit", 0)
+            if pp > 0:
+                price = pp
+                break
+        # codeql[py/clear-text-logging-sensitive-data]
+        print(
+            f"      {model:<30} {data['total_requests']:>10.0f} reqs  @ {fmt_price(price)}/req  = {fmt_price(data['total_net'])}"
+        )
+    print()
+
+
+def _print_copilot_by_model(copilot: dict | None, premium_by_model):
+    """Copilot usage grouped by model (section of BIGGEST CONSUMERS)."""
+    if _effective_metering(copilot or {}) == "ai_credits":
+        _print_copilot_ai_credits_by_model(copilot)
+        return
+    _print_copilot_premium_requests_by_model(premium_by_model)
 
 
 def _print_lfs_storage(lfs_summary):
@@ -290,6 +327,7 @@ def _print_top_consumers(
     *,
     repo_consumers=None,
     private_minutes=None,
+    copilot: dict | None = None,
 ):
     """Section 2: biggest consumers by category (minutes, storage, Copilot)."""
     print("  2. BIGGEST CONSUMERS BY CATEGORY")
@@ -304,7 +342,7 @@ def _print_top_consumers(
     if repo_consumers:
         _print_repo_consumer_breakdowns(repo_consumers, private_minutes, visibility_by_repo)
 
-    _print_copilot_by_model(premium_by_model)
+    _print_copilot_by_model(copilot, premium_by_model)
     _print_lfs_storage(lfs_summary)
 
 

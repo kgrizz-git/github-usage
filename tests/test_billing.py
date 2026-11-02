@@ -508,3 +508,21 @@ class BillingTests(unittest.TestCase):
         )
 
         self.assertEqual(get_actions_per_repo(api, "octocat", "api"), (0.0, 0.0, {}))
+
+    def test_fetch_metered_billing_usage_null_usage_items(self):
+        from github_usage.billing import fetch_metered_billing_usage
+
+        api = FakeAPI(
+            request_responses={
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/ai_credit/usage",
+                    (("product", "copilot"),),
+                ): {"usageItems": None},
+            }
+        )
+        by_model, error = fetch_metered_billing_usage(
+            api, "octocat", "ai_credit", product="copilot"
+        )
+        self.assertIsNone(error)
+        self.assertEqual(by_model, {})

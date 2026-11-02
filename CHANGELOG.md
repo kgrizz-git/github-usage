@@ -8,6 +8,15 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ## [Unreleased]
 
+### Fixed
+
+- **Email Actions section:** plain-text and HTML emails show **private-repo quota** against the 2,000 min / 500 MB free tier (with public usage labeled free) instead of comparing combined account totals to the private quota. When no visibility split is available, the report says so explicitly rather than implying the total is all quota-counted.
+- **Copilot AI credits:** email report data now reads GitHub's `…/billing/ai_credit/usage` endpoint (preferred over legacy premium-request usage after Copilot's 2026 metering change) and labels the email Copilot section and forecast row accordingly; org-licensed Copilot without personal usage gets an explanatory note. Usage displays **credit quantities** (`grossQuantity`) rather than dollar `netAmount`, which is often zero on included allowance. Failed usage API calls surface as report errors or notes instead of looking like zero usage. Forecast exports (CSV/XLSX/PDF/legacy) use the same Copilot metric label as email.
+- **Security CI (`pip-audit`):** bump locked `pypdf` to 6.21.4+ (CVE-2026-119203–209) so the weekly `Security` workflow passes again.
+- **PR CodeQL:** move intentional Copilot billing stdout into `report_sources.py` (and annotate `report_summary.py` where needed) so new taint paths from metered billing fetch do not fail the CodeQL required check.
+- **SonarCloud (PR #35):** split Actions email formatters in `_email_report_common.py`, simplify `copilot_usage_fetch` fallbacks, and rename a shadowing `credits` variable in `copilot_metering.py`.
+- **Copilot export/console consistency:** PDF/XLSX Copilot sections, live `show_copilot_summary`, and final-summary “by model” block use the same metering helpers as email (`copilot_export_primary_row`, `_effective_metering`). Billing treats null `usageItems` as empty; `get_ai_credit_usage` defaults `product` to `copilot`.
+
 ### Added
 
 - **Known-vulnerable Actions check:** new `vulnerable-actions` job in the `Security` workflow runs zizmor's `known-vulnerable-actions` audit on every PR, push to `main`, and the weekly schedule, failing on any action reference with a GitHub security advisory. Covers SHA-pinned actions (e.g. `gitleaks-action`), which Dependabot alerts never flag; fails loudly if the audit itself errors or `GH_TOKEN` is empty.

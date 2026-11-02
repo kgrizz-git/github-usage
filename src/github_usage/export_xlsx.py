@@ -22,7 +22,8 @@ from .export_visibility import (
     storage_analysis_export_rows,
     visibility_summary_rows,
 )
-from .report_forecast_data import build_report_forecast
+from .report_forecast_data import build_report_forecast, forecast_metric_rows
+from .copilot_metering import copilot_by_model_quantity_header, copilot_export_primary_row
 from .visibility import repo_visibility
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
@@ -168,11 +169,12 @@ def _write_sources_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
 
 def _write_copilot_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
     copilot = data.get("copilot") or {}
+    primary_label, primary_value = copilot_export_primary_row(copilot)
     write_sheet(
         "Copilot",
         "Copilot Usage",
         [
-            ["Total Requests", copilot.get("total_requests")],
+            [primary_label, primary_value],
             ["Total Gross", copilot.get("total_gross")],
             ["Total Discount", copilot.get("total_discount")],
             ["Total Net", copilot.get("total_net")],
@@ -180,7 +182,8 @@ def _write_copilot_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
     )
     by_model = copilot.get("by_model") or {}
     if by_model:
-        model_rows = [["Model", "Requests", "Gross", "Discount", "Net"]]
+        qty_header = copilot_by_model_quantity_header(copilot)
+        model_rows = [["Model", qty_header, "Gross", "Discount", "Net"]]
         for model_name, model_data in by_model.items():
             if isinstance(model_data, dict):
                 model_rows.append(
@@ -287,11 +290,10 @@ def _write_forecast_sheet(
     if forecast is None:
         return
     rows = [["Metric", "Current", "Projected", "Limit", "Run-out day"]]
-    for metric_name in ("minutes", "storage_avg_mb", "premium_requests"):
-        metric = forecast[metric_name]
+    for label, metric in forecast_metric_rows(forecast):
         rows.append(
             [
-                metric_name,
+                label,
                 metric["current"],
                 metric["projected"],
                 metric["limit"],
