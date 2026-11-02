@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from ._email_report_common import copilot_forecast_metric
 from .forecast import compute_forecast
 from .report_helpers import day_of_month, days_in_month
 from .usage_split import flat_equivalent_gb_hours
@@ -65,7 +66,7 @@ def build_report_forecast(
     actions = report.get("actions") or {}
     minutes, storage_avg_mb = _private_quota_inputs(actions)
     copilot = report.get("copilot") or {}
-    premium_requests = float(copilot.get("total_requests") or 0.0)
+    premium_requests, _ = copilot_forecast_metric(copilot)
     ref = reference_date or date.today()
     forecast = compute_forecast(
         day_of_month=day_of_month(ref),

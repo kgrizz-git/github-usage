@@ -138,11 +138,12 @@ class EmailReportTests(unittest.TestCase):
             "monthly_costs": {"actions": {"net": 1.23}},
         }
         lines = _format_actions_section(data)
+        joined = "\n".join(lines)
         self.assertEqual(lines[0], "Actions")
-        self.assertIn("1,250.0 / 2,000 (62.5%)", lines[1])
-        self.assertIn("312.0 MB / 500 MB (62.4%)", lines[2])
-        self.assertEqual(lines[3], "- Net cost: $1.2300")
-        self.assertEqual(lines[4], "")
+        self.assertIn("Account total:", joined)
+        self.assertIn("312.0 / 500 MB", joined)
+        self.assertIn("GB-hrs", joined)
+        self.assertIn("Net cost: $1.2300", joined)
 
     def test_format_html_report_renders_html_sections(self):
         from github_usage.email_report import format_html_report

@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from ._email_report_common import _bytes_to_mb, _generated_line
+from ._email_report_common import (
+    _bytes_to_mb,
+    _generated_line,
+    copilot_forecast_metric,
+    copilot_model_detail_line,
+    copilot_section_title,
+    copilot_usage_summary_lines,
+    email_actions_minutes_lines,
+    email_actions_storage_lines,
+)
 from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
@@ -44,27 +53,8 @@ def _format_actions_section(data: dict) -> list[str]:
     if not actions:
         return []
     net = (data.get("monthly_costs") or {}).get("actions", {}).get("net", 0.0)
-    has_split = "public_minutes" in actions
-    lines = [
-        "Actions",
-        (
-            f"- Minutes: {actions.get('minutes', 0.0):,.1f} / "
-            f"{actions.get('minutes_limit', 0):,} "
-            f"({actions.get('minutes_percent', 0.0):.1f}%)"
-        ),
-        (
-            f"- Storage: {actions.get('storage_avg_mb', 0.0):,.1f} MB / "
-            f"{actions.get('storage_limit_mb', 0):,} MB "
-            f"({actions.get('storage_percent', 0.0):.1f}%)"
-        ),
-        f"- Net cost: {fmt_price(net)}",
-    ]
-    if has_split:
-        priv_min = float(actions.get("private_minutes") or 0.0)
-        pub_min = float(actions.get("public_minutes") or 0.0)
-        lines.append(
-            f"  (private: {priv_min:,.1f} min quota-counted · public: {pub_min:,.1f} min free)"
-        )
+    lines = ["Actions", *email_actions_minutes_lines(actions), *email_actions_storage_lines(actions)]
+    lines.append(f"- Net cost: {fmt_price(net)}")
     lines.append("")
     return lines
 
@@ -73,17 +63,13 @@ def _format_copilot_section(data: dict) -> list[str]:
     copilot = data.get("copilot")
     if not copilot:
         return []
-    lines = [
-        "Copilot Premium Requests",
-        f"- Total requests: {copilot.get('total_requests', 0.0):,.1f}",
-        f"- Net cost: {fmt_price(copilot.get('total_net', 0.0))}",
-    ]
+    metering = copilot.get("metering") or "premium_requests"
+    lines = [copilot_section_title(copilot), *copilot_usage_summary_lines(copilot)]
     by_model = copilot.get("by_model") or {}
     if by_model:
         lines.append("- By model:")
         for model, values in sorted(by_model.items()):
-            requests = values.get("requests", values.get("total_requests", 0.0))
-            lines.append(f"  - {model}: {requests:,.1f} requests")
+            lines.append(copilot_model_detail_line(model, values, metering=metering))
     lines.append("")
     return lines
 
@@ -387,10 +373,12 @@ def _format_forecast_section(
     def _run_out(value: int | None) -> str:
         return f"day {value}" if value is not None else "--"
 
+    copilot = data.get("copilot") or {}
+    _, copilot_label = copilot_forecast_metric(copilot)
     rows = [
         ("Actions Minutes", forecast["minutes"]),
         ("Storage (avg MB)", forecast["storage_avg_mb"]),
-        ("Premium Requests", forecast["premium_requests"]),
+        (copilot_label, forecast["premium_requests"]),
     ]
     for label, metric in rows:
         lines.append(

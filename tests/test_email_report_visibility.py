@@ -19,13 +19,19 @@ class EmailReportVisibilityTests(unittest.TestCase):
                 "storage_percent": 40.0,
                 "private_minutes": 1200.0,
                 "public_minutes": 300.0,
+                "private_minutes_percent": 60.0,
+                "private_storage_avg_mb": 180.0,
+                "public_storage_avg_mb": 20.0,
+                "private_storage_gb_hours": 1.5,
+                "public_storage_gb_hours": 0.2,
             },
             "monthly_costs": {"actions": {"net": 0.0}},
         }
         lines = _format_actions_section(data)
         joined = "\n".join(lines)
-        self.assertIn("private: 1,200.0 min quota-counted", joined)
-        self.assertIn("public: 300.0 min free", joined)
+        self.assertIn("Quota (private repos): 1,200.0 / 2,000 min (60.0%)", joined)
+        self.assertIn("Public repos (free): 300.0 min", joined)
+        self.assertIn("Quota storage (private): 180.0 / 500 MB", joined)
 
     def test_format_actions_section_no_split_without_public_minutes(self):
         from github_usage.email_report_text import _format_actions_section

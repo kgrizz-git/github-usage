@@ -345,6 +345,52 @@ class ReportDataTests(unittest.TestCase):
         self.assertEqual(result["sku_breakdown"]["linux"]["grossAmount"], 0.0)
         self.assertEqual(result["sku_breakdown"]["linux"]["grossQuantity"], 0.0)
 
+    def test_get_copilot_usage_prefers_ai_credit_when_present(self):
+        from github_usage.report_data import get_copilot_usage
+
+        api = FakeAPI(
+            request_responses={
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Copilot"),),
+                ): {"usageItems": []},
+                ("GET", "/users/octocat/settings/billing/ai_credit/usage", ()): {
+                    "usageItems": [
+                        {
+                            "model": "gpt-4.1",
+                            "grossQuantity": 1.0,
+                            "grossAmount": 0.5,
+                            "discountAmount": 0.0,
+                            "netAmount": 0.5,
+                        }
+                    ]
+                },
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/premium_request/usage",
+                    (("product", "copilot"),),
+                ): {
+                    "usageItems": [
+                        {
+                            "model": "legacy-model",
+                            "grossQuantity": 99.0,
+                            "grossAmount": 0.0,
+                            "discountAmount": 0.0,
+                            "netAmount": 0.0,
+                        }
+                    ]
+                },
+            }
+        )
+
+        result = get_copilot_usage(api, "octocat")
+
+        self.assertEqual(result["metering"], "ai_credits")
+        self.assertEqual(result["total_usage_net"], 0.5)
+        self.assertIn("gpt-4.1", result["by_model"])
+        self.assertNotIn("legacy-model", result["by_model"])
+
     def test_get_copilot_usage_handles_null_amounts(self):
         """Source sanitization: both _billing_summary and inline premium loop handle nulls."""
         from github_usage.report_data import get_copilot_usage

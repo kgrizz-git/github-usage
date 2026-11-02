@@ -4,7 +4,16 @@ from __future__ import annotations
 
 import html
 
-from ._email_report_common import _bytes_to_mb, _generated_line
+from ._email_report_common import (
+    _bytes_to_mb,
+    _generated_line,
+    copilot_forecast_metric,
+    copilot_model_detail_line,
+    copilot_section_title,
+    copilot_usage_summary_lines,
+    email_actions_minutes_lines,
+    email_actions_storage_lines,
+)
 from ._email_report_html_tables import (
     html_cost_consumer_row,
     html_flat_table,
@@ -56,43 +65,38 @@ def _format_html_actions_section(data: dict) -> list[str]:
     if not actions:
         return []
     net = (data.get("monthly_costs") or {}).get("actions", {}).get("net", 0.0)
-    return [
-        "<h2>Actions</h2>",
-        _TABLE_OPEN,
-        "<tr><th>Metric</th><th>Value</th></tr>",
-        (
-            f"<tr><td>Minutes</td><td>{actions.get('minutes', 0.0):,.1f} / "
-            f"{actions.get('minutes_limit', 0):,} "
-            f"({actions.get('minutes_percent', 0.0):.1f}%)</td></tr>"
-        ),
-        (
-            f"<tr><td>Storage</td><td>{actions.get('storage_avg_mb', 0.0):,.1f} MB / "
-            f"{actions.get('storage_limit_mb', 0):,} MB "
-            f"({actions.get('storage_percent', 0.0):.1f}%)</td></tr>"
-        ),
-        f"<tr><td>Net cost</td><td>{fmt_price(net)}</td></tr>",
-        _TABLE_CLOSE,
-    ]
+    minute_lines = email_actions_minutes_lines(actions)
+    storage_lines = email_actions_storage_lines(actions)
+    rows = ["<tr><th>Metric</th><th>Value</th></tr>"]
+    for line in minute_lines:
+        label, _, value = line.partition(": ")
+        rows.append(f"<tr><td>{html.escape(label.removeprefix('- '))}</td><td>{html.escape(value)}</td></tr>")
+    for line in storage_lines:
+        label, _, value = line.partition(": ")
+        rows.append(f"<tr><td>{html.escape(label.removeprefix('- '))}</td><td>{html.escape(value)}</td></tr>")
+    rows.append(f"<tr><td>Net cost</td><td>{fmt_price(net)}</td></tr>")
+    return ["<h2>Actions</h2>", _TABLE_OPEN, *rows, _TABLE_CLOSE]
 
 
 def _format_html_copilot_section(data: dict) -> list[str]:
     copilot = data.get("copilot")
     if not copilot:
         return []
+    metering = copilot.get("metering") or "premium_requests"
     parts = [
-        "<h2>Copilot Premium Requests</h2>",
+        f"<h2>{html.escape(copilot_section_title(copilot))}</h2>",
         "<ul>",
-        f"<li>Total requests: {copilot.get('total_requests', 0.0):,.1f}</li>",
-        f"<li>Net cost: {fmt_price(copilot.get('total_net', 0.0))}</li>",
     ]
+    for line in copilot_usage_summary_lines(copilot):
+        parts.append(f"<li>{html.escape(line.removeprefix('- '))}</li>")
     by_model = copilot.get("by_model") or {}
     if by_model:
         parts.append(_UL_CLOSE)
         parts.append("<h3>By model</h3>")
         parts.append("<ul>")
         for model, values in sorted(by_model.items()):
-            requests = values.get("requests", values.get("total_requests", 0.0))
-            parts.append(f"<li>{html.escape(model)}: {requests:,.1f} requests</li>")
+            detail = copilot_model_detail_line(model, values, metering=metering).strip()
+            parts.append(f"<li>{html.escape(detail.removeprefix('- '))}</li>")
     parts.append(_UL_CLOSE)
     return parts
 
@@ -347,10 +351,12 @@ def _format_html_forecast_section(
         ' <span class="visibility-tag">(private repos — quota-counted)</span>' if has_split else ""
     )
 
+    copilot = data.get("copilot") or {}
+    _, copilot_label = copilot_forecast_metric(copilot)
     rows = [
         ("Actions Minutes", forecast["minutes"]),
         ("Storage (avg MB)", forecast["storage_avg_mb"]),
-        ("Premium Requests", forecast["premium_requests"]),
+        (copilot_label, forecast["premium_requests"]),
     ]
 
     parts = [
