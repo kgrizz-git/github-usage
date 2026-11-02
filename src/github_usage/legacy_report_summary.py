@@ -229,13 +229,14 @@ def _forecast_rows(
     rows.append(("Projected storage at month end", storage_line))
 
     premium = forecast["premium_requests"]
+    copilot_label = forecast.get("copilot_metric_label", "Premium Requests")
     if premium_requests_limit is not None:
         premium_line = f"{premium['projected']:.1f} / {premium_requests_limit:.0f}"
         if premium_requests_limit > 0:
             premium_line += f" ({premium['projected'] / premium_requests_limit * 100:.1f}%)"
-        rows.append(("Projected premium requests at month end", premium_line))
+        rows.append((f"Projected {copilot_label.lower()} at month end", premium_line))
     else:
-        rows.append(("Projected premium requests at month end", f"{premium['projected']:.1f}"))
+        rows.append((f"Projected {copilot_label.lower()} at month end", f"{premium['projected']:.1f}"))
 
     return rows
 

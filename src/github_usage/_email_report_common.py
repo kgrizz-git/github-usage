@@ -94,6 +94,14 @@ def email_actions_storage_lines(actions: dict) -> list[str]:
             )
         if pub_mb > 0 or pub_gb > 0:
             lines.append(f"- Public repos (free): {pub_mb:,.1f} MB · {pub_gb:,.4f} GB-hrs")
+        account_gb = float(actions.get("storage_gb_hours") or 0.0)
+        if account_gb > 0 and (
+            unattributed_gb >= 0.0001 or not actions.get("reconciled_storage", True)
+        ):
+            lines.append(
+                f"- Account total (billing API): {account_gb:,.4f} GB-hrs "
+                "(may include unscanned repos)"
+            )
         return lines
     avg_mb = float(actions.get("storage_avg_mb") or 0.0)
     gb_hours = float(actions.get("storage_gb_hours") or 0.0)

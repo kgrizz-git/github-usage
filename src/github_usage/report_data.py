@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Protocol
 
-from .billing import get_ai_credit_usage, get_premium_request_usage
+from .copilot_usage_fetch import resolve_copilot_usage_sources
 from .report_actions import fetch_repo_actions_table
 from .report_helpers import fmt_price, gb_hours_to_avg_mb, sanitize_item_amounts
 from .report_optional import (
@@ -110,57 +110,39 @@ def _copilot_by_model_from_billing(by_model: dict | None) -> dict:
     return shaped
 
 
-def _billing_usage_has_items(by_model: dict | None) -> bool:
-    if not by_model:
-        return False
-    return any(entry.get("items") for entry in by_model.values())
-
-
 def get_copilot_usage(api: GitHubAPIClient, username: str) -> dict:
     """Return Copilot billing totals and per-model usage (AI credits or premium requests)."""
     summary = _billing_summary(api, username, "Copilot")
-    ai_raw = get_ai_credit_usage(api, username, product="copilot")
-    premium_raw = get_premium_request_usage(api, username, product="copilot")
-    if _billing_usage_has_items(ai_raw):
-        metering = "ai_credits"
-        source = ai_raw
-    elif _billing_usage_has_items(premium_raw):
-        metering = "premium_requests"
-        source = premium_raw
-    elif ai_raw is not None and premium_raw is not None:
-        metering = "ai_credits"
-        source = {}
-    elif premium_raw is not None:
-        metering = "premium_requests"
-        source = premium_raw or {}
-    elif ai_raw is not None:
-        metering = "ai_credits"
-        source = ai_raw or {}
-    else:
-        metering = "unknown"
-        source = {}
+    metering, source, fetch_notes = resolve_copilot_usage_sources(api, username)
     by_model = _copilot_by_model_from_billing(source)
     total_credits_used = sum(float(model["requests"]) for model in by_model.values())
     total_billable_credits = sum(
         float(model.get("billable_quantity", 0.0)) for model in by_model.values()
     )
+    premium_request_total = (
+        sum(float(model["requests"]) for model in by_model.values())
+        if metering == "premium_requests"
+        else 0.0
+    )
     usage_note = None
+    if fetch_notes:
+        usage_note = " ".join(fetch_notes)
     if not by_model:
+        empty_msg = (
+            "No AI credit or premium-request usage line items returned for this personal "
+            "account. If Copilot is licensed through an organization, usage is billed there "
+            "and does not appear on user billing endpoints."
+        )
         if metering == "unknown":
-            usage_note = (
+            empty_msg = (
                 "Copilot billing usage endpoints did not return usable data for this account."
             )
-        else:
-            usage_note = (
-                "No AI credit or premium-request usage line items returned for this personal "
-                "account. If Copilot is licensed through an organization, usage is billed there "
-                "and does not appear on user billing endpoints."
-            )
+        usage_note = f"{usage_note} {empty_msg}".strip() if usage_note else empty_msg
     cost = _summary_cost(summary)
     return {
         "metering": metering,
-        "total_requests": sum(float(model["requests"]) for model in by_model.values()),
-        "total_credits_used": total_credits_used,
+        "total_requests": premium_request_total,
+        "total_credits_used": total_credits_used if metering == "ai_credits" else 0.0,
         "total_billable_credits": total_billable_credits,
         "total_gross": cost["gross"],
         "total_discount": cost["discount"],

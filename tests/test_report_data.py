@@ -470,6 +470,32 @@ class ReportDataTests(unittest.TestCase):
         self.assertEqual(result["metering"], "premium_requests")
         self.assertEqual(result["total_requests"], 12.0)
 
+    def test_get_copilot_usage_raises_when_both_endpoints_fail(self):
+        from github_usage.report_data import get_copilot_usage
+
+        api = FakeAPI(
+            request_responses={
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Copilot"),),
+                ): {"usageItems": []},
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/ai_credit/usage",
+                    (("product", "copilot"),),
+                ): RuntimeError("403 Forbidden"),
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/premium_request/usage",
+                    (("product", "copilot"),),
+                ): RuntimeError("403 Forbidden"),
+            }
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "Copilot usage unavailable"):
+            get_copilot_usage(api, "octocat")
+
     def test_get_copilot_usage_handles_null_amounts(self):
         """Source sanitization: both _billing_summary and inline premium loop handle nulls."""
         from github_usage.report_data import get_copilot_usage
@@ -490,6 +516,11 @@ class ReportDataTests(unittest.TestCase):
                         }
                     ]
                 },
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/ai_credit/usage",
+                    (("product", "copilot"),),
+                ): {"usageItems": []},
                 (
                     "GET",
                     "/users/octocat/settings/billing/premium_request/usage",
@@ -527,6 +558,11 @@ class ReportDataTests(unittest.TestCase):
                 ): {"usageItems": []},
                 (
                     "GET",
+                    "/users/octocat/settings/billing/ai_credit/usage",
+                    (("product", "copilot"),),
+                ): {"usageItems": []},
+                (
+                    "GET",
                     "/users/octocat/settings/billing/premium_request/usage",
                     (("product", "copilot"),),
                 ): [1, 2, 3],  # list instead of dict
@@ -535,8 +571,8 @@ class ReportDataTests(unittest.TestCase):
 
         result = get_copilot_usage(api, "octocat")
 
-        # No crash; by_model is empty
-        self.assertEqual(result["by_model"], {})
+        self.assertEqual(result["metering"], "ai_credits")
+        self.assertIn("Premium request usage unavailable", result["usage_note"] or "")
 
     def test_rate_limit_handles_non_dict_response(self):
         """Regression: /rate_limit returns a list; _rate_limit returns (None, None)."""

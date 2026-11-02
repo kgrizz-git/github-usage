@@ -11,13 +11,12 @@ from ._email_report_common import (
     email_actions_table_rows,
 )
 from .copilot_metering import (
-    copilot_forecast_metric,
     copilot_model_detail_line,
     copilot_section_title,
     copilot_usage_summary_lines,
 )
 from .repo_consumers import private_list_is_redundant
-from .report_forecast_data import build_report_forecast
+from .report_forecast_data import build_report_forecast, forecast_metric_rows
 from .report_helpers import fmt_price
 from .visibility import (
     group_by_visibility,
@@ -381,13 +380,7 @@ def _format_forecast_section(
     def _run_out(value: int | None) -> str:
         return f"day {value}" if value is not None else "--"
 
-    copilot = data.get("copilot") or {}
-    _, copilot_label = copilot_forecast_metric(copilot)
-    rows = [
-        ("Actions Minutes", forecast["minutes"]),
-        ("Storage (avg MB)", forecast["storage_avg_mb"]),
-        (copilot_label, forecast["premium_requests"]),
-    ]
+    rows = forecast_metric_rows(forecast)
     for label, metric in rows:
         lines.append(
             f"{label:20} {metric['current']:>9,.1f} {metric['projected']:>10,.1f} "

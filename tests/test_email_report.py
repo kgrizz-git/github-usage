@@ -141,6 +141,7 @@ class EmailReportTests(unittest.TestCase):
         joined = "\n".join(lines)
         self.assertEqual(lines[0], "Actions")
         self.assertIn("Account total:", joined)
+        self.assertIn("1,250.0 min", joined)
         self.assertIn("312.0 / 500 MB", joined)
         self.assertIn("GB-hrs", joined)
         self.assertIn("Net cost: $1.2300", joined)

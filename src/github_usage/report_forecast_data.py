@@ -49,6 +49,16 @@ def _attach_forecast_extras(forecast: dict, actions: dict, *, ref: date) -> None
         forecast["filtered_empty_private"] = True
 
 
+def forecast_metric_rows(forecast: dict) -> list[tuple[str, dict]]:
+    """Human-readable forecast table rows (label, metric dict)."""
+    copilot_label = forecast.get("copilot_metric_label", "Premium Requests")
+    return [
+        ("Actions Minutes", forecast["minutes"]),
+        ("Storage (avg MB)", forecast["storage_avg_mb"]),
+        (copilot_label, forecast["premium_requests"]),
+    ]
+
+
 def build_report_forecast(
     report: dict,
     *,
@@ -66,7 +76,7 @@ def build_report_forecast(
     actions = report.get("actions") or {}
     minutes, storage_avg_mb = _private_quota_inputs(actions)
     copilot = report.get("copilot") or {}
-    premium_requests, _ = copilot_forecast_metric(copilot)
+    premium_requests, copilot_label = copilot_forecast_metric(copilot)
     ref = reference_date or date.today()
     forecast = compute_forecast(
         day_of_month=day_of_month(ref),
@@ -80,5 +90,6 @@ def build_report_forecast(
     )
     if forecast is None:
         return None
+    forecast["copilot_metric_label"] = copilot_label
     _attach_forecast_extras(forecast, actions, ref=ref)
     return forecast

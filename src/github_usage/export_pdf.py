@@ -22,7 +22,7 @@ from .export_visibility import (
     storage_summary_label_values,
     visibility_summary_label_values,
 )
-from .report_forecast_data import build_report_forecast
+from .report_forecast_data import build_report_forecast, forecast_metric_rows
 from .usage_split import classify_actions_sku
 from .visibility import repo_visibility, visibility_label
 
@@ -270,12 +270,7 @@ def _write_forecast_page(
     rows = [
         ("Day", f"{forecast['day_of_month']} of {forecast['days_in_month']}"),
     ]
-    for metric_name, label in [
-        ("minutes", "Actions Minutes"),
-        ("storage_avg_mb", "Storage (avg MB)"),
-        ("premium_requests", "Premium Requests"),
-    ]:
-        metric = forecast[metric_name]
+    for label, metric in forecast_metric_rows(forecast):
         limit = metric["limit"]
         run_out = metric["run_out_day"]
         limit_str = _fmt_num(limit) if limit is not None else "--"

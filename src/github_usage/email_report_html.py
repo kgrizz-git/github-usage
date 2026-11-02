@@ -11,7 +11,6 @@ from ._email_report_common import (
     email_actions_table_rows,
 )
 from .copilot_metering import (
-    copilot_forecast_metric,
     copilot_model_detail_line,
     copilot_section_title,
     copilot_usage_summary_lines,
@@ -26,7 +25,7 @@ from ._email_report_html_tables import (
     html_workflow_breakdown_table,
 )
 from .repo_consumers import private_list_is_redundant
-from .report_forecast_data import build_report_forecast
+from .report_forecast_data import build_report_forecast, forecast_metric_rows
 from .report_helpers import fmt_price
 from .visibility import (
     group_by_visibility,
@@ -351,13 +350,7 @@ def _format_html_forecast_section(
         ' <span class="visibility-tag">(private repos — quota-counted)</span>' if has_split else ""
     )
 
-    copilot = data.get("copilot") or {}
-    _, copilot_label = copilot_forecast_metric(copilot)
-    rows = [
-        ("Actions Minutes", forecast["minutes"]),
-        ("Storage (avg MB)", forecast["storage_avg_mb"]),
-        (copilot_label, forecast["premium_requests"]),
-    ]
+    rows = forecast_metric_rows(forecast)
 
     parts = [
         f"<h2>Monthly Forecast{scope_note}</h2>",

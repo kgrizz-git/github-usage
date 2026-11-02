@@ -22,7 +22,7 @@ from .export_visibility import (
     storage_analysis_export_rows,
     visibility_summary_rows,
 )
-from .report_forecast_data import build_report_forecast
+from .report_forecast_data import build_report_forecast, forecast_metric_rows
 from .visibility import repo_visibility
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
@@ -287,11 +287,10 @@ def _write_forecast_sheet(
     if forecast is None:
         return
     rows = [["Metric", "Current", "Projected", "Limit", "Run-out day"]]
-    for metric_name in ("minutes", "storage_avg_mb", "premium_requests"):
-        metric = forecast[metric_name]
+    for label, metric in forecast_metric_rows(forecast):
         rows.append(
             [
-                metric_name,
+                label,
                 metric["current"],
                 metric["projected"],
                 metric["limit"],

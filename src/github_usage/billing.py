@@ -65,15 +65,20 @@ def _usage_items_by_model(items: list) -> dict:
     return by_model
 
 
-def _metered_billing_usage(
+def fetch_metered_billing_usage(
     api,
     username: str,
     usage_kind: str,
     *,
     product: str | None = None,
     model: str | None = None,
-) -> dict | None:
-    """Fetch ``…/settings/billing/{usage_kind}/usage`` and group by model."""
+) -> tuple[dict | None, str | None]:
+    """Fetch metered usage grouped by model.
+
+    Returns ``(by_model, error)``. On success, ``by_model`` is a (possibly empty)
+    dict and ``error`` is ``None``. On failure, ``by_model`` is ``None`` and
+    ``error`` explains why — distinct from a successful empty ``usageItems`` list.
+    """
     params: dict[str, str] = {}
     if product:
         params["product"] = product
@@ -85,13 +90,30 @@ def _metered_billing_usage(
             f"/users/{username}/settings/billing/{usage_kind}/usage",
             params if params else None,
         )
-    except RuntimeError:
-        return None
+    except RuntimeError as exc:
+        return None, str(exc)
     if not data:
-        return None
+        return None, "billing usage endpoint returned no data"
     if not isinstance(data, dict):
+        return None, "billing usage endpoint returned an unexpected response"
+    return _usage_items_by_model(data.get("usageItems", [])), None
+
+
+def _metered_billing_usage(
+    api,
+    username: str,
+    usage_kind: str,
+    *,
+    product: str | None = None,
+    model: str | None = None,
+) -> dict | None:
+    """Fetch ``…/settings/billing/{usage_kind}/usage`` and group by model."""
+    by_model, error = fetch_metered_billing_usage(
+        api, username, usage_kind, product=product, model=model
+    )
+    if error:
         return None
-    return _usage_items_by_model(data.get("usageItems", []))
+    return by_model
 
 
 def get_premium_request_usage(api, username, product="copilot", model=None):
