@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from .billing import get_billing_summary, get_full_billing, get_premium_request_usage
 from .report_helpers import fmt_price, gb_hours_to_avg_mb
+from .report_sources import print_premium_request_model_breakdown
 from .terminal import print_section
 
 
@@ -55,24 +56,7 @@ def show_copilot_summary(api, username):
         print()
         return
 
-    # codeql[py/clear-text-logging-sensitive-data]
-    for model, data in sorted(
-        premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
-    ):
-        # codeql[py/clear-text-logging-sensitive-data]
-        print(f"    {model}:")
-        # codeql[py/clear-text-logging-sensitive-data]
-        print(f"      Total requests: {data['total_requests']:.2f}")
-        print(
-            f"      Gross: {fmt_price(data['total_gross'])} | Discount: {fmt_price(data['total_discount'])} | Net: {fmt_price(data['total_net'])}"
-        )
-        for item in data["items"]:
-            sku = item.get("sku", "unknown")
-            qty = item.get("grossQuantity", 0)
-            price = item.get("pricePerUnit", 0)
-            # codeql[py/clear-text-logging-sensitive-data]
-            print(f"        {sku}: {qty:.2f} @ {fmt_price(price)}/ea")
-        print()
+    print_premium_request_model_breakdown(premium_by_model)
 
 
 def show_gitlfs_summary(api, username):
@@ -355,26 +339,7 @@ def render_copilot_summary(copilot: dict | None, premium_by_model: dict | None) 
             )
             print()
         return
-    # codeql[py/clear-text-logging-sensitive-data]
-    for model, data in sorted(
-        premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
-    ):
-        # codeql[py/clear-text-logging-sensitive-data]
-        print(f"    {model}:")
-        # codeql[py/clear-text-logging-sensitive-data]
-        print(f"      Total requests: {data['total_requests']:.2f}")
-        print(
-            f"      Gross: {fmt_price(data['total_gross'])} | "
-            f"Discount: {fmt_price(data['total_discount'])} | "
-            f"Net: {fmt_price(data['total_net'])}"
-        )
-        for item in data.get("items", []):
-            sku = item.get("sku", "unknown")
-            qty = item.get("grossQuantity", 0)
-            price = item.get("pricePerUnit", 0)
-            # codeql[py/clear-text-logging-sensitive-data]
-            print(f"        {sku}: {qty:.2f} @ {fmt_price(price)}/ea")
-        print()
+    print_premium_request_model_breakdown(premium_by_model)
 
 
 def render_gitlfs_summary(git_lfs: dict | None) -> None:
