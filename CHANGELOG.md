@@ -15,6 +15,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 - **Security CI (`pip-audit`):** bump locked `pypdf` to 6.21.4+ (CVE-2026-119203–209) so the weekly `Security` workflow passes again.
 - **PR CodeQL:** move intentional Copilot billing stdout into `report_sources.py` (and annotate `report_summary.py` where needed) so new taint paths from metered billing fetch do not fail the CodeQL required check.
 - **SonarCloud (PR #35):** split Actions email formatters in `_email_report_common.py`, simplify `copilot_usage_fetch` fallbacks, and rename a shadowing `credits` variable in `copilot_metering.py`.
+- **Copilot export/console consistency:** PDF/XLSX Copilot sections, live `show_copilot_summary`, and final-summary “by model” block use the same metering helpers as email (`copilot_export_primary_row`, `_effective_metering`). Billing treats null `usageItems` as empty; `get_ai_credit_usage` defaults `product` to `copilot`.
 
 ### Added
 

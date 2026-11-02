@@ -96,7 +96,10 @@ def fetch_metered_billing_usage(
         return None, "billing usage endpoint returned no data"
     if not isinstance(data, dict):
         return None, "billing usage endpoint returned an unexpected response"
-    return _usage_items_by_model(data.get("usageItems", [])), None
+    items = data.get("usageItems") or []
+    if not isinstance(items, list):
+        return None, "billing usage endpoint returned an unexpected response"
+    return _usage_items_by_model(items), None
 
 
 def _metered_billing_usage(
@@ -123,7 +126,7 @@ def get_premium_request_usage(api, username, product="copilot", model=None):
     )
 
 
-def get_ai_credit_usage(api, username, product=None, model=None):
+def get_ai_credit_usage(api, username, product="copilot", model=None):
     """Get AI credit usage breakdown by model (post-2026 Copilot metering)."""
     return _metered_billing_usage(api, username, "ai_credit", product=product, model=model)
 

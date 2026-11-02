@@ -24,6 +24,17 @@ class ProductsReportTests(unittest.TestCase):
 
         with (
             mock.patch("github_usage.report_products.get_billing_summary", return_value=summary),
+            mock.patch(
+                "github_usage.report_products.get_copilot_usage",
+                return_value={
+                    "metering": "premium_requests",
+                    "total_requests": 1.0,
+                    "total_gross": 10.0,
+                    "total_discount": 2.0,
+                    "total_net": 8.0,
+                    "by_model": {},
+                },
+            ),
             mock.patch("github_usage.report_products.get_premium_request_usage", return_value={}),
         ):
             stdout = StringIO()

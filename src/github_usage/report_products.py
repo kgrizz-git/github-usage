@@ -11,6 +11,7 @@ from .copilot_metering import (
     copilot_usage_summary_lines,
 )
 from .report_helpers import fmt_price, gb_hours_to_avg_mb
+from .report_data import get_copilot_usage
 from .report_sources import print_premium_request_model_breakdown
 from .terminal import print_section
 
@@ -57,13 +58,45 @@ def show_copilot_summary(api, username):
 
     # By model breakdown
     print("  By Model:")
+    copilot_usage = get_copilot_usage(api, username)
     premium_by_model = get_premium_request_usage(api, username)
-    if not premium_by_model:
+    _print_copilot_by_model_block(copilot_usage, premium_by_model)
+
+
+def _print_copilot_by_model_block(copilot: dict, premium_by_model: dict | None) -> None:
+    """Print legacy Copilot per-model lines (metering-aware)."""
+    metering = _effective_metering(copilot)
+    if metering == "ai_credits":
+        by_model = copilot.get("by_model") or {}
+        if not by_model:
+            print(_NO_COPILOT_MODEL_DATA)
+            print()
+            return
+        for model, data in sorted(
+            by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
+        ):
+            print(copilot_model_detail_line(model, data, metering="ai_credits"))
+        print()
+        return
+    if premium_by_model:
+        print_premium_request_model_breakdown(premium_by_model)
+        return
+    by_model = copilot.get("by_model") or {}
+    if not by_model:
         print(_NO_COPILOT_MODEL_DATA)
         print()
         return
-
-    print_premium_request_model_breakdown(premium_by_model)
+    for model, data in sorted(
+        by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
+    ):
+        print(f"    {model}:")
+        print(f"      Total requests: {data.get('requests', 0):.2f}")
+        print(
+            f"      Gross: {fmt_price(data.get('gross', 0))} | "
+            f"Discount: {fmt_price(data.get('discount', 0))} | "
+            f"Net: {fmt_price(data.get('net', 0))}"
+        )
+        print()
 
 
 def show_gitlfs_summary(api, username):
@@ -318,43 +351,12 @@ def render_copilot_summary(copilot: dict | None, premium_by_model: dict | None) 
         print("  No Copilot usage data found.")
         print()
         return
-    metering = _effective_metering(copilot)
     print("  Summary:")
     for line in copilot_usage_summary_lines(copilot):
         print(f"  {line}")
     print()
     print("  By Model:")
-    if metering == "ai_credits":
-        by_model = copilot.get("by_model") or {}
-        if not by_model:
-            print(_NO_COPILOT_MODEL_DATA)
-            print()
-            return
-        for model, data in sorted(
-            by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
-        ):
-            print(copilot_model_detail_line(model, data, metering="ai_credits"))
-        print()
-        return
-    if premium_by_model:
-        print_premium_request_model_breakdown(premium_by_model)
-        return
-    by_model = copilot.get("by_model") or {}
-    if not by_model:
-        print(_NO_COPILOT_MODEL_DATA)
-        print()
-        return
-    for model, data in sorted(
-        by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
-    ):
-        print(f"    {model}:")
-        print(f"      Total requests: {data.get('requests', 0):.2f}")
-        print(
-            f"      Gross: {fmt_price(data.get('gross', 0))} | "
-            f"Discount: {fmt_price(data.get('discount', 0))} | "
-            f"Net: {fmt_price(data.get('net', 0))}"
-        )
-        print()
+    _print_copilot_by_model_block(copilot, premium_by_model)
 
 
 def render_gitlfs_summary(git_lfs: dict | None) -> None:

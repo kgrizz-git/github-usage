@@ -108,6 +108,22 @@ class ExportXlsxTests(unittest.TestCase):
         self.assertIn("gpt-4.1", models)
         self.assertIn("claude-sonnet-4", models)
 
+    def test_copilot_sheet_ai_credits_label(self):
+        data = dict(self.data)
+        data["copilot"] = {
+            **data["copilot"],
+            "metering": "ai_credits",
+            "total_credits_used": 99.0,
+            "total_requests": 0.0,
+        }
+        wb = self._open(data)
+        ws = wb["Copilot"]
+        rows = list(ws.iter_rows(values_only=True))
+        self.assertEqual(rows[3], ("AI Credits Used (qty)", 99.0))
+        ws_model = wb["By Model"]
+        model_rows = list(ws_model.iter_rows(values_only=True))
+        self.assertEqual(model_rows[3][1], "Credits (qty)")
+
     def test_git_lfs_sheet(self):
         wb = self._open()
         ws = wb["Git LFS"]

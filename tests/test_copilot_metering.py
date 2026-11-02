@@ -50,6 +50,15 @@ class CopilotMeteringTests(unittest.TestCase):
         }
         self.assertEqual(_effective_metering(copilot), "ai_credits")
 
+    def test_export_primary_row_ai_credits(self):
+        from github_usage.copilot_metering import copilot_export_primary_row
+
+        label, value = copilot_export_primary_row(
+            {"metering": "ai_credits", "total_credits_used": 3.5, "total_requests": 0.0}
+        )
+        self.assertEqual(label, "AI Credits Used (qty)")
+        self.assertAlmostEqual(value, 3.5)
+
 
 if __name__ == "__main__":
     unittest.main()

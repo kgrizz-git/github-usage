@@ -23,6 +23,7 @@ from .export_visibility import (
     visibility_summary_label_values,
 )
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
+from .copilot_metering import copilot_by_model_quantity_header, copilot_export_primary_row
 from .usage_split import classify_actions_sku
 from .visibility import repo_visibility, visibility_label
 
@@ -136,10 +137,11 @@ def _write_copilot_page(add_section: AddSectionFn, data: dict) -> None:
     copilot = data.get("copilot") or {}
     if not copilot:
         return
+    primary_label, primary_value = copilot_export_primary_row(copilot)
     add_section(
         "Copilot",
         [
-            ("Total Requests", _fmt_num(copilot.get("total_requests"))),
+            (primary_label, _fmt_num(primary_value)),
             ("Total Gross", _fmt_num(copilot.get("total_gross"))),
             ("Total Discount", _fmt_num(copilot.get("total_discount"))),
             ("Total Net", _fmt_num(copilot.get("total_net"))),

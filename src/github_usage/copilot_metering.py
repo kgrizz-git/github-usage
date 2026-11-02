@@ -73,3 +73,20 @@ def copilot_forecast_metric(copilot: dict) -> tuple[float, str]:
     if metering == "premium_requests":
         return float(copilot.get("total_requests") or 0.0), "Premium Requests"
     return 0.0, "Copilot usage"
+
+
+def copilot_export_primary_row(copilot: dict) -> tuple[str, float]:
+    """Primary usage label and value for PDF/XLSX Copilot summary sections."""
+    value, label = copilot_forecast_metric(copilot)
+    if label == "Premium Requests":
+        return "Total Requests", value
+    if label == "AI Credits (qty)":
+        return "AI Credits Used (qty)", value
+    return label, value
+
+
+def copilot_by_model_quantity_header(copilot: dict) -> str:
+    """Column header for per-model quantity in tabular exports."""
+    if _effective_metering(copilot) == "ai_credits":
+        return "Credits (qty)"
+    return "Requests"
