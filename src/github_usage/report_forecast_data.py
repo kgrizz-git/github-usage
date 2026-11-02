@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from ._email_report_common import copilot_forecast_metric
+from .copilot_metering import copilot_forecast_metric
 from .forecast import compute_forecast
 from .report_helpers import day_of_month, days_in_month
 from .usage_split import flat_equivalent_gb_hours

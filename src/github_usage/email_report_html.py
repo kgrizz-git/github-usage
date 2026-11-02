@@ -7,12 +7,14 @@ import html
 from ._email_report_common import (
     _bytes_to_mb,
     _generated_line,
+    email_actions_net_cost_line,
+    email_actions_table_rows,
+)
+from .copilot_metering import (
     copilot_forecast_metric,
     copilot_model_detail_line,
     copilot_section_title,
     copilot_usage_summary_lines,
-    email_actions_minutes_lines,
-    email_actions_storage_lines,
 )
 from ._email_report_html_tables import (
     html_cost_consumer_row,
@@ -65,16 +67,14 @@ def _format_html_actions_section(data: dict) -> list[str]:
     if not actions:
         return []
     net = (data.get("monthly_costs") or {}).get("actions", {}).get("net", 0.0)
-    minute_lines = email_actions_minutes_lines(actions)
-    storage_lines = email_actions_storage_lines(actions)
     rows = ["<tr><th>Metric</th><th>Value</th></tr>"]
-    for line in minute_lines:
-        label, _, value = line.partition(": ")
-        rows.append(f"<tr><td>{html.escape(label.removeprefix('- '))}</td><td>{html.escape(value)}</td></tr>")
-    for line in storage_lines:
-        label, _, value = line.partition(": ")
-        rows.append(f"<tr><td>{html.escape(label.removeprefix('- '))}</td><td>{html.escape(value)}</td></tr>")
-    rows.append(f"<tr><td>Net cost</td><td>{fmt_price(net)}</td></tr>")
+    for label, value in email_actions_table_rows(actions):
+        rows.append(
+            f"<tr><td>{html.escape(label)}</td><td>{html.escape(value)}</td></tr>"
+        )
+    net_line = email_actions_net_cost_line(net)
+    _, _, net_value = net_line.partition(": ")
+    rows.append(f"<tr><td>Net cost</td><td>{html.escape(net_value)}</td></tr>")
     return ["<h2>Actions</h2>", _TABLE_OPEN, *rows, _TABLE_CLOSE]
 
 

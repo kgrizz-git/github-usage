@@ -5,12 +5,16 @@ from __future__ import annotations
 from ._email_report_common import (
     _bytes_to_mb,
     _generated_line,
+    email_actions_minutes_lines,
+    email_actions_net_cost_line,
+    email_actions_storage_lines,
+    email_actions_table_rows,
+)
+from .copilot_metering import (
     copilot_forecast_metric,
     copilot_model_detail_line,
     copilot_section_title,
     copilot_usage_summary_lines,
-    email_actions_minutes_lines,
-    email_actions_storage_lines,
 )
 from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
@@ -53,9 +57,13 @@ def _format_actions_section(data: dict) -> list[str]:
     if not actions:
         return []
     net = (data.get("monthly_costs") or {}).get("actions", {}).get("net", 0.0)
-    lines = ["Actions", *email_actions_minutes_lines(actions), *email_actions_storage_lines(actions)]
-    lines.append(f"- Net cost: {fmt_price(net)}")
-    lines.append("")
+    lines = [
+        "Actions",
+        *email_actions_minutes_lines(actions),
+        *email_actions_storage_lines(actions),
+        email_actions_net_cost_line(net),
+        "",
+    ]
     return lines
 
 

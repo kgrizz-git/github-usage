@@ -355,7 +355,7 @@ class ReportDataTests(unittest.TestCase):
                     "/users/octocat/settings/billing/usage/summary",
                     (("product", "Copilot"),),
                 ): {"usageItems": []},
-                ("GET", "/users/octocat/settings/billing/ai_credit/usage", ()): {
+                ("GET", "/users/octocat/settings/billing/ai_credit/usage", (("product", "copilot"),)): {
                     "usageItems": [
                         {
                             "model": "gpt-4.1",
@@ -387,9 +387,88 @@ class ReportDataTests(unittest.TestCase):
         result = get_copilot_usage(api, "octocat")
 
         self.assertEqual(result["metering"], "ai_credits")
-        self.assertEqual(result["total_usage_net"], 0.5)
+        self.assertEqual(result["total_credits_used"], 1.0)
         self.assertIn("gpt-4.1", result["by_model"])
         self.assertNotIn("legacy-model", result["by_model"])
+
+    def test_get_copilot_usage_ai_credit_included_usage_uses_gross_quantity(self):
+        """Included AI credit rows can have netAmount 0 while grossQuantity is non-zero."""
+        from github_usage.report_data import get_copilot_usage
+
+        api = FakeAPI(
+            request_responses={
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Copilot"),),
+                ): {"usageItems": []},
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/ai_credit/usage",
+                    (("product", "copilot"),),
+                ): {
+                    "usageItems": [
+                        {
+                            "model": "gpt-4.1",
+                            "grossQuantity": 3956.18,
+                            "netQuantity": 0.0,
+                            "grossAmount": 39.56,
+                            "discountAmount": 39.56,
+                            "netAmount": 0.0,
+                        }
+                    ]
+                },
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/premium_request/usage",
+                    (("product", "copilot"),),
+                ): {"usageItems": []},
+            }
+        )
+
+        result = get_copilot_usage(api, "octocat")
+
+        self.assertEqual(result["metering"], "ai_credits")
+        self.assertAlmostEqual(result["total_credits_used"], 3956.18)
+        self.assertAlmostEqual(result["by_model"]["gpt-4.1"]["requests"], 3956.18)
+
+    def test_get_copilot_usage_falls_back_to_premium_when_ai_empty(self):
+        from github_usage.report_data import get_copilot_usage
+
+        api = FakeAPI(
+            request_responses={
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/usage/summary",
+                    (("product", "Copilot"),),
+                ): {"usageItems": []},
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/ai_credit/usage",
+                    (("product", "copilot"),),
+                ): {"usageItems": []},
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/premium_request/usage",
+                    (("product", "copilot"),),
+                ): {
+                    "usageItems": [
+                        {
+                            "model": "gpt-4.1",
+                            "grossQuantity": 12.0,
+                            "grossAmount": 0.0,
+                            "discountAmount": 0.0,
+                            "netAmount": 0.0,
+                        }
+                    ]
+                },
+            }
+        )
+
+        result = get_copilot_usage(api, "octocat")
+
+        self.assertEqual(result["metering"], "premium_requests")
+        self.assertEqual(result["total_requests"], 12.0)
 
     def test_get_copilot_usage_handles_null_amounts(self):
         """Source sanitization: both _billing_summary and inline premium loop handle nulls."""

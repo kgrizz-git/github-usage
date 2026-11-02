@@ -50,6 +50,7 @@ def _usage_items_by_model(items: list) -> dict:
             by_model[model] = {
                 "items": [],
                 "total_requests": 0.0,
+                "total_net_quantity": 0.0,
                 "total_gross": 0.0,
                 "total_discount": 0.0,
                 "total_net": 0.0,
@@ -57,6 +58,7 @@ def _usage_items_by_model(items: list) -> dict:
         sanitized = sanitize_item_amounts(item)
         by_model[model]["items"].append(sanitized)
         by_model[model]["total_requests"] += _safe_amount(sanitized, "grossQuantity")
+        by_model[model]["total_net_quantity"] += _safe_amount(sanitized, "netQuantity")
         by_model[model]["total_gross"] += _safe_amount(sanitized, "grossAmount")
         by_model[model]["total_discount"] += _safe_amount(sanitized, "discountAmount")
         by_model[model]["total_net"] += _safe_amount(sanitized, "netAmount")
