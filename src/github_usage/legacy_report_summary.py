@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .copilot_metering import _effective_metering
 from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
@@ -163,12 +164,16 @@ def _copilot_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
         ("Copilot net", fmt_price(float(billing.get("total_net", 0.0)))),
     ]
     by_model = (data.get("copilot") or {}).get("by_model") or {}
+    metering = _effective_metering(data.get("copilot") or {})
     for model, values in sorted(
         by_model.items(), key=lambda item: float(item[1].get("requests", 0)), reverse=True
     )[:5]:
-        reqs = float(values.get("requests", 0))
+        qty = float(values.get("requests", 0))
         net = float(values.get("net", 0.0))
-        rows.append((f"  {model}", f"{reqs:.0f} reqs · {fmt_price(net)}"))
+        if metering == "ai_credits":
+            rows.append((f"  {model}", f"{qty:.2f} credits · {fmt_price(net)}"))
+        else:
+            rows.append((f"  {model}", f"{qty:.0f} reqs · {fmt_price(net)}"))
     return rows
 
 

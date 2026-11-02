@@ -29,7 +29,9 @@ def get_billing_summary(api, username, product):
         return None
     if not isinstance(billing, dict):
         return None
-    items = billing.get("usageItems", [])
+    items = billing.get("usageItems") or []
+    if not isinstance(items, list):
+        return None
     summary = {"raw": billing, "items": {}, "total_gross": 0, "total_discount": 0, "total_net": 0}
     for item in items:
         sku = item.get("sku", item.get("product", "unknown"))
@@ -141,7 +143,10 @@ def get_full_billing(api, username):
         return None
     if not isinstance(data, dict):
         return None
-    return data.get("usageItems", [])
+    items = data.get("usageItems") or []
+    if not isinstance(items, list):
+        return None
+    return items
 
 
 def get_user_actions_billing(api, username):
@@ -180,7 +185,10 @@ def get_actions_per_repo(api, owner, repo):
     total_minutes = 0.0
     total_storage_gb_hours = 0.0
     sku_breakdown = {}
-    for item in billing.get("usageItems", []):
+    usage_items = billing.get("usageItems") or []
+    if not isinstance(usage_items, list):
+        return 0.0, 0.0, {}
+    for item in usage_items:
         sku = item.get("sku", "unknown")
         sanitized = sanitize_item_amounts(item)
         unit = sanitized.get("unitType", "")

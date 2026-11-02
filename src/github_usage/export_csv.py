@@ -26,6 +26,7 @@ from .export_visibility import (
     visibility_summary_rows,
 )
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
+from .copilot_metering import copilot_by_model_quantity_header
 from .visibility import repo_visibility
 
 
@@ -129,7 +130,7 @@ def _write_copilot_section(writer, data: dict) -> None:  # type: ignore[type-arg
     copilot = _coerce_section(data.get("copilot"), {})
     for key, value in copilot.items():
         if key == "by_model":
-            _write_copilot_by_model(writer, value)
+            _write_copilot_by_model(writer, value, copilot)
         else:
             writer.writerow([key, value])
 
@@ -254,11 +255,12 @@ def _write_forecast_section(
         )
 
 
-def _write_copilot_by_model(writer: csv.writer, by_model) -> None:  # type: ignore[type-arg]
+def _write_copilot_by_model(writer: csv.writer, by_model, copilot: dict) -> None:  # type: ignore[type-arg]
     if not by_model:
         return
+    qty_header = copilot_by_model_quantity_header(copilot)
     writer.writerow(["by_model"])
-    writer.writerow(["model", "requests", "gross", "discount", "net"])
+    writer.writerow(["model", qty_header, "gross", "discount", "net"])
     for model_name, model_data in by_model.items():
         if isinstance(model_data, dict):
             writer.writerow(

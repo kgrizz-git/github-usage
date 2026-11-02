@@ -253,40 +253,51 @@ def _print_repo_storage_breakdowns(by_storage, by_storage_private, visibility_by
         print()
 
 
-def _print_copilot_by_model(copilot: dict | None, premium_by_model):
-    """Copilot usage grouped by model (section of BIGGEST CONSUMERS)."""
-    metering = _effective_metering(copilot or {})
-    if metering == "ai_credits":
-        print("    Copilot AI Credits (by model):")
-        by_model = (copilot or {}).get("by_model") or {}
-        if by_model:
-            for model, data in sorted(
-                by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
-            ):
-                qty = float(data.get("requests", 0.0))
-                print(f"      {model:<30} {qty:>10.2f} credits (gross qty)")
-        else:
-            print("      No model-level data available.")
+def _print_copilot_ai_credits_by_model(copilot: dict | None) -> None:
+    """AI credit quantities by model (BIGGEST CONSUMERS subsection)."""
+    print("    Copilot AI Credits (by model):")
+    by_model = (copilot or {}).get("by_model") or {}
+    if not by_model:
+        print("      No model-level data available.")
         print()
         return
-    print("    Copilot Premium Requests (by model):")
-    if premium_by_model:
-        for model, data in sorted(
-            premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
-        ):
-            price = 0
-            for item in data.get("items", []):
-                pp = item.get("pricePerUnit", 0)
-                if pp > 0:
-                    price = pp
-                    break
-            # codeql[py/clear-text-logging-sensitive-data]
-            print(
-                f"      {model:<30} {data['total_requests']:>10.0f} reqs  @ {fmt_price(price)}/req  = {fmt_price(data['total_net'])}"
-            )
-    else:
-        print("      No model-level data available.")
+    for model, data in sorted(
+        by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
+    ):
+        qty = float(data.get("requests", 0.0))
+        print(f"      {model:<30} {qty:>10.2f} credits (gross qty)")
     print()
+
+
+def _print_copilot_premium_requests_by_model(premium_by_model) -> None:
+    """Premium request usage by model (BIGGEST CONSUMERS subsection)."""
+    print("    Copilot Premium Requests (by model):")
+    if not premium_by_model:
+        print("      No model-level data available.")
+        print()
+        return
+    for model, data in sorted(
+        premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
+    ):
+        price = 0
+        for item in data.get("items", []):
+            pp = item.get("pricePerUnit", 0)
+            if pp > 0:
+                price = pp
+                break
+        # codeql[py/clear-text-logging-sensitive-data]
+        print(
+            f"      {model:<30} {data['total_requests']:>10.0f} reqs  @ {fmt_price(price)}/req  = {fmt_price(data['total_net'])}"
+        )
+    print()
+
+
+def _print_copilot_by_model(copilot: dict | None, premium_by_model):
+    """Copilot usage grouped by model (section of BIGGEST CONSUMERS)."""
+    if _effective_metering(copilot or {}) == "ai_credits":
+        _print_copilot_ai_credits_by_model(copilot)
+        return
+    _print_copilot_premium_requests_by_model(premium_by_model)
 
 
 def _print_lfs_storage(lfs_summary):

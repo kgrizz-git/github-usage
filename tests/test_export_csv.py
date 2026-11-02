@@ -76,7 +76,7 @@ class ExportCsvTests(unittest.TestCase):
             sub.append(row)
         self.assertIn(["by_model"], sub)
         header_idx = sub.index(["by_model"])
-        self.assertEqual(sub[header_idx + 1], ["model", "requests", "gross", "discount", "net"])
+        self.assertEqual(sub[header_idx + 1], ["model", "Requests", "gross", "discount", "net"])
         model_names = {r[0] for r in sub[header_idx + 2 :] if r}
         self.assertIn("gpt-4.1", model_names)
         self.assertIn("claude-sonnet-4", model_names)

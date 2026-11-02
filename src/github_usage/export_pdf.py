@@ -23,7 +23,7 @@ from .export_visibility import (
     visibility_summary_label_values,
 )
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
-from .copilot_metering import copilot_by_model_quantity_header, copilot_export_primary_row
+from .copilot_metering import copilot_export_primary_row
 from .usage_split import classify_actions_sku
 from .visibility import repo_visibility, visibility_label
 
