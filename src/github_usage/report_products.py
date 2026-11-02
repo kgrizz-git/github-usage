@@ -14,6 +14,8 @@ from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .report_sources import print_premium_request_model_breakdown
 from .terminal import print_section
 
+_NO_COPILOT_MODEL_DATA = "    No model-level data available."
+
 
 def show_copilot_summary(api, username):
     """Print Copilot billing summary and per-model premium request breakdown."""
@@ -57,7 +59,7 @@ def show_copilot_summary(api, username):
     print("  By Model:")
     premium_by_model = get_premium_request_usage(api, username)
     if not premium_by_model:
-        print("    No model-level data available.")
+        print(_NO_COPILOT_MODEL_DATA)
         print()
         return
 
@@ -325,7 +327,7 @@ def render_copilot_summary(copilot: dict | None, premium_by_model: dict | None) 
     if metering == "ai_credits":
         by_model = copilot.get("by_model") or {}
         if not by_model:
-            print("    No model-level data available.")
+            print(_NO_COPILOT_MODEL_DATA)
             print()
             return
         for model, data in sorted(
@@ -339,7 +341,7 @@ def render_copilot_summary(copilot: dict | None, premium_by_model: dict | None) 
         return
     by_model = copilot.get("by_model") or {}
     if not by_model:
-        print("    No model-level data available.")
+        print(_NO_COPILOT_MODEL_DATA)
         print()
         return
     for model, data in sorted(
