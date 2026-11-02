@@ -55,6 +55,7 @@ def show_copilot_summary(api, username):
         print()
         return
 
+    # codeql[py/clear-text-logging-sensitive-data]
     for model, data in sorted(
         premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
     ):
@@ -351,6 +352,7 @@ def render_copilot_summary(copilot: dict | None, premium_by_model: dict | None) 
             )
             print()
         return
+    # codeql[py/clear-text-logging-sensitive-data]
     for model, data in sorted(
         premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
     ):

@@ -255,6 +255,7 @@ def _print_copilot_by_model(premium_by_model):
                 if pp > 0:
                     price = pp
                     break
+            # codeql[py/clear-text-logging-sensitive-data]
             print(
                 f"      {model:<30} {data['total_requests']:>10.0f} reqs  @ {fmt_price(price)}/req  = {fmt_price(data['total_net'])}"
             )

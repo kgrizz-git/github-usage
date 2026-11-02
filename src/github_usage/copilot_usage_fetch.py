@@ -40,8 +40,8 @@ def resolve_copilot_usage_sources(
     if prem_err:
         notes.append(f"Premium request usage unavailable ({prem_err})")
 
-    ai_data = ai_raw if ai_err is None else {}
-    prem_data = prem_raw if prem_err is None else {}
+    ai_data: dict = {} if ai_err else (ai_raw or {})
+    prem_data: dict = {} if prem_err else (prem_raw or {})
 
     if ai_err is None and _billing_usage_has_items(ai_data):
         return "ai_credits", ai_data, notes
