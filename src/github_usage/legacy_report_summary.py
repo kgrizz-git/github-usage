@@ -143,6 +143,35 @@ def _repo_billed_storage_rows(data: dict[str, Any], *, limit: int = 10) -> list[
     return rows
 
 
+def _copilot_rows_from_copilot_section(
+    copilot: dict[str, Any] | None, errors: dict[str, Any]
+) -> list[tuple[str, str]]:
+    if copilot is None and errors.get("copilot"):
+        return [("Copilot", f"n/a ({errors['copilot']})")]
+    if not copilot:
+        return [("Copilot", "No usage")]
+    return [
+        ("Copilot gross", fmt_price(float(copilot.get("total_gross", 0.0)))),
+        ("Copilot net", fmt_price(float(copilot.get("total_net", 0.0)))),
+    ]
+
+
+def _copilot_by_model_tui_rows(copilot: dict[str, Any], *, limit: int = 5) -> list[tuple[str, str]]:
+    by_model = copilot.get("by_model") or {}
+    metering = _effective_metering(copilot)
+    rows: list[tuple[str, str]] = []
+    for model, values in sorted(
+        by_model.items(), key=lambda item: float(item[1].get("requests", 0)), reverse=True
+    )[:limit]:
+        qty = float(values.get("requests", 0))
+        net = float(values.get("net", 0.0))
+        if metering == "ai_credits":
+            rows.append((f"  {model}", f"{qty:.2f} credits · {fmt_price(net)}"))
+        else:
+            rows.append((f"  {model}", f"{qty:.0f} reqs · {fmt_price(net)}"))
+    return rows
+
+
 def _copilot_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     """Copilot billing summary rows."""
     errors = data.get("errors") or {}
@@ -150,30 +179,13 @@ def _copilot_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     if billing is None and errors.get("copilot_billing"):
         return [("Copilot", f"n/a ({errors['copilot_billing']})")]
     if not billing:
-        copilot = data.get("copilot")
-        if copilot is None and errors.get("copilot"):
-            return [("Copilot", f"n/a ({errors['copilot']})")]
-        if not copilot:
-            return [("Copilot", "No usage")]
-        return [
-            ("Copilot gross", fmt_price(float(copilot.get("total_gross", 0.0)))),
-            ("Copilot net", fmt_price(float(copilot.get("total_net", 0.0)))),
-        ]
+        return _copilot_rows_from_copilot_section(data.get("copilot"), errors)
     rows = [
         ("Copilot gross", fmt_price(float(billing.get("total_gross", 0.0)))),
         ("Copilot net", fmt_price(float(billing.get("total_net", 0.0)))),
     ]
-    by_model = (data.get("copilot") or {}).get("by_model") or {}
-    metering = _effective_metering(data.get("copilot") or {})
-    for model, values in sorted(
-        by_model.items(), key=lambda item: float(item[1].get("requests", 0)), reverse=True
-    )[:5]:
-        qty = float(values.get("requests", 0))
-        net = float(values.get("net", 0.0))
-        if metering == "ai_credits":
-            rows.append((f"  {model}", f"{qty:.2f} credits · {fmt_price(net)}"))
-        else:
-            rows.append((f"  {model}", f"{qty:.0f} reqs · {fmt_price(net)}"))
+    copilot = data.get("copilot") or {}
+    rows.extend(_copilot_by_model_tui_rows(copilot))
     return rows
 
 
