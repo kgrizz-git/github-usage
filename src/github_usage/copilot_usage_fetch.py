@@ -11,6 +11,31 @@ def _billing_usage_has_items(by_model: dict | None) -> bool:
     return any(entry.get("items") for entry in by_model.values())
 
 
+def _usage_fetch_notes(ai_err: str | None, prem_err: str | None) -> list[str]:
+    notes: list[str] = []
+    if ai_err:
+        notes.append(f"AI credit usage unavailable ({ai_err})")
+    if prem_err:
+        notes.append(f"Premium request usage unavailable ({prem_err})")
+    return notes
+
+
+def _resolve_empty_usage(
+    ai_err: str | None,
+    prem_err: str | None,
+    ai_data: dict,
+    prem_data: dict,
+    notes: list[str],
+) -> tuple[str, dict, list[str]]:
+    if ai_err is None and prem_err is None:
+        return "ai_credits", {}, notes
+    if prem_err is None:
+        return "premium_requests", prem_data, notes
+    if ai_err is None:
+        return "ai_credits", ai_data, notes
+    return "unknown", {}, notes
+
+
 def resolve_copilot_usage_sources(
     api,
     username: str,
@@ -34,11 +59,7 @@ def resolve_copilot_usage_sources(
             f"premium request endpoint failed ({prem_err})"
         )
 
-    notes: list[str] = []
-    if ai_err:
-        notes.append(f"AI credit usage unavailable ({ai_err})")
-    if prem_err:
-        notes.append(f"Premium request usage unavailable ({prem_err})")
+    notes = _usage_fetch_notes(ai_err, prem_err)
 
     ai_data: dict = {} if ai_err else (ai_raw or {})
     prem_data: dict = {} if prem_err else (prem_raw or {})
@@ -47,10 +68,4 @@ def resolve_copilot_usage_sources(
         return "ai_credits", ai_data, notes
     if prem_err is None and _billing_usage_has_items(prem_data):
         return "premium_requests", prem_data, notes
-    if ai_err is None and prem_err is None:
-        return "ai_credits", {}, notes
-    if prem_err is None:
-        return "premium_requests", prem_data, notes
-    if ai_err is None:
-        return "ai_credits", ai_data, notes
-    return "unknown", {}, notes
+    return _resolve_empty_usage(ai_err, prem_err, ai_data, prem_data, notes)

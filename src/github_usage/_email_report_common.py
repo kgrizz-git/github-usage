@@ -39,26 +39,44 @@ def email_actions_table_rows(actions: dict) -> list[tuple[str, str]]:
     return rows
 
 
-def email_actions_minutes_lines(actions: dict) -> list[str]:
-    """Bullet lines for Actions compute minutes (quota is private-only)."""
-    limit = int(actions.get("minutes_limit") or _PRIVATE_MINUTES_LIMIT)
-    if "private_minutes" in actions:
-        private = float(actions.get("private_minutes") or 0.0)
-        public = float(actions.get("public_minutes") or 0.0)
-        pct = (private / limit * 100.0) if limit else 0.0
-        lines = [f"- Quota (private repos): {private:,.1f} / {limit:,} min ({pct:.1f}%)"]
-        if public > 0:
-            lines.append(f"- Public repos (free): {public:,.1f} min")
-        unattributed = float(actions.get("unattributed_minutes") or 0.0)
-        if unattributed >= 0.05:
-            lines.append(f"- Not attributed to scanned repos: {unattributed:,.1f} min")
-        account = float(actions.get("minutes") or 0.0)
-        reconciled = actions.get("reconciled", True)
-        if account > 0 and not reconciled:
-            lines.append(f"- Account total (billing API): {account:,.1f} min")
-        elif account > 0 and abs(account - (private + public + unattributed)) > 0.05:
-            lines.append(f"- Account total (billing API): {account:,.1f} min")
-        return lines
+def _append_account_minutes_total(
+    lines: list[str],
+    *,
+    account: float,
+    private: float,
+    public: float,
+    unattributed: float,
+    reconciled: bool,
+) -> None:
+    if account <= 0:
+        return
+    if not reconciled or abs(account - (private + public + unattributed)) > 0.05:
+        lines.append(f"- Account total (billing API): {account:,.1f} min")
+
+
+def _email_actions_minutes_with_visibility(actions: dict, limit: int) -> list[str]:
+    private = float(actions.get("private_minutes") or 0.0)
+    public = float(actions.get("public_minutes") or 0.0)
+    pct = (private / limit * 100.0) if limit else 0.0
+    lines = [f"- Quota (private repos): {private:,.1f} / {limit:,} min ({pct:.1f}%)"]
+    if public > 0:
+        lines.append(f"- Public repos (free): {public:,.1f} min")
+    unattributed = float(actions.get("unattributed_minutes") or 0.0)
+    if unattributed >= 0.05:
+        lines.append(f"- Not attributed to scanned repos: {unattributed:,.1f} min")
+    account = float(actions.get("minutes") or 0.0)
+    _append_account_minutes_total(
+        lines,
+        account=account,
+        private=private,
+        public=public,
+        unattributed=unattributed,
+        reconciled=bool(actions.get("reconciled", True)),
+    )
+    return lines
+
+
+def _email_actions_minutes_without_visibility(actions: dict, limit: int) -> list[str]:
     minutes = float(actions.get("minutes") or 0.0)
     pct = float(actions.get("minutes_percent") or 0.0)
     return [
@@ -71,38 +89,50 @@ def email_actions_minutes_lines(actions: dict) -> list[str]:
     ]
 
 
-def email_actions_storage_lines(actions: dict) -> list[str]:
-    """Bullet lines for billed Actions artifact storage."""
-    limit_mb = int(actions.get("storage_limit_mb") or _PRIVATE_STORAGE_LIMIT_MB)
-    if "private_storage_avg_mb" in actions:
-        priv_mb = float(actions.get("private_storage_avg_mb") or 0.0)
-        pub_mb = float(actions.get("public_storage_avg_mb") or 0.0)
-        priv_gb = float(actions.get("private_storage_gb_hours") or 0.0)
-        pub_gb = float(actions.get("public_storage_gb_hours") or 0.0)
-        unattributed_gb = float(actions.get("unattributed_storage_gb_hours") or 0.0)
-        priv_pct = (priv_mb / limit_mb * 100.0) if limit_mb else 0.0
-        lines = [
-            (
-                f"- Quota storage (private): {priv_mb:,.1f} / {limit_mb:,} MB "
-                f"({priv_pct:.1f}%)"
-            ),
-            f"- Accrued (private): {priv_gb:,.4f} GB-hrs",
-        ]
-        if unattributed_gb >= 0.0001:
-            lines.append(
-                f"- Storage not attributed to scanned repos: {unattributed_gb:,.4f} GB-hrs"
-            )
-        if pub_mb > 0 or pub_gb > 0:
-            lines.append(f"- Public repos (free): {pub_mb:,.1f} MB · {pub_gb:,.4f} GB-hrs")
-        account_gb = float(actions.get("storage_gb_hours") or 0.0)
-        if account_gb > 0 and (
-            unattributed_gb >= 0.0001 or not actions.get("reconciled_storage", True)
-        ):
-            lines.append(
-                f"- Account total (billing API): {account_gb:,.4f} GB-hrs "
-                "(may include unscanned repos)"
-            )
-        return lines
+def email_actions_minutes_lines(actions: dict) -> list[str]:
+    """Bullet lines for Actions compute minutes (quota is private-only)."""
+    limit = int(actions.get("minutes_limit") or _PRIVATE_MINUTES_LIMIT)
+    if "private_minutes" in actions:
+        return _email_actions_minutes_with_visibility(actions, limit)
+    return _email_actions_minutes_without_visibility(actions, limit)
+
+
+def _append_account_storage_total(lines: list[str], actions: dict, unattributed_gb: float) -> None:
+    account_gb = float(actions.get("storage_gb_hours") or 0.0)
+    if account_gb <= 0:
+        return
+    if unattributed_gb >= 0.0001 or not actions.get("reconciled_storage", True):
+        lines.append(
+            f"- Account total (billing API): {account_gb:,.4f} GB-hrs "
+            "(may include unscanned repos)"
+        )
+
+
+def _email_actions_storage_with_visibility(actions: dict, limit_mb: int) -> list[str]:
+    priv_mb = float(actions.get("private_storage_avg_mb") or 0.0)
+    pub_mb = float(actions.get("public_storage_avg_mb") or 0.0)
+    priv_gb = float(actions.get("private_storage_gb_hours") or 0.0)
+    pub_gb = float(actions.get("public_storage_gb_hours") or 0.0)
+    unattributed_gb = float(actions.get("unattributed_storage_gb_hours") or 0.0)
+    priv_pct = (priv_mb / limit_mb * 100.0) if limit_mb else 0.0
+    lines = [
+        (
+            f"- Quota storage (private): {priv_mb:,.1f} / {limit_mb:,} MB "
+            f"({priv_pct:.1f}%)"
+        ),
+        f"- Accrued (private): {priv_gb:,.4f} GB-hrs",
+    ]
+    if unattributed_gb >= 0.0001:
+        lines.append(
+            f"- Storage not attributed to scanned repos: {unattributed_gb:,.4f} GB-hrs"
+        )
+    if pub_mb > 0 or pub_gb > 0:
+        lines.append(f"- Public repos (free): {pub_mb:,.1f} MB · {pub_gb:,.4f} GB-hrs")
+    _append_account_storage_total(lines, actions, unattributed_gb)
+    return lines
+
+
+def _email_actions_storage_without_visibility(actions: dict, limit_mb: int) -> list[str]:
     avg_mb = float(actions.get("storage_avg_mb") or 0.0)
     gb_hours = float(actions.get("storage_gb_hours") or 0.0)
     pct = float(actions.get("storage_percent") or 0.0)
@@ -114,6 +144,14 @@ def email_actions_storage_lines(actions: dict) -> list[str]:
             "account totals may include public repos."
         ),
     ]
+
+
+def email_actions_storage_lines(actions: dict) -> list[str]:
+    """Bullet lines for billed Actions artifact storage."""
+    limit_mb = int(actions.get("storage_limit_mb") or _PRIVATE_STORAGE_LIMIT_MB)
+    if "private_storage_avg_mb" in actions:
+        return _email_actions_storage_with_visibility(actions, limit_mb)
+    return _email_actions_storage_without_visibility(actions, limit_mb)
 
 
 def email_actions_net_cost_line(net: float) -> str:

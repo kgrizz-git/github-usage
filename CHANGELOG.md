@@ -14,6 +14,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 - **Copilot AI credits:** email report data now reads GitHub's `…/billing/ai_credit/usage` endpoint (preferred over legacy premium-request usage after Copilot's 2026 metering change) and labels the email Copilot section and forecast row accordingly; org-licensed Copilot without personal usage gets an explanatory note. Usage displays **credit quantities** (`grossQuantity`) rather than dollar `netAmount`, which is often zero on included allowance. Failed usage API calls surface as report errors or notes instead of looking like zero usage. Forecast exports (CSV/XLSX/PDF/legacy) use the same Copilot metric label as email.
 - **Security CI (`pip-audit`):** bump locked `pypdf` to 6.21.4+ (CVE-2026-119203–209) so the weekly `Security` workflow passes again.
 - **PR CodeQL:** move intentional Copilot billing stdout into `report_sources.py` (and annotate `report_summary.py` where needed) so new taint paths from metered billing fetch do not fail the CodeQL required check.
+- **SonarCloud (PR #35):** split Actions email formatters in `_email_report_common.py`, simplify `copilot_usage_fetch` fallbacks, and rename a shadowing `credits` variable in `copilot_metering.py`.
 
 ### Added
 

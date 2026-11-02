@@ -37,10 +37,10 @@ def copilot_usage_summary_lines(copilot: dict) -> list[str]:
     lines: list[str] = []
     metering = _effective_metering(copilot)
     if metering == "ai_credits":
-        credits = float(copilot.get("total_credits_used") or 0.0)
-        lines.append(f"- AI credits used (quantity): {credits:,.2f}")
+        credits_used = float(copilot.get("total_credits_used") or 0.0)
+        lines.append(f"- AI credits used (quantity): {credits_used:,.2f}")
         billable = float(copilot.get("total_billable_credits") or 0.0)
-        if billable > 0 and abs(billable - credits) > 0.001:
+        if billable > 0 and abs(billable - credits_used) > 0.001:
             lines.append(f"- Billable credits (net quantity): {billable:,.2f}")
     elif metering == "premium_requests":
         lines.append(f"- Total requests: {copilot.get('total_requests', 0.0):,.1f}")
