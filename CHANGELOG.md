@@ -36,6 +36,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Email report repo cap in GitHub Actions:** raised the scheduled workflow's `--max-repos` from 50 to 100 so repo-level sections cover more of the account (aligning with the CLI/config default). Repos beyond the previous cap were excluded from the private/public Actions split and top-repository rankings; the cap still applies above 100 repos, and repo-level sections now make roughly twice as many REST calls (about 210 of the 5,000/hr core quota with consumers + artifact storage).
 - **Shorter README:** focused the landing page on getting started and scheduled delivery; moved setup, email configuration, report/export reference, runs/drift, and development details into linked user guides under `docs/`.
 
 - **README positioning and quick start:** refreshed the project overview around automated reporting, cost visibility, actionable repository detail, and flexible outputs. Added a scheduled-email quick start; clarified the independent GitHub Actions and local macOS launchd delivery paths, token permissions, platform scope, and planned work; and aligned the package description with this positioning.
