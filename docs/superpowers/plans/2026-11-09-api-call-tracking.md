@@ -119,23 +119,33 @@ one matching window per estimate and subtract a full stats snapshot:
 
 - The **baseline is the full `get_request_stats()` snapshot** (total +
   per-resource), captured before the first call the estimate covers.
-- After all fetches, compute the delta field-by-field:
-  `actual_requests = current_total - baseline_total` and
-  `actual_requests_by_resource[res] = current[res] - baseline.get(res, 0)`.
+- `total_requests = current_total` — the raw client total, used for
+  original-fetch messages (not comparable to the estimate).
+- `actual_requests` must cover exactly the calls the estimate covers — no
+  more. Snapshot the counter immediately around each repo-level getter and
+  sum the per-getter deltas field-by-field
+  (`actual_requests_by_resource[res] = sum(after[res] - before[res])`).
   The resource deltas must reconcile: assert in tests that
   `sum(actual_requests_by_resource.values()) == actual_requests`.
-- Keep `total_requests = current_total` as raw context (not comparable to the
-  estimate).
 - `estimate_variance = actual_requests - estimated_incremental_requests`.
 - Document the window in the report dict (e.g. `estimate_scope`).
 
 Matching windows (baseline capture points):
 
-- `build_report_data`: capture **in-builder, immediately after `_rate_limit(api)`**
-  (`report_data.py:374`). The email estimate covers only the optional
-  repo-level sections that follow, so pre-window calls (`/user`,
-  `/user/repos` pagination, `/rate_limit`) are excluded from *both* sides.
-  The caller must not pass an earlier snapshot here.
+- `build_report_data`: capture a `window_baseline` **in-builder, immediately
+  after `_rate_limit(api)`** (`report_data.py:374`) for `total_requests`
+  context. But the email estimate covers only the optional repo-level
+  sections, while the window also contains account-level section fetches
+  (`get_actions_usage`, `get_copilot_usage`, `get_gitlfs_usage`,
+  `get_monthly_costs` — e.g. an LFS-only report estimates 0 while making ≥4
+  calls there). So `actual_requests` comes only from snapshots taken around
+  the repo-level getters (`get_repo_consumers`,
+  `get_artifact_storage_details`, `get_release_asset_details`,
+  `workflow_breakdown_for_top_private`, and the
+  `fetch_repo_actions_table` fallback at `report_data.py:435`), summed as
+  above. The quota guard still uses the pre-fetch estimate vs
+  `core_remaining`, unchanged. The caller must not pass an earlier snapshot
+  here.
 - `build_legacy_report_data`: the legacy estimate's `account_level = 10`
   covers account-level calls including `/user` and `/rate_limit`, which in the
   CLI path happen **before** the builder is invoked
@@ -158,11 +168,12 @@ Merge points (must be after the last fetch):
 
 Add derived fields to `api_estimate`:
 
-- `actual_requests`: measured delta over the estimate's matching window.
-- `total_requests`: raw client total (context only; not comparable to the
-  estimate).
-- `actual_requests_by_resource`: per-resource deltas over the same window
-  (must sum to `actual_requests`).
+- `actual_requests`: repo-level-only measured delta over the estimate's
+  matching window (the only figure compared against the estimate).
+- `total_requests`: raw client total for original-fetch messages (not
+  comparable to the estimate).
+- `actual_requests_by_resource`: per-resource repo-level deltas over the same
+  window (must sum to `actual_requests`).
 - `estimate_scope`: which window the numbers cover
   (e.g. `"repo-sections-only"` vs `"full-report-including-account-level"`).
 - `estimate_variance`: `actual_requests - estimated_incremental_requests`.
@@ -181,9 +192,10 @@ A cache hit must not claim the original fetch's API usage as new usage, and
 must not destroy the cached measurement either.
 
 - Add a small `annotate_cache_hit(data)` helper (e.g. in `report_cache.py`)
-  that sets `data["api_estimate"]["from_cache"] = True`. Leave
-  `actual_requests` as the original fetch's count; renderers print
-  "0 new API requests (N during the original fetch)".
+  that sets `data["api_estimate"]["from_cache"] = True`. Leave both counts
+  intact; renderers print `total_requests` as the original-fetch total, e.g.
+  "0 new API requests (M total during the original fetch; N in estimate
+  scope)". Never present the window delta as the full-fetch total.
 - Call it from all three cache-hit sites:
   1. `cli_email_report._load_or_fetch_email_data()`
   2. `legacy_report.run_legacy_report_session()`
@@ -211,14 +223,15 @@ Suggested content (compact):
 
 ```
 REST API Usage
-- Actual requests: 123 (estimated 120)
+- Repo-level requests (estimate scope): 123 (estimated 120)
+- Total requests this fetch: 130
 - Core quota remaining before: 4,877 / 5,000
 - Core rate limit: 5,000 requests/hour (authenticated) — https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
-- By resource: billing 20, repos 1, actions 100, rate_limit 1, other 1
+- By resource (estimate scope): billing 20, repos 1, actions 100, rate_limit 1, other 1
 - Source: live fetch
 ```
 
-On a cache hit: `- Source: cached report (0 new API requests; 123 during the original fetch)`.
+On a cache hit: `- Source: cached report (0 new API requests; 130 total during the original fetch)`.
 
 Surface-by-surface:
 
@@ -310,7 +323,10 @@ which already lists static rate-limit numbers, to include the same docs link.
 - `tests/test_legacy_terminal.py`: legacy terminal API usage section.
 - `tests/test_legacy_report_summary.py`: GUI legacy detail rows include usage.
 - `tests/test_report_cache.py`: cache hit annotates `from_cache` (and leaves
-  the original count); `CACHE_VERSION` bump invalidates old wrappers.
+  both counts); `CACHE_VERSION` bump invalidates old wrappers. Update the
+  `CACHE_VERSION` pin in `tests/test_report_optional.py:327`
+  (`CacheVersionTests.test_cache_version_is_3`) from 3 to 4 alongside the
+  bump, or `scripts/check` fails.
 - `tests/test_api.py` (or the new module's test): cover the `getattr` fallback
   path (client without `get_request_stats`), the no-estimate case, and the
   `estimate_variance` sign / zero-estimate cases.
@@ -320,6 +336,9 @@ which already lists static rate-limit numbers, to include the same docs link.
   (`test_email_report.py:16-29`) keep passing, or update the fixtures.
 - State that aggregated counts need no redaction; assert `request_log` never
   enters the report dict.
+- Assert the original-fetch message uses `total_requests` (not the window
+  delta) in the email, legacy terminal, and export surfaces; assert the
+  estimate-scope delta is labeled separately.
 - Assert the rate-limit reference line and the docs link render in the email,
   legacy terminal, and export surfaces.
 - New `report_api_usage.py` must clear the 82% new-file coverage gate
@@ -366,10 +385,11 @@ which already lists static rate-limit numbers, to include the same docs link.
 - [ ] Add `GitHubAPI` request counting + `get_request_stats()`; unit tests.
 - [ ] Add `report_api_usage.py` (lines + rows adapter); cover the new file's 82%
   coverage gate.
-- [ ] Merge baseline-delta actual usage into `api_estimate` in both builders
-  (matching windows; full-snapshot subtraction incl. per-resource); bump
-  `CACHE_VERSION`; add `annotate_cache_hit()` at all three sites, including
-  the legacy `baseline_stats` caller parameter; tests.
+- [ ] Merge repo-level-delta actual usage into `api_estimate` in both builders
+  (email: per-getter snapshots around repo-level getters; legacy:
+  caller-passed `baseline_stats` full-snapshot subtraction incl. per-resource);
+  bump `CACHE_VERSION` (plus the test pin); add `annotate_cache_hit()` at all
+  three sites; tests.
 - [ ] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
   GUI legacy detail rows; add the rate-limit reference line + docs link;
   tests.
