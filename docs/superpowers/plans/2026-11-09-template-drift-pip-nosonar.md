@@ -33,9 +33,18 @@ through unchanged, so the next setup regeneration (option 5 / wizard /
 `write_workflow`) silently drops both the comment and the suppression. The
 suppression loss is the real risk: it currently silences
 `githubactions:S8541`/`S8544` (unpinned package versions / dependencies —
-editable install of this repo's own package, versions pinned via
-`pyproject`/`uv.lock`; see `CHANGELOG.md` and commit `d7f143f5`), which would
-fire again on the next regenerated workflow.
+see `CHANGELOG.md` and commit `d7f143f5`), which would fire again on the next
+regenerated workflow.
+
+One correction before porting: the comment's last line ("nothing else is
+resolved here") overclaims. `pyproject.toml:2` (`[build-system] requires`)
+pins only `setuptools>=77.0.3` — a range, not a pin — and pip resolves that
+build backend in an isolated env, not from `uv.lock`. The suppression remains
+appropriate (the only unpinned resolution is the setuptools build backend for
+this repo's own package install in CI; no third-party runtime code is installed
+unpinned — `dependencies` is empty), but the comment must say so honestly. The
+corrected wording below replaces the third line; it goes into the template
+**and** the committed workflow identically so parity holds.
 
 Tracked in `TO_DO.md` (Code Health): remove that item when this plan is
 complete (per repo rule, completed items are removed, not checked off).
@@ -43,8 +52,17 @@ complete (per repo rule, completed items are removed, not checked off).
 ## Scope
 
 - Single edit to `email-report.yml.template`: expand the single line 72 into
-  the exact 4-line block from the committed workflow (lines 72-75) — the
-  3-line comment plus `  # NOSONAR` on the `- run: pip install -e .` step.
+  the 4-line block below (corrected third line — see Problem). Apply the
+  identical block to the committed `email-report.yml:72-75` so the two files
+  stay byte-identical outside the generator placeholders:
+
+  ```yaml
+        # Editable install of this repo's own package. It declares no runtime
+        # dependencies, but pip still resolves the setuptools>=77.0.3 build
+        # backend in an isolated env (not from uv.lock).
+        - run: pip install -e .  # NOSONAR
+  ```
+
   Bare `# NOSONAR` is the repo standard; parameterized forms like
   `# NOSONAR(rule)` are invalid and rejected by `python:S7632` (commit
   `d7f143f5`). The suppression guards the *regenerated workflow output*,
@@ -57,14 +75,15 @@ complete (per repo rule, completed items are removed, not checked off).
 
 ## Out of scope
 
-- Rewording the comment or changing install behavior.
+- Changing install behavior or the suppression itself.
 - Other workflow/template drift (none known).
 - The API-call-tracking plan and the `--max-repos` cap raise (same branch,
   separate commits).
 
 ## Done criteria
 
-- Template contains the comment block and the `# NOSONAR` suffix verbatim.
+- Template and committed workflow contain the corrected comment block and the
+  `# NOSONAR` suffix verbatim (identical in both files).
 - `render_workflow()` output from an in-memory test config matching the
   committed workflow's parameters (`include_consumers=True`,
   `include_artifact_storage=True`, `email_format="html"`, `max_repos=100`,
@@ -92,8 +111,8 @@ complete (per repo rule, completed items are removed, not checked off).
   `pip install -e .  # NOSONAR` line (guards the template, the generator's
   only input for this block).
 - `tests/test_workflow_templates.py`: assert the committed workflow and the
-  template agree on the pip-install block (same comment + same `# NOSONAR`),
-  guarding drift in both directions.
+  template agree on the pip-install block (same corrected comment + same
+  `# NOSONAR`), guarding drift in both directions.
 - Parity check as a test (not a manual local-config diff): render from an
   in-memory config matching the committed workflow's parameters
   (`include_consumers=True`, `include_artifact_storage=True`,
