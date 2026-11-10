@@ -63,11 +63,19 @@ def get_repo_consumers(api, repos: list[dict], limit: int = 5, max_repos: int = 
 def get_artifact_storage_details(api, repos: list[dict], max_repos: int = 100) -> dict:
     """Return per-repo artifact storage totals for the top storage consumers."""
     rows = []
+    errors: dict = {}
     considered = repos[:max_repos]
     for repo in considered:
         owner = repo.get("owner", {}).get("login", "")
         name = repo.get("name", "")
-        artifacts = api.get_all_pages(f"/repos/{owner}/{name}/actions/artifacts", {"per_page": 100})
+        full_name = repo.get("full_name") or f"{owner}/{name}"
+        try:
+            artifacts = api.get_all_pages(
+                f"/repos/{owner}/{name}/actions/artifacts", {"per_page": 100}
+            )
+        except RuntimeError as e:
+            errors[full_name] = str(e)
+            continue
         size = sum(
             s
             for s in (_safe_int_size(item.get("size_in_bytes")) for item in artifacts)
@@ -76,7 +84,7 @@ def get_artifact_storage_details(api, repos: list[dict], max_repos: int = 100) -
         if size:
             rows.append(
                 {
-                    "repo": repo.get("full_name") or f"{owner}/{name}",
+                    "repo": full_name,
                     "artifact_bytes": size,
                     "visibility": repo_visibility(repo),
                 }
@@ -86,6 +94,7 @@ def get_artifact_storage_details(api, repos: list[dict], max_repos: int = 100) -
         "max_repos": max_repos,
         "truncated": len(repos) > max_repos,
         "top_repos": sorted(rows, key=lambda row: row["artifact_bytes"], reverse=True)[:5],
+        "errors": errors,
     }
 
 
