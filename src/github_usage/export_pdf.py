@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .copilot_metering import copilot_export_primary_row
 from .export_visibility import (
     annotate_sku_name,
     sources_rows,
@@ -23,7 +24,6 @@ from .export_visibility import (
     visibility_summary_label_values,
 )
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
-from .copilot_metering import copilot_export_primary_row
 from .usage_split import classify_actions_sku
 from .visibility import repo_visibility, visibility_label
 
@@ -223,16 +223,21 @@ def _write_sources_page(add_section: AddSectionFn, data: dict) -> None:
 
 
 def _write_artifact_storage_page(add_section: AddSectionFn, data: dict) -> None:
+    """Write the Artifact Storage page, including per-repo scan errors."""
     artifacts = data.get("artifact_storage") or {}
     artifact_repos = artifacts.get("top_repos") or []
-    if artifact_repos:
-        rows = [
-            (
-                _annotated_repo_label(entry),
-                f"{_fmt_num(entry.get('artifact_bytes'))} bytes",
-            )
-            for entry in artifact_repos
-        ]
+    # Error rows first: add_section renders only rows[:_MAX_SECTION_ROWS], and
+    # repo rows (capped at 5 upstream) must never push errors off the page.
+    errors = artifacts.get("errors") or {}
+    rows = [(repo_name, f"skipped: {errors[repo_name]}") for repo_name in sorted(errors)]
+    rows.extend(
+        (
+            _annotated_repo_label(entry),
+            f"{_fmt_num(entry.get('artifact_bytes'))} bytes",
+        )
+        for entry in artifact_repos
+    )
+    if rows:
         add_section("Artifact Storage", rows)
 
 

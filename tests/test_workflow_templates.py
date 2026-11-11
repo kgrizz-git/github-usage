@@ -18,6 +18,7 @@ class WorkflowTemplateTests(unittest.TestCase):
         self.assertIn("only_public:", workflow)
         self.assertIn("only_private:", workflow)
         self.assertIn("--only-public", workflow)
+        self.assertRegex(workflow, r"--max-repos 100(?!\d)")
 
     def test_checked_in_workflow_and_template_use_only_recipient_secret(self):
         for name in ("email-report.yml", "email-report.yml.template"):

@@ -90,6 +90,31 @@ class GetArtifactStorageDetailsTests(unittest.TestCase):
         result = get_artifact_storage_details(api, [_repo("octocat/repo")], max_repos=10)
         self.assertEqual(result["top_repos"], [])
 
+    def test_records_per_repo_error_and_keeps_other_repos(self):
+        """One repo's artifact API error must not abort the whole scan."""
+        api = FakeAPI()
+        # Failing repo first: the error side_effect pairs with the first repo,
+        # proving the scan continues past it (order matters here).
+        with mock.patch.object(
+            api,
+            "get_all_pages",
+            side_effect=[
+                RuntimeError("API error 403"),
+                [{"size_in_bytes": 1024}],
+            ],
+        ):
+            result = get_artifact_storage_details(
+                api,
+                [_repo("octocat/bad", name="bad"), _repo("octocat/good", name="good")],
+                max_repos=10,
+            )
+        self.assertEqual(
+            result["top_repos"],
+            [{"repo": "octocat/good", "artifact_bytes": 1024, "visibility": "public"}],
+        )
+        self.assertIn("octocat/bad", result["errors"])
+        self.assertEqual(result["scanned_repo_count"], 2)
+
     def test_populates_from_object_shaped_artifacts_response(self):
         """Artifact collector populates rows when GitHub returns {artifacts: [...]}."""
         import json

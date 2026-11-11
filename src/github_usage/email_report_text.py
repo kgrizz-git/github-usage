@@ -265,6 +265,7 @@ def _format_workflow_breakdown_section(data: dict) -> list[str]:
 
 
 def _format_artifact_storage_section(data: dict) -> list[str]:
+    """Format the Actions Artifact Storage section, including per-repo scan errors."""
     artifact_storage = data.get("artifact_storage")
     if not artifact_storage:
         return []
@@ -287,6 +288,9 @@ def _format_artifact_storage_section(data: dict) -> list[str]:
         lines.append(
             f"- Artifact scan truncated at {artifact_storage.get('max_repos')} repositories."
         )
+    for repo_name in sorted(artifact_storage.get("errors") or {}):
+        message = artifact_storage["errors"][repo_name]
+        lines.append(f"- {repo_name}: skipped ({message})")
     lines.append("")
     return lines
 

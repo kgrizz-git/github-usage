@@ -14,6 +14,7 @@
 ## Email Report Follow-Ups
 
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
+- [ ] Surface per-repo artifact scan errors in CSV/XLSX exports and the "Unavailable Data" sections (currently only the text/HTML email and PDF list skipped repos), and add per-repo error handling to `get_release_asset_details` (one repo failure still aborts that whole section via `_try_section`).
 
 ## Actions / Local Full Report
 
@@ -30,6 +31,7 @@
 - [ ] Rename internal `legacy_*` modules/symbols to “local full report” naming (`legacy_report_data` → e.g. `local_report_data`, cache `kind="legacy"`, CLI/TUI internals, tests). User-facing copy already says “local full report”; this is the code rename. Keep a thin `legacy` compatibility shim if external imports still need it.
 
 - [ ] Add tests to raise overall src coverage from the current ~76% to 80%. Update `scripts/coverage-check` default from `COVERAGE_TOTAL_MIN=75` to `80` once achieved.
+- [ ] Port the manual `pip install -e .` comment + `# NOSONAR` in `.github/workflows/email-report.yml` into `email-report.yml.template` so the next setup regeneration does not silently drop the Sonar suppression.
 
 ## Configuration & Setup
 
