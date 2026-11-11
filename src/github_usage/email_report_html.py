@@ -89,9 +89,7 @@ def _format_html_copilot_section(data: dict) -> list[str]:
         parts.append(f"<li>{html.escape(line.removeprefix('- '))}</li>")
     by_model = copilot.get("by_model") or {}
     if by_model:
-        parts.append(_UL_CLOSE)
-        parts.append("<h3>By model</h3>")
-        parts.append("<ul>")
+        parts.extend([_UL_CLOSE, "<h3>By model</h3>", "<ul>"])
         for model, values in sorted(by_model.items()):
             detail = copilot_model_detail_line(model, values, metering=metering).strip()
             if detail.startswith("- "):
@@ -220,46 +218,54 @@ def _format_html_workflow_breakdown_section(data: dict) -> list[str]:
     return html_workflow_breakdown_table(breakdown, limit=5)
 
 
+def _html_artifact_repo_rows(repos: list) -> list[str]:
+    """Render artifact repo rows as list items, grouped by visibility."""
+    groups = group_by_visibility(repos)
+    if len(groups) <= 1:
+        rows = [
+            f"<li>{html_repo_cell(row)}: "
+            f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
+            for row in repos
+        ]
+        return ["<ul>", *rows, _UL_CLOSE]
+    parts = []
+    for vis, group_rows in groups.items():
+        parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
+        parts.append("<ul>")
+        for row in group_rows:
+            parts.append(
+                f"<li>{html_repo_cell(row)}: "
+                f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
+            )
+        parts.append(_UL_CLOSE)
+    return parts
+
+
+def _html_artifact_error_rows(errors: dict) -> list[str]:
+    """Render per-repo artifact scan errors as list items."""
+    if not errors:
+        return []
+    rows = [
+        f"<li>{html.escape(repo_name)}: skipped ({html.escape(str(errors[repo_name]))})</li>"
+        for repo_name in sorted(errors)
+    ]
+    return ["<ul>", *rows, _UL_CLOSE]
+
+
 def _format_html_artifact_storage_section(data: dict) -> list[str]:
     artifact_storage = data.get("artifact_storage")
     if not artifact_storage:
         return []
-    repos = artifact_storage.get("top_repos", [])
     parts = ["<h2>Actions Artifact Storage</h2>"]
+    repos = artifact_storage.get("top_repos", [])
     if repos:
-        groups = group_by_visibility(repos)
-        if len(groups) <= 1:
-            parts.append("<ul>")
-            for row in repos:
-                parts.append(
-                    f"<li>{html_repo_cell(row)}: "
-                    f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
-                )
-            parts.append(_UL_CLOSE)
-        else:
-            for vis, group_rows in groups.items():
-                parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
-                parts.append("<ul>")
-                for row in group_rows:
-                    parts.append(
-                        f"<li>{html_repo_cell(row)}: "
-                        f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
-                    )
-                parts.append(_UL_CLOSE)
+        parts.extend(_html_artifact_repo_rows(repos))
     if artifact_storage.get("truncated"):
         parts.append(
             f"<p><em>Artifact scan truncated at "
             f"{artifact_storage.get('max_repos')} repositories.</em></p>"
         )
-    errors = artifact_storage.get("errors") or {}
-    if errors:
-        parts.append("<ul>")
-        for repo_name in sorted(errors):
-            parts.append(
-                f"<li>{html.escape(repo_name)}: skipped "
-                f"({html.escape(str(errors[repo_name]))})</li>"
-            )
-        parts.append(_UL_CLOSE)
+    parts.extend(_html_artifact_error_rows(artifact_storage.get("errors") or {}))
     return parts
 
 
@@ -480,9 +486,13 @@ def format_html_report(
     """Format report data as an HTML email body."""
     username = html.escape(data.get("username") or "?")
     parts: list[str] = [_HTML_DOCUMENT_HEAD]
-    parts.append(f"<h1>GitHub Usage Report for {username}</h1>")
-    parts.append(f'<p class="meta">{html.escape(_generated_line(data.get("generated_at")))}</p>')
-    parts.append('<p class="meta">Period: current month</p>')
+    parts.extend(
+        [
+            f"<h1>GitHub Usage Report for {username}</h1>",
+            f'<p class="meta">{html.escape(_generated_line(data.get("generated_at")))}</p>',
+            '<p class="meta">Period: current month</p>',
+        ]
+    )
     parts.extend(_html_warning_block(data.get("warnings") or []))
     for formatter in _SECTION_HTML_FORMATTERS:
         if formatter is _format_html_forecast_section:
