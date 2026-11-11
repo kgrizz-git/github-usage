@@ -693,9 +693,16 @@ class EmailReportTests(unittest.TestCase):
             }
         }
         text = "\n".join(_format_artifact_storage_section(data))
-        self.assertIn("org/good", text)
-        self.assertIn("org/bad", text)
-        self.assertIn("skipped", text)
+        self.assertIn("- org/good: 0.0 MB artifacts", text)
+        self.assertIn("- org/bad: skipped (API error 403)", text)
+
+    def test_artifact_storage_errors_only_section_text(self):
+        from github_usage.email_report_text import _format_artifact_storage_section
+
+        data = {"artifact_storage": {"top_repos": [], "errors": {"org/bad": "API error 403"}}}
+        text = "\n".join(_format_artifact_storage_section(data))
+        self.assertIn("Actions Artifact Storage", text)
+        self.assertIn("- org/bad: skipped (API error 403)", text)
 
     def test_artifact_storage_grouped_by_visibility_html(self):
         from github_usage.email_report_html import _format_html_artifact_storage_section
@@ -721,13 +728,26 @@ class EmailReportTests(unittest.TestCase):
                 "top_repos": [
                     {"repo": "org/good", "visibility": "public", "artifact_bytes": 1024},
                 ],
+                "errors": {"org/a&b": "oops <boom>"},
+            }
+        }
+        joined = "\n".join(_format_html_artifact_storage_section(data))
+        self.assertIn("<li>org/good: 0.0 MB artifacts</li>", joined)
+        self.assertIn("<li>org/a&amp;b: skipped (oops &lt;boom&gt;)</li>", joined)
+
+    def test_artifact_storage_errors_only_section_html(self):
+        from github_usage.email_report_html import _format_html_artifact_storage_section
+
+        data = {
+            "artifact_storage": {
+                "top_repos": [],
                 "errors": {"org/bad": "API error 403"},
             }
         }
         joined = "\n".join(_format_html_artifact_storage_section(data))
-        self.assertIn("org/good", joined)
-        self.assertIn("org/bad", joined)
-        self.assertIn("skipped", joined)
+        self.assertIn("<h2>Actions Artifact Storage</h2>", joined)
+        self.assertIn("<li>org/bad: skipped (API error 403)</li>", joined)
+        self.assertNotIn("<ul></ul>", joined)
 
     def test_release_assets_grouped_by_visibility_text(self):
         from github_usage.email_report_text import _format_release_assets_section

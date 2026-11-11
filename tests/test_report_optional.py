@@ -93,6 +93,8 @@ class GetArtifactStorageDetailsTests(unittest.TestCase):
     def test_records_per_repo_error_and_keeps_other_repos(self):
         """One repo's artifact API error must not abort the whole scan."""
         api = FakeAPI()
+        # Failing repo first: the error side_effect pairs with the first repo,
+        # proving the scan continues past it (order matters here).
         with mock.patch.object(
             api,
             "get_all_pages",

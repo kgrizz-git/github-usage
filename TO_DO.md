@@ -14,6 +14,7 @@
 ## Email Report Follow-Ups
 
 - [ ] Add cached or persisted artifact/release storage snapshots so monthly email reports can compare storage details over time.
+- [ ] Surface per-repo artifact scan errors in CSV/XLSX exports and the "Unavailable Data" sections (currently only the text/HTML email and PDF list skipped repos), and add per-repo error handling to `get_release_asset_details` (one repo failure still aborts that whole section via `_try_section`).
 
 ## Actions / Local Full Report
 

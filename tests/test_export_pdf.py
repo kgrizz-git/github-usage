@@ -203,6 +203,44 @@ class ExportPdfTests(unittest.TestCase):
         labels = [label for label, _ in rows]
         self.assertIn("org/good", labels)
         self.assertIn("org/bad", labels)
+        values = dict(rows)
+        self.assertEqual(values["org/bad"], "skipped: API error 403")
+
+    def test_write_artifact_storage_page_errors_first_and_errors_only(self):
+        from fpdf import FPDF
+
+        from github_usage.export_pdf import _make_pdf_writer, _write_artifact_storage_page
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=20)
+        seen = []
+
+        def recording(title, rows):
+            seen.append((title, rows))
+            add_section(title, rows)
+
+        add_section, _ = _make_pdf_writer(pdf)
+        data = {
+            "artifact_storage": {
+                "top_repos": [{"repo": f"org/repo{i}", "artifact_bytes": 1024} for i in range(5)],
+                "errors": {f"org/bad{i}": "API error 403" for i in range(26)},
+            }
+        }
+        _write_artifact_storage_page(recording, data)
+        self.assertEqual(len(seen), 1)
+        _, rows = seen[0]
+        # Error rows precede repo rows so the 30-row page cap truncates
+        # successful rows first, never silently dropping failures.
+        self.assertTrue(all(label.startswith("org/bad") for label, _ in rows[:26]))
+        self.assertTrue(all(label.startswith("org/repo") for label, _ in rows[26:]))
+
+        seen.clear()
+        _write_artifact_storage_page(
+            recording,
+            {"artifact_storage": {"top_repos": [], "errors": {"org/bad": "API error 403"}}},
+        )
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0][1], [("org/bad", "skipped: API error 403")])
 
     def test_dependency_check_at_orchestrator(self):
         from github_usage import export_report

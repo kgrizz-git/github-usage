@@ -225,15 +225,17 @@ def _write_sources_page(add_section: AddSectionFn, data: dict) -> None:
 def _write_artifact_storage_page(add_section: AddSectionFn, data: dict) -> None:
     artifacts = data.get("artifact_storage") or {}
     artifact_repos = artifacts.get("top_repos") or []
-    rows = [
+    # Error rows first: add_section renders only rows[:_MAX_SECTION_ROWS], and
+    # repo rows (capped at 5 upstream) must never push errors off the page.
+    errors = artifacts.get("errors") or {}
+    rows = [(repo_name, f"skipped: {errors[repo_name]}") for repo_name in sorted(errors)]
+    rows.extend(
         (
             _annotated_repo_label(entry),
             f"{_fmt_num(entry.get('artifact_bytes'))} bytes",
         )
         for entry in artifact_repos
-    ]
-    for repo_name in sorted(artifacts.get("errors") or {}):
-        rows.append((repo_name, f"skipped: {artifacts['errors'][repo_name]}"))
+    )
     if rows:
         add_section("Artifact Storage", rows)
 

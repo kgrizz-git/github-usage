@@ -226,25 +226,26 @@ def _format_html_artifact_storage_section(data: dict) -> list[str]:
         return []
     repos = artifact_storage.get("top_repos", [])
     parts = ["<h2>Actions Artifact Storage</h2>"]
-    groups = group_by_visibility(repos)
-    if len(groups) <= 1:
-        parts.append("<ul>")
-        for row in repos:
-            parts.append(
-                f"<li>{html_repo_cell(row)}: "
-                f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
-            )
-        parts.append(_UL_CLOSE)
-    else:
-        for vis, group_rows in groups.items():
-            parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
+    if repos:
+        groups = group_by_visibility(repos)
+        if len(groups) <= 1:
             parts.append("<ul>")
-            for row in group_rows:
+            for row in repos:
                 parts.append(
                     f"<li>{html_repo_cell(row)}: "
                     f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
                 )
             parts.append(_UL_CLOSE)
+        else:
+            for vis, group_rows in groups.items():
+                parts.append(f"<h3>{html.escape(visibility_group_header(vis))}</h3>")
+                parts.append("<ul>")
+                for row in group_rows:
+                    parts.append(
+                        f"<li>{html_repo_cell(row)}: "
+                        f"{_bytes_to_mb(row['artifact_bytes']):,.1f} MB artifacts</li>"
+                    )
+                parts.append(_UL_CLOSE)
     if artifact_storage.get("truncated"):
         parts.append(
             f"<p><em>Artifact scan truncated at "

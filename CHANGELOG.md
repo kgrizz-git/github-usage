@@ -10,6 +10,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Fixed
 
+- **Artifact storage partial failures:** a per-repo artifact API error no longer blanks the whole Actions Artifact Storage section — successfully scanned repos still render, and failed repos are listed as skipped in the text/HTML email and PDF exports.
 - **Email Actions section:** plain-text and HTML emails show **private-repo quota** against the 2,000 min / 500 MB free tier (with public usage labeled free) instead of comparing combined account totals to the private quota. When no visibility split is available, the report says so explicitly rather than implying the total is all quota-counted.
 - **Copilot AI credits:** email report data now reads GitHub's `…/billing/ai_credit/usage` endpoint (preferred over legacy premium-request usage after Copilot's 2026 metering change) and labels the email Copilot section and forecast row accordingly; org-licensed Copilot without personal usage gets an explanatory note. Usage displays **credit quantities** (`grossQuantity`) rather than dollar `netAmount`, which is often zero on included allowance. Failed usage API calls surface as report errors or notes instead of looking like zero usage. Forecast exports (CSV/XLSX/PDF/legacy) use the same Copilot metric label as email.
 - **Security CI (`pip-audit`):** bump locked `pypdf` to 6.21.4+ (CVE-2026-119203–209) so the weekly `Security` workflow passes again.
