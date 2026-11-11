@@ -97,13 +97,13 @@ class GetArtifactStorageDetailsTests(unittest.TestCase):
             api,
             "get_all_pages",
             side_effect=[
-                [{"size_in_bytes": 1024}],
                 RuntimeError("API error 403"),
+                [{"size_in_bytes": 1024}],
             ],
         ):
             result = get_artifact_storage_details(
                 api,
-                [_repo("octocat/good", name="good"), _repo("octocat/bad", name="bad")],
+                [_repo("octocat/bad", name="bad"), _repo("octocat/good", name="good")],
                 max_repos=10,
             )
         self.assertEqual(

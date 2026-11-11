@@ -176,6 +176,34 @@ class ExportPdfTests(unittest.TestCase):
         # plus the actions page).
         self.assertGreaterEqual(pdf.pages_count, 1)
 
+    def test_write_artifact_storage_page_renders_errors_alongside_rows(self):
+        from fpdf import FPDF
+
+        from github_usage.export_pdf import _make_pdf_writer, _write_artifact_storage_page
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=20)
+        seen = []
+
+        def recording(title, rows):
+            seen.append((title, rows))
+            add_section(title, rows)
+
+        add_section, _ = _make_pdf_writer(pdf)
+        data = {
+            "artifact_storage": {
+                "top_repos": [{"repo": "org/good", "artifact_bytes": 1024}],
+                "errors": {"org/bad": "API error 403"},
+            }
+        }
+        _write_artifact_storage_page(recording, data)
+        self.assertEqual(len(seen), 1)
+        title, rows = seen[0]
+        self.assertEqual(title, "Artifact Storage")
+        labels = [label for label, _ in rows]
+        self.assertIn("org/good", labels)
+        self.assertIn("org/bad", labels)
+
     def test_dependency_check_at_orchestrator(self):
         from github_usage import export_report
 

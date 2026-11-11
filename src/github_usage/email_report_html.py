@@ -10,12 +10,6 @@ from ._email_report_common import (
     email_actions_net_cost_line,
     email_actions_table_rows,
 )
-from .copilot_metering import (
-    _effective_metering,
-    copilot_model_detail_line,
-    copilot_section_title,
-    copilot_usage_summary_lines,
-)
 from ._email_report_html_tables import (
     html_cost_consumer_row,
     html_flat_table,
@@ -24,6 +18,12 @@ from ._email_report_html_tables import (
     html_repo_cell,
     html_storage_row,
     html_workflow_breakdown_table,
+)
+from .copilot_metering import (
+    _effective_metering,
+    copilot_model_detail_line,
+    copilot_section_title,
+    copilot_usage_summary_lines,
 )
 from .repo_consumers import private_list_is_redundant
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
@@ -69,9 +69,7 @@ def _format_html_actions_section(data: dict) -> list[str]:
     net = (data.get("monthly_costs") or {}).get("actions", {}).get("net", 0.0)
     rows = ["<tr><th>Metric</th><th>Value</th></tr>"]
     for label, value in email_actions_table_rows(actions):
-        rows.append(
-            f"<tr><td>{html.escape(label)}</td><td>{html.escape(value)}</td></tr>"
-        )
+        rows.append(f"<tr><td>{html.escape(label)}</td><td>{html.escape(value)}</td></tr>")
     net_line = email_actions_net_cost_line(net)
     _, _, net_value = net_line.partition(": ")
     rows.append(f"<tr><td>Net cost</td><td>{html.escape(net_value)}</td></tr>")
@@ -252,6 +250,15 @@ def _format_html_artifact_storage_section(data: dict) -> list[str]:
             f"<p><em>Artifact scan truncated at "
             f"{artifact_storage.get('max_repos')} repositories.</em></p>"
         )
+    errors = artifact_storage.get("errors") or {}
+    if errors:
+        parts.append("<ul>")
+        for repo_name in sorted(errors):
+            parts.append(
+                f"<li>{html.escape(repo_name)}: skipped "
+                f"({html.escape(str(errors[repo_name]))})</li>"
+            )
+        parts.append(_UL_CLOSE)
     return parts
 
 

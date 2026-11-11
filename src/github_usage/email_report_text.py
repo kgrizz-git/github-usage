@@ -287,6 +287,9 @@ def _format_artifact_storage_section(data: dict) -> list[str]:
         lines.append(
             f"- Artifact scan truncated at {artifact_storage.get('max_repos')} repositories."
         )
+    for repo_name in sorted(artifact_storage.get("errors") or {}):
+        message = artifact_storage["errors"][repo_name]
+        lines.append(f"- {repo_name}: skipped ({message})")
     lines.append("")
     return lines
 

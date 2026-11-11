@@ -681,6 +681,22 @@ class EmailReportTests(unittest.TestCase):
         self.assertIn("Private Repos:", text)
         self.assertIn("Public Repos:", text)
 
+    def test_artifact_storage_errors_rendered_alongside_rows_text(self):
+        from github_usage.email_report_text import _format_artifact_storage_section
+
+        data = {
+            "artifact_storage": {
+                "top_repos": [
+                    {"repo": "org/good", "visibility": "public", "artifact_bytes": 1024},
+                ],
+                "errors": {"org/bad": "API error 403"},
+            }
+        }
+        text = "\n".join(_format_artifact_storage_section(data))
+        self.assertIn("org/good", text)
+        self.assertIn("org/bad", text)
+        self.assertIn("skipped", text)
+
     def test_artifact_storage_grouped_by_visibility_html(self):
         from github_usage.email_report_html import _format_html_artifact_storage_section
 
@@ -696,6 +712,22 @@ class EmailReportTests(unittest.TestCase):
         joined = "\n".join(parts)
         self.assertIn("Private Repos:", joined)
         self.assertIn("Public Repos:", joined)
+
+    def test_artifact_storage_errors_rendered_alongside_rows_html(self):
+        from github_usage.email_report_html import _format_html_artifact_storage_section
+
+        data = {
+            "artifact_storage": {
+                "top_repos": [
+                    {"repo": "org/good", "visibility": "public", "artifact_bytes": 1024},
+                ],
+                "errors": {"org/bad": "API error 403"},
+            }
+        }
+        joined = "\n".join(_format_html_artifact_storage_section(data))
+        self.assertIn("org/good", joined)
+        self.assertIn("org/bad", joined)
+        self.assertIn("skipped", joined)
 
     def test_release_assets_grouped_by_visibility_text(self):
         from github_usage.email_report_text import _format_release_assets_section
