@@ -16,13 +16,7 @@ from .billing import get_billing_summary, get_premium_request_usage
 from .repo_consumers import build_consumer_rankings
 from .report_account import fetch_account_info, fetch_rate_limits
 from .report_actions import fetch_actions_os_breakdown, fetch_repo_actions_table
-from .report_api_usage import (
-    SCOPE_FULL_REPORT,
-    _api_request_stats,
-    _finalize_api_estimate,
-    _stats_total,
-    _subtract_stats,
-)
+from .report_api_usage import _api_request_stats, _merge_legacy_api_estimate
 from .report_data import (
     GitHubAPIClient,
     _empty_cost,
@@ -378,19 +372,13 @@ def build_legacy_report_data(
     except RuntimeError as exc:
         errors["lfs_billing"] = str(exc)
 
-    current = _api_request_stats(api)
-    window_actual, window_by = _subtract_stats(current, baseline_stats)
-    listing_actual, listing_by = _subtract_stats(listing_after, listing_before)
-    by_resource = {
-        res: window_by.get(res, 0) - listing_by.get(res, 0)
-        for res in sorted(set(window_by) | set(listing_by))
-    }
-    report["api_estimate"] = _finalize_api_estimate(
+    report["api_estimate"] = _merge_legacy_api_estimate(
         report.get("api_estimate") or {},
-        actual=window_actual - listing_actual,
-        by_resource=by_resource,
-        total=_stats_total(current),
-        scope=SCOPE_FULL_REPORT if explicit_baseline else None,
+        current=_api_request_stats(api),
+        baseline=baseline_stats,
+        listing_before=listing_before,
+        listing_after=listing_after,
+        include_scope=explicit_baseline,
     )
 
     report["insights"] = get_key_insights(report)

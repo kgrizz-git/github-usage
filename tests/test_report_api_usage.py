@@ -204,6 +204,32 @@ class ApiRequestStatsTests(unittest.TestCase):
             {"actual_requests": 0, "actual_requests_by_resource": {}},
         )
 
+    def test_non_dict_stats_with_count_buckets_under_other(self):
+        from github_usage.report_api_usage import _api_request_stats
+
+        class NonDictCountingFake:
+            request_count = 3
+
+            def get_request_stats(self):
+                return "nope"
+
+        self.assertEqual(
+            _api_request_stats(NonDictCountingFake()),
+            {"actual_requests": 3, "actual_requests_by_resource": {"other": 3}},
+        )
+
+    def test_non_callable_stats_attr_falls_back_to_count(self):
+        from github_usage.report_api_usage import _api_request_stats
+
+        class NonCallableFake:
+            get_request_stats = None
+            request_count = 2
+
+        self.assertEqual(
+            _api_request_stats(NonCallableFake()),
+            {"actual_requests": 2, "actual_requests_by_resource": {"other": 2}},
+        )
+
     def test_plain_object_yields_zeros(self):
         from github_usage.report_api_usage import _api_request_stats
 

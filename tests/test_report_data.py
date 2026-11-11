@@ -771,6 +771,8 @@ class ApiUsageBuilderMergeTests(unittest.TestCase):
         )
 
     def test_email_actual_counts_only_repo_level_calls(self):
+        import json
+
         from github_usage.report_api_usage import SCOPE_REPO_SECTIONS
         from github_usage.report_data import build_report_data
         from tests._fakes import CountingFakeAPI
@@ -800,6 +802,11 @@ class ApiUsageBuilderMergeTests(unittest.TestCase):
             estimate["actual_requests"] - estimate["estimated_incremental_requests"],
         )
         self.assertFalse(estimate["from_cache"])
+        # Raw request paths never enter the report, so exports cannot leak them.
+        blob = json.dumps(estimate)
+        self.assertNotIn("request_log", blob)
+        self.assertNotIn("/user/repos", blob)
+        self.assertNotIn("/repos/", blob)
 
     def test_email_fallback_path_tracks_fetch_repo_actions_table(self):
         from github_usage.report_data import build_report_data

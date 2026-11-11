@@ -14,7 +14,13 @@
 > 100% file coverage. Chunk 3 complete 2026-11-11 — builder merge with
 > per-getter tracking, caller-passed legacy baselines with listing carve-out,
 > `annotate_cache_hit` at all three cache sites, `CACHE_VERSION` 4, and
-> CountingFakeAPI + builder/helper/cache-hit tests (818 tests green).
+> CountingFakeAPI + builder/helper/cache-hit tests (831 tests green).
+> Chunk-3 review (deepseek, APPROVE, no blockers): most findings were already
+> satisfied by the implementation (caller-baseline and session tests, fallback
+> `other`-bucket, extracted `_merge_legacy_api_estimate`, sorted buckets,
+> multi-page `page_counts`, GUI test placement); applied the remainder —
+> fallback non-dict/count-combined tests, section-level abort coverage,
+> redaction assertions, `_track_repo_calls`/`deltas` typing, legacy docstring.
 
 # Track GitHub REST API Calls and Report Usage
 
@@ -460,9 +466,18 @@ which already lists static rate-limit numbers, to include the same docs link.
   non-dict snapshots tolerated; exact-bucket test assertions kept where they
   pin the dense contract; legacy None-baseline omits (rather than invents) a
   scope value.
+  **Review 2:** deepseek APPROVE (no blockers) with minors applied — caller-
+  baseline test proves pre-builder inclusion; `_merge_legacy_api_estimate`
+  extracted to `report_api_usage.py` (~163→~140-line builder); section-level
+  abort path tested with fallback re-run; `annotate_cache_hit` covered at all
+  three call sites via integration tests; `_track_repo_calls`/`deltas` typed;
+  monotonicity documented; GUI test module ordering fixed.
 - [ ] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
   GUI legacy detail rows; add the rate-limit reference line + docs link;
-  tests.
+  tests. Chunk-4 decisions (locked): keep the cached scope line as the original
+  measurement (only the total line is relabeled); gate the extended quota
+  block on `notes or usage lines` so measured reports with zero notes still
+  render; label totals as requests-issued (retries excluded).
 - [ ] Docs (`docs/reports.md`, `docs/email-reports.md`), changelog,
   `scripts/check`, and a final review.
 

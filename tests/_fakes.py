@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import subprocess
 
+from github_usage.api import _RESOURCE_BUCKETS, _classify_request_path
+
 
 class FakeSleeper:
     def __init__(self):
@@ -97,8 +99,6 @@ class CountingFakeAPI(FakeAPI):
         return super().get_all_pages(path, params, limit)
 
     def get_request_stats(self):
-        from github_usage.api import _RESOURCE_BUCKETS, _classify_request_path
-
         by_resource = {bucket: 0 for bucket in _RESOURCE_BUCKETS}
         for entry in self.request_log:
             bucket = _classify_request_path(entry["path"])

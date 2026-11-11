@@ -71,7 +71,7 @@ def _subtract_stats(current: dict, baseline: dict) -> tuple[int, dict[str, int]]
     return _stats_total(current) - _stats_total(baseline), by_resource
 
 
-def _sum_repo_deltas(deltas: list) -> tuple[int, dict[str, int]]:
+def _sum_repo_deltas(deltas: list[tuple[dict, dict]]) -> tuple[int, dict[str, int]]:
     """Sum ``(before, after)`` stats snapshots into ``(actual, by_resource)``."""
     actual = 0
     by_resource: dict[str, int] = {}
@@ -107,6 +107,37 @@ def _finalize_api_estimate(
         merged["estimate_scope"] = scope
     merged["from_cache"] = False
     return merged
+
+
+def _merge_legacy_api_estimate(
+    estimate: dict,
+    *,
+    current: dict,
+    baseline: dict,
+    listing_before: dict,
+    listing_after: dict,
+    include_scope: bool,
+) -> dict:
+    """Merge measured legacy usage into ``estimate`` and return the result.
+
+    Subtracts the repository-listing page fetches from the window delta so
+    listing pagination changes the total without moving the variance.
+    Omits ``estimate_scope`` when ``include_scope`` is false, so renderers
+    use the neutral label for best-effort windows.
+    """
+    window_actual, window_by = _subtract_stats(current, baseline)
+    listing_actual, listing_by = _subtract_stats(listing_after, listing_before)
+    by_resource = {
+        res: window_by.get(res, 0) - listing_by.get(res, 0)
+        for res in sorted(set(window_by) | set(listing_by))
+    }
+    return _finalize_api_estimate(
+        estimate,
+        actual=window_actual - listing_actual,
+        by_resource=by_resource,
+        total=_stats_total(current),
+        scope=SCOPE_FULL_REPORT if include_scope else None,
+    )
 
 
 def api_usage_lines(estimate: dict | None) -> list[str]:
@@ -189,7 +220,7 @@ def _api_request_stats(api) -> dict[str, object]:
 _T = TypeVar("_T")
 
 
-def _track_repo_calls(api, func: Callable[[], _T], deltas: list) -> _T:
+def _track_repo_calls(api, func: Callable[[], _T], deltas: list[tuple[dict, dict]]) -> _T:
     """Run ``func()``, appending its (before, after) stats to ``deltas``.
 
     The call's return value is passed through. Exceptions propagate after

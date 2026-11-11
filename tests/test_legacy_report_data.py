@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import unittest
 
 from github_usage.billing import BillingFetchError
@@ -485,6 +486,11 @@ class LegacyApiUsageMergeTests(unittest.TestCase):
             estimate["actual_requests"] - estimate["estimated_incremental_requests"],
         )
         self.assertFalse(estimate["from_cache"])
+        # Raw request paths never enter the report, so exports cannot leak them.
+        blob = json.dumps(estimate)
+        self.assertNotIn("request_log", blob)
+        self.assertNotIn("/user/repos", blob)
+        self.assertNotIn("/repos/", blob)
 
     def test_legacy_caller_baseline_excludes_pre_builder_calls(self) -> None:
         from github_usage.report_api_usage import SCOPE_FULL_REPORT, _api_request_stats
