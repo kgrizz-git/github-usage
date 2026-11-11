@@ -160,10 +160,13 @@ Matching windows (baseline capture points):
   (`estimate_scope`) so the variance stays honest.
   Carve `_limited_repos()` out of `actual_requests`: snapshot the counter
   around that call (`legacy_report_data.py:234`) and subtract those
-  repository-listing page fetches from the delta while retaining them in
-  `total_requests`. Neither estimate models listing pagination, so a second
-  `/user/repos` page at 101+ repos must not move the variance. (The email
-  builder needs no carve-out: its baseline is already post-listing.)
+  repository-listing page fetches from the delta — including from
+  `actual_requests_by_resource`, in whichever bucket(s) the listing pages
+  were recorded in, so the reconciliation assertion still holds. Neither
+  estimate models listing pagination, so a second `/user/repos` page at
+  101+ repos must not move the variance. (The email builder needs no
+  carve-out: its baseline is already post-listing, and its `actual_requests`
+  is a sum of per-repo-getter deltas rather than a window delta.)
 
 Merge points (must be after the last fetch):
 - `build_report_data`: immediately before
@@ -241,7 +244,8 @@ REST API Usage
 ```
 
 The scope label comes from `estimate_scope`: email renderers qualify it as
-repo-level scope, legacy renderers as account-level-inclusive scope.
+repo-level scope (`Repo-level requests in estimate scope:`), legacy renderers
+as account-level-inclusive scope.
 
 On a cache hit: `- Source: cached report (0 new API requests; 130 total during the original fetch)`.
 
