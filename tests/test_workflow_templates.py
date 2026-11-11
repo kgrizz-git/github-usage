@@ -3,6 +3,8 @@ import stat
 import unittest
 from pathlib import Path
 
+from github_usage.setup_workflow import render_workflow
+
 
 class WorkflowTemplateTests(unittest.TestCase):
     def test_email_report_workflow_uses_safe_secret_names_and_dispatch_inputs(self):
@@ -27,6 +29,32 @@ class WorkflowTemplateTests(unittest.TestCase):
                 self.assertIn("REPORT_EMAIL: ${{ secrets.REPORT_EMAIL }}", workflow)
                 self.assertNotIn("inputs.report_email", workflow)
                 self.assertNotIn("      report_email:", workflow)
+
+    def test_pip_install_block_agrees_in_workflow_and_template(self):
+        for name in ("email-report.yml", "email-report.yml.template"):
+            with self.subTest(file=name):
+                text = (Path(".github/workflows") / name).read_text()
+                self.assertIn(
+                    "# Editable install of this repo's own package. It declares no runtime",
+                    text,
+                )
+                self.assertIn("pip install -e .  # NOSONAR", text)
+
+    def test_rendered_workflow_matches_committed_workflow(self):
+        config = {
+            "email_report": {
+                "email_format": "html",
+                "max_repos": 100,
+                "warn_over": ["25", "80%"],
+            },
+            "github_actions": {
+                "include_consumers": True,
+                "include_artifact_storage": True,
+            },
+        }
+        rendered = render_workflow(config, Path("."))
+        committed = Path(".github/workflows/email-report.yml").read_text()
+        self.assertEqual(rendered, committed)
 
     def test_launchd_email_report_runs_monday_morning(self):
         plist_path = Path("launchd/com.github.github-usage.email-report.plist")

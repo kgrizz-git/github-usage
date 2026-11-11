@@ -134,6 +134,14 @@ class RenderWorkflowTests(unittest.TestCase):
         self.assertIn("inputs.include_forecast", rendered)
         self.assertIn("args+=(--include-forecast)", rendered)
 
+    def test_pip_install_comment_and_nosonar_survive_render(self):
+        rendered = render_workflow(self._config(), self.root)
+        self.assertIn(
+            "# Editable install of this repo's own package. It declares no runtime",
+            rendered,
+        )
+        self.assertIn("pip install -e .  # NOSONAR", rendered)
+
     def test_non_default_profile_renders_profile_suffix_and_path(self):
         config = {
             "profiles": [

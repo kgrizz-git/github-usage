@@ -1,10 +1,14 @@
-> **Status:** IN PROGRESS
+> **Status:** COMPLETE
 
 > Line numbers cited below are accurate as of 2026-11-09; relocate by anchor (comment text / step name) if they drift.
 >
 > **Terminology:** user-facing name is **local full report** (CLI/TUI). Code modules still use `legacy_*` until the rename tracked in `TO_DO.md`.
 >
-> **Implementation log:** (none yet)
+> **Implementation log:** 2026-11-11 — corrected block applied to the template
+> and the committed workflow identically; 3 pinning tests added
+> (render assertion, block-agreement, render-vs-committed byte-parity);
+> deepseek review APPROVE (no blockers/majors; stale Scope bullet fixed,
+> test import hoisted, new test moved after the forecast group).
 
 # Port Manual pip-install Comment + NOSONAR into email-report Template
 
@@ -69,7 +73,7 @@ complete (per repo rule, completed items are removed, not checked off).
   not the template file itself.
 - No change to `render_workflow()` — static text passes through; no new
   placeholder needed.
-- No change to the committed `email-report.yml` — it already has the block.
+- The corrected block also replaces the old wording in the committed `email-report.yml` (it already had a block, but with the overclaiming third line) so both files stay identical.
 - Verify there is no *other* committed-vs-template drift while here (last
   verified 2026-11-09: the pip-install block was the only delta).
 
@@ -126,11 +130,19 @@ complete (per repo rule, completed items are removed, not checked off).
 
 ## Task breakdown
 
-- [ ] Port the comment + `# NOSONAR` into `email-report.yml.template`.
-- [ ] Add the `test_setup_workflow.py` render assertion and the
+- [x] Port the comment + `# NOSONAR` into `email-report.yml.template`.
+  **Done:** 2026-11-11 — corrected 4-line block in the template; identical
+  block replaces the old wording in the committed workflow.
+- [x] Add the `test_setup_workflow.py` render assertion and the
   `test_workflow_templates.py` parity assertion.
-- [ ] Verify static parity via the updated unit tests (in-memory config
+  **Done:** 2026-11-11 — render assertion, block-agreement test, and
+  render-vs-committed byte-parity test (in-memory config, machine-independent).
+- [x] Verify static parity via the updated unit tests (in-memory config
   matching the committed workflow's parameters, not the local gitignored
   config); run `scripts/check` and `scripts/docs-check`.
-- [ ] Confirm SonarCloud check green on the PR; remove the `TO_DO.md` item;
+  **Done:** 2026-11-11 — byte-parity confirmed (3253 == 3253 bytes); tests,
+  typecheck, docs-check, and ruff (repo-pinned 0.9.6) green.
+- [x] Confirm SonarCloud check green on the PR; remove the `TO_DO.md` item;
   archive this plan.
+  **Done:** 2026-11-11 — `TO_DO.md` item removed; plan archived in the same
+  change set. SonarCloud green to be confirmed on the PR.
