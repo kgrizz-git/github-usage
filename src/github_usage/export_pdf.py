@@ -58,8 +58,13 @@ def _make_pdf_writer(pdf):
         pdf.ln(5)
         pdf.set_font("Helvetica", size=10)
         for label, value in rows[:_MAX_SECTION_ROWS]:
-            pdf.cell(60, 7, f"{label}:", new_x=XPos.END)
-            pdf.cell(0, 7, str(value), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            if not label:
+                pdf.cell(0, 7, str(value), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            elif not value:
+                pdf.cell(0, 7, f"{label}:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            else:
+                pdf.cell(60, 7, f"{label}:", new_x=XPos.END)
+                pdf.cell(0, 7, str(value), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(3)
         if len(rows) > _MAX_SECTION_ROWS:
             pdf.set_font("Helvetica", style="I", size=9)
@@ -94,22 +99,19 @@ def _write_cover_page(pdf, data: dict) -> None:
 def _write_api_usage_page(add_section: AddSectionFn, data: dict) -> None:
     """Write a REST API Usage page with measured-vs-estimated request counts.
 
-    The docs URL rides on its own row: fixed-width ``pdf.cell`` calls cannot
-    wrap long values, and the full rate-limit line runs past the A4 edge.
+    Each entry renders as a label line followed by its value line: the
+    fixed 60 mm label column cannot fit the longer labels, and
+    ``pdf.cell`` neither wraps nor clips, so two-column rows would
+    overprint their values.
     """
-    estimate = data.get("api_estimate") or {}
-    rows = list(api_usage_rows(estimate))
+    rows = api_usage_rows(data.get("api_estimate") or {})
     if not rows:
         return
-    split: list[tuple[str, str]] = []
+    lines: list[tuple[str, str]] = []
     for label, value in rows:
-        if label == "Core rate limit" and "https://" in value:
-            head, _, url = value.partition(" https://")
-            split.append((label, head))
-            split.append(("Rate-limit docs", "https://" + url))
-        else:
-            split.append((label, value))
-    add_section("REST API Usage", split)
+        lines.append((label, ""))
+        lines.append(("", value))
+    add_section("REST API Usage", lines)
 
 
 def _write_actions_page(add_section: AddSectionFn, data: dict) -> None:

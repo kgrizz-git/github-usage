@@ -150,6 +150,9 @@ def render_what_else(username: str) -> None:
     print("    - SCIM:           15000/hour (enterprise)")
     print("    - Audit Log:      1750/hour")
     print("    - Dependency:     100/hour (snapshots + SBOM)")
+    print(
+        "    - Docs: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api"
+    )
     print()
 
 

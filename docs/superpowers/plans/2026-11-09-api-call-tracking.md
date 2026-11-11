@@ -474,16 +474,26 @@ which already lists static rate-limit numbers, to include the same docs link.
   abort path tested with fallback re-run; `annotate_cache_hit` covered at all
   three call sites via integration tests; `_track_repo_calls`/`deltas` typed;
   monotonicity documented; GUI test module ordering fixed.
-  **Review 3 (chunk 4):** deepseek verdict pending — chunk-4 review requested.
-- [ ] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
+- [x] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
   GUI legacy detail rows; add the rate-limit reference line + docs link;
   tests. Chunk-4 decisions (locked): keep the cached scope line as the original
   measurement (only the total line is relabeled); gate the extended quota
   block on `notes or usage lines` so measured reports with zero notes still
   render; label totals as requests-issued (retries excluded); HTML docs URL
   stays plain text (matches text body; mail clients autolink); terminal keeps
-  both quota lines (usage block stays self-contained); PDF splits the docs URL
-  onto its own row (fixed-width cells can't wrap).
+  both quota lines (usage block stays self-contained); PDF renders every entry
+  as a label line followed by its value line (fixed-width cells can't wrap).
+  **Review:** deepseek APPROVE with follow-ups applied — ruff-format fixes,
+  per-surface docs-link assertions, uniform PDF label/value split (no
+  overprint), shared "REST API Usage" naming, `_track_repo_calls` typing,
+  moved GUI cache test above the `__main__` guard.
+  **Pre-PR review (grok 4.7 high, plan mode):** REQUEST CHANGES with one
+  major (PDF 60 mm label column overprints the total-request counts —
+  fixed by rendering every API-usage entry as a label line followed by a
+  full-width value line, plus `add_section` full-width handling for
+  empty label/value rows) and one minor (static `render_what_else`
+  rate-limit list missing the docs link — fixed). Nits recorded as
+  follow-ups, not blockers.
 - [ ] Docs (`docs/reports.md`, `docs/email-reports.md`), changelog,
   `scripts/check`, and a final review.
 
