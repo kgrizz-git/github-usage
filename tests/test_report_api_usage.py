@@ -1,6 +1,13 @@
 import unittest
 
-from github_usage.report_api_usage import api_usage_lines, api_usage_rows
+from github_usage.report_api_usage import (
+    _finalize_api_estimate,
+    _subtract_stats,
+    _track_repo_calls,
+    api_usage_lines,
+    api_usage_rows,
+)
+from tests._fakes import CountingFakeAPI
 
 
 def _estimate(**overrides):
@@ -115,6 +122,95 @@ class ApiUsageRowsTests(unittest.TestCase):
     def test_rows_empty_without_measurement(self):
         self.assertEqual(api_usage_rows({}), [])
         self.assertEqual(api_usage_rows(None), [])
+
+
+class ApiUsageHelperTests(unittest.TestCase):
+    def test_subtract_stats_handles_multi_call_deltas(self):
+        after, by_resource = _subtract_stats(
+            {"actual_requests": 7, "actual_requests_by_resource": {"billing": 4, "user": 3}},
+            {"actual_requests": 3, "actual_requests_by_resource": {"billing": 2, "user": 1}},
+        )
+        self.assertEqual(after, 4)
+        self.assertEqual(by_resource, {"billing": 2, "user": 2})
+
+    def test_subtract_stats_tolerates_missing_keys(self):
+        self.assertEqual(_subtract_stats({}, {}), (0, {}))
+
+    def test_track_repo_calls_records_delta_on_error(self):
+        api = CountingFakeAPI()
+        deltas = []
+
+        def boom_after_one_call():
+            api.request("GET", "/user")
+            raise RuntimeError("x")
+
+        with self.assertRaises(RuntimeError):
+            _track_repo_calls(api, boom_after_one_call, deltas)
+        self.assertEqual(len(deltas), 1)
+        before, after = deltas[0]
+        self.assertEqual(after["actual_requests"] - before["actual_requests"], 1)
+        self.assertEqual(
+            _subtract_stats(after, before),
+            (1, {"user": 1, "other": 0, "rate_limit": 0, "billing": 0, "actions": 0, "repos": 0}),
+        )
+
+    def test_finalize_api_estimate_sets_all_fields(self):
+        merged = _finalize_api_estimate(
+            {"estimated_incremental_requests": 120, "notes": []},
+            actual=5,
+            by_resource={"billing": 5},
+            total=9,
+            scope="repo-sections-only",
+        )
+        self.assertEqual(merged["actual_requests"], 5)
+        self.assertEqual(merged["total_requests"], 9)
+        self.assertEqual(merged["actual_requests_by_resource"], {"billing": 5})
+        self.assertEqual(merged["estimate_variance"], 5 - 120)
+        self.assertEqual(merged["estimate_scope"], "repo-sections-only")
+        self.assertFalse(merged["from_cache"])
+        self.assertEqual(merged["notes"], [])
+
+    def test_finalize_api_estimate_omits_scope_when_none(self):
+        merged = _finalize_api_estimate(
+            {"estimated_incremental_requests": 0},
+            actual=0,
+            by_resource={},
+            total=0,
+            scope=None,
+        )
+        self.assertNotIn("estimate_scope", merged)
+
+
+class ApiRequestStatsTests(unittest.TestCase):
+    def test_count_only_client_buckets_under_other(self):
+        from github_usage.report_api_usage import _api_request_stats
+
+        class CountOnlyFake:
+            request_count = 3
+
+        stats = _api_request_stats(CountOnlyFake())
+        self.assertEqual(stats["actual_requests"], 3)
+        self.assertEqual(stats["actual_requests_by_resource"], {"other": 3})
+
+    def test_non_dict_stats_falls_back_to_zeros(self):
+        from github_usage.report_api_usage import _api_request_stats
+
+        class NonDictFake:
+            def get_request_stats(self):
+                return "nope"
+
+        self.assertEqual(
+            _api_request_stats(NonDictFake()),
+            {"actual_requests": 0, "actual_requests_by_resource": {}},
+        )
+
+    def test_plain_object_yields_zeros(self):
+        from github_usage.report_api_usage import _api_request_stats
+
+        self.assertEqual(
+            _api_request_stats(object()),
+            {"actual_requests": 0, "actual_requests_by_resource": {}},
+        )
 
 
 if __name__ == "__main__":

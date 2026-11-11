@@ -733,3 +733,228 @@ class ReportDataTests(unittest.TestCase):
         self.assertTrue(report["actions"]["filtered"])
         self.assertEqual(report["actions"]["public_minutes"], 500.0)
         self.assertEqual(report["actions"]["private_minutes"], 0.0)
+
+
+def _email_kwargs(**overrides):
+    params = dict(_DEFAULT_KWARGS)
+    params.update(include_consumers=True, max_repos=10)
+    params.update(overrides)
+    return params
+
+
+# Sample repos: no visibility key (treated as public), zero usage with the
+# default fake responses.
+_SAMPLE_PUBLIC_REPOS = [
+    {"full_name": "octocat/r1", "owner": {"login": "octocat"}, "name": "r1"},
+    {"full_name": "octocat/r2", "owner": {"login": "octocat"}, "name": "r2"},
+]
+
+
+class ApiUsageBuilderMergeTests(unittest.TestCase):
+    def test_email_merge_zeroed_stats_for_non_counting_client(self):
+        from github_usage.report_data import build_report_data
+
+        api = FakeAPI(pages_responses={"/user/repos": []})
+        report = build_report_data(api, "octocat", **_email_kwargs())
+        estimate = report["api_estimate"]
+        self.assertEqual(estimate["actual_requests"], 0)
+        self.assertEqual(estimate["total_requests"], 0)
+        self.assertEqual(estimate["actual_requests_by_resource"], {})
+        self.assertEqual(estimate["estimate_scope"], "repo-sections-only")
+        self.assertFalse(estimate["from_cache"])
+        self.assertEqual(
+            estimate["estimate_variance"], 0 - estimate["estimated_incremental_requests"]
+        )
+
+    def test_email_actual_counts_only_repo_level_calls(self):
+        from github_usage.report_api_usage import SCOPE_REPO_SECTIONS
+        from github_usage.report_data import build_report_data
+        from tests._fakes import CountingFakeAPI
+
+        api = CountingFakeAPI(pages_responses={"/user/repos": list(_SAMPLE_PUBLIC_REPOS)})
+        report = build_report_data(api, "octocat", **_email_kwargs())
+        estimate = report["api_estimate"]
+        # Only the two per-repo billing calls fall in the estimate window.
+        self.assertEqual(estimate["actual_requests"], 2)
+        self.assertEqual(
+            estimate["actual_requests_by_resource"],
+            {
+                "billing": 2,
+                "user": 0,
+                "rate_limit": 0,
+                "actions": 0,
+                "repos": 0,
+                "other": 0,
+            },
+        )
+        # Account-level calls (/rate_limit, billing summaries, monthly costs)
+        # land in the total but not in the window delta.
+        self.assertGreater(estimate["total_requests"], estimate["actual_requests"])
+        self.assertEqual(estimate["estimate_scope"], SCOPE_REPO_SECTIONS)
+        self.assertEqual(
+            estimate["estimate_variance"],
+            estimate["actual_requests"] - estimate["estimated_incremental_requests"],
+        )
+        self.assertFalse(estimate["from_cache"])
+
+    def test_email_fallback_path_tracks_fetch_repo_actions_table(self):
+        from github_usage.report_data import build_report_data
+        from tests._fakes import CountingFakeAPI
+
+        api = CountingFakeAPI(pages_responses={"/user/repos": list(_SAMPLE_PUBLIC_REPOS)})
+        report = build_report_data(api, "octocat", **_email_kwargs(include_consumers=False))
+        estimate = report["api_estimate"]
+        self.assertEqual(estimate["actual_requests"], 2)
+        self.assertEqual(
+            estimate["actual_requests_by_resource"],
+            {
+                "billing": 2,
+                "user": 0,
+                "rate_limit": 0,
+                "actions": 0,
+                "repos": 0,
+                "other": 0,
+            },
+        )
+
+    def test_email_partial_failure_still_merges_made_calls(self):
+        from unittest import mock
+
+        from github_usage.billing import BillingFetchError, get_actions_per_repo
+        from github_usage.report_data import build_report_data
+        from tests._fakes import CountingFakeAPI
+
+        api = CountingFakeAPI(pages_responses={"/user/repos": list(_SAMPLE_PUBLIC_REPOS)})
+        calls = []
+
+        def flaky(api_arg, owner, name):
+            calls.append((owner, name))
+            if len(calls) > 1:
+                raise BillingFetchError(f"{owner}/{name}: boom")
+            return get_actions_per_repo(api_arg, owner, name)
+
+        with mock.patch("github_usage.report_optional.get_actions_per_repo", side_effect=flaky):
+            report = build_report_data(api, "octocat", **_email_kwargs())
+        consumers = report["repo_consumers"]
+        self.assertIn("octocat/r2", consumers["errors"])
+        estimate = report["api_estimate"]
+        # The one successful per-repo call is counted despite the failure;
+        # only repo-level calls land in the window delta.
+        self.assertEqual(estimate["actual_requests"], 1)
+        self.assertEqual(
+            estimate["actual_requests_by_resource"],
+            {
+                "billing": 1,
+                "user": 0,
+                "rate_limit": 0,
+                "actions": 0,
+                "repos": 0,
+                "other": 0,
+            },
+        )
+        self.assertGreater(estimate["total_requests"], estimate["actual_requests"])
+        self.assertEqual(
+            estimate["estimate_variance"],
+            estimate["actual_requests"] - estimate["estimated_incremental_requests"],
+        )
+
+    def test_email_section_failure_still_tracks_and_falls_back(self):
+        from unittest import mock
+
+        from github_usage.billing import get_actions_per_repo
+        from github_usage.report_data import build_report_data
+        from tests._fakes import CountingFakeAPI
+
+        api = CountingFakeAPI(pages_responses={"/user/repos": list(_SAMPLE_PUBLIC_REPOS)})
+        calls = []
+
+        def flaky(api_arg, owner, name):
+            # A real counted call, then an abort that escapes get_repo_consumers
+            # (plain RuntimeError, not BillingFetchError) into _try_section.
+            calls.append((owner, name))
+            result = get_actions_per_repo(api_arg, owner, name)
+            if len(calls) > 1:
+                raise RuntimeError("mid-scan abort")
+            return result
+
+        with mock.patch("github_usage.report_optional.get_actions_per_repo", side_effect=flaky):
+            report = build_report_data(api, "octocat", **_email_kwargs())
+        # The consumers section failed and fell back to the per-repo table.
+        self.assertIn("repo_consumers", report["errors"])
+        estimate = report["api_estimate"]
+        # 2 aborted-section calls + 2 fallback calls, all tracked.
+        self.assertEqual(estimate["actual_requests"], 4)
+        self.assertEqual(
+            estimate["actual_requests_by_resource"],
+            {
+                "billing": 4,
+                "user": 0,
+                "rate_limit": 0,
+                "actions": 0,
+                "repos": 0,
+                "other": 0,
+            },
+        )
+
+    def test_email_artifact_and_release_sections_are_tracked(self):
+        from github_usage.report_data import build_report_data
+        from tests._fakes import CountingFakeAPI
+
+        pages = {
+            "/user/repos": list(_SAMPLE_PUBLIC_REPOS),
+            "/repos/octocat/r1/actions/artifacts": [{"id": 1, "size_in_bytes": 10}],
+            "/repos/octocat/r1/releases": [{"assets": [{"size": 5}]}],
+            "/repos/octocat/r2/actions/artifacts": [],
+            "/repos/octocat/r2/releases": [],
+        }
+        api = CountingFakeAPI(pages_responses=pages)
+        report = build_report_data(
+            api,
+            "octocat",
+            **_email_kwargs(
+                include_actions=False,
+                include_consumers=False,
+                include_artifact_storage=True,
+                include_release_assets=True,
+            ),
+        )
+        estimate = report["api_estimate"]
+        # 2 artifact + 2 release per-repo calls; artifact/release pages bucket
+        # as actions/repos (not billing).
+        self.assertEqual(estimate["actual_requests"], 4)
+        self.assertEqual(
+            estimate["actual_requests_by_resource"],
+            {
+                "billing": 0,
+                "user": 0,
+                "rate_limit": 0,
+                "actions": 2,
+                "repos": 2,
+                "other": 0,
+            },
+        )
+
+    def test_email_workflow_breakdown_calls_are_tracked(self):
+        from unittest import mock
+
+        from github_usage.report_data import build_report_data
+        from tests._fakes import CountingFakeAPI
+
+        repos = [
+            {
+                "full_name": "octocat/priv",
+                "owner": {"login": "octocat"},
+                "name": "priv",
+                "visibility": "private",
+            }
+        ]
+        api = CountingFakeAPI(pages_responses={"/user/repos": repos})
+        with mock.patch(
+            "github_usage.report_optional.get_actions_per_repo",
+            return_value=(10.0, 0.0, {"sku": {"grossAmount": 1.0}}),
+        ):
+            report = build_report_data(api, "octocat", **_email_kwargs())
+        estimate = report["api_estimate"]
+        # 1 mocked consumers call (uncounted) + runs pages + workflows pages.
+        self.assertEqual(estimate["actual_requests"], 2)
+        self.assertEqual(estimate["actual_requests_by_resource"]["actions"], 2)

@@ -323,10 +323,10 @@ class RepoConsumersPrivateRankingTests(unittest.TestCase):
 
 
 class CacheVersionTests(unittest.TestCase):
-    def test_cache_version_is_3(self):
+    def test_cache_version_is_4(self):
         from github_usage.report_cache import CACHE_VERSION
 
-        self.assertEqual(CACHE_VERSION, 3)
+        self.assertEqual(CACHE_VERSION, 4)
 
 
 if __name__ == "__main__":

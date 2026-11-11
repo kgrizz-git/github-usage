@@ -11,7 +11,10 @@
 > dense zeroed buckets, normalized-path/params/404 tests). Chunk 2 complete
 > 2026-11-11 — `report_api_usage.py` shared lines/rows formatters with scope
 > labels, rate-limit reference line, and cache-hit message; 9 unit tests at
-> 100% file coverage.
+> 100% file coverage. Chunk 3 complete 2026-11-11 — builder merge with
+> per-getter tracking, caller-passed legacy baselines with listing carve-out,
+> `annotate_cache_hit` at all three cache sites, `CACHE_VERSION` 4, and
+> CountingFakeAPI + builder/helper/cache-hit tests (818 tests green).
 
 # Track GitHub REST API Calls and Report Usage
 
@@ -170,8 +173,9 @@ Matching windows (baseline capture points):
   captured before initialization (a fresh-client zero snapshot is
   equivalent), never the entry default, preserving comparable counts with
   the CLI. When `baseline_stats` is None (direct builder use), the builder
-  snapshots at entry and records the narrower scope (`estimate_scope`) so
-  the variance stays honest.
+  snapshots at entry and records no scope, so renderers use the neutral
+  scope label instead of implying full-report coverage (the entry window is
+  narrower than the full estimate span).
   Carve `_limited_repos()` out of `actual_requests`: snapshot the counter
   around that call (`legacy_report_data.py:234`) and subtract those
   repository-listing page fetches from the delta — including from
@@ -268,6 +272,10 @@ zero-count buckets are omitted from the breakdown, and all strings are
 ASCII-only (the PDF writer uses core Helvetica, which has no em dash).
 
 On a cache hit: `- Source: cached report (0 new API requests; 130 total during the original fetch)`.
+
+Cached rendering keeps the original measurement on the scope line; only the
+total line is relabeled. (Recorded 2026-11-11: do not zero the scope line —
+chunk 4 must preserve this.)
 
 Surface-by-surface:
 
@@ -433,12 +441,25 @@ which already lists static rate-limit numbers, to include the same docs link.
   **Review:** deepseek APPROVE with follow-ups applied — ASCII-only strings
   (PDF-safe), absent-measurement gate returning no lines, zero-bucket filter,
   cached total label, shared `SCOPE_*` constants, shorter PDF-safe labels.
-- [ ] Merge repo-level-delta actual usage into `api_estimate` in both builders
+- [x] Merge repo-level-delta actual usage into `api_estimate` in both builders
   (email: per-getter snapshots around repo-level getters, using the shared
   `SCOPE_*` constants for `estimate_scope`; legacy: caller-passed
   `baseline_stats` full-snapshot subtraction incl. per-resource, minus the
   `_limited_repos` listing calls); bump `CACHE_VERSION` (plus the test pin);
   add `annotate_cache_hit()` at all three sites; tests.
+  **Done:** 2026-11-11 — per-getter `_track_repo_calls` + `_sum_repo_deltas`
+  merge in both builders; legacy caller-passed `baseline_stats` with listing
+  carve-out and omitted scope on entry fallback; `annotate_cache_hit` at all
+  three cache sites; `CACHE_VERSION` 4 + pin update; CountingFakeAPI (incl.
+  multi-page listings) + builder/helper/cache-hit integration tests (incl.
+  caller-baseline, 2-page invariance, session coverage, section-failure
+  fallback).
+  **Review:** deepseek APPROVE with follow-ups folded in — `_api_request_stats`
+  fallback buckets unknowns under `other`; merge helpers consolidated in
+  `report_api_usage.py` (report_data.py stays under the 500-line budget);
+  non-dict snapshots tolerated; exact-bucket test assertions kept where they
+  pin the dense contract; legacy None-baseline omits (rather than invents) a
+  scope value.
 - [ ] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
   GUI legacy detail rows; add the rate-limit reference line + docs link;
   tests.

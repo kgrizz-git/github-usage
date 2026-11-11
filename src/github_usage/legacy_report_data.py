@@ -16,6 +16,13 @@ from .billing import get_billing_summary, get_premium_request_usage
 from .repo_consumers import build_consumer_rankings
 from .report_account import fetch_account_info, fetch_rate_limits
 from .report_actions import fetch_actions_os_breakdown, fetch_repo_actions_table
+from .report_api_usage import (
+    SCOPE_FULL_REPORT,
+    _api_request_stats,
+    _finalize_api_estimate,
+    _stats_total,
+    _subtract_stats,
+)
 from .report_data import (
     GitHubAPIClient,
     _empty_cost,
@@ -224,14 +231,28 @@ def build_legacy_report_data(
     only_private: bool = False,
     account: dict | None = None,
     rate_limits: dict | None = None,
+    baseline_stats: dict | None = None,
 ) -> dict[str, Any]:
-    """Fetch and assemble the legacy report superset dict in a single pass."""
+    """Fetch and assemble the legacy report superset dict in a single pass.
+
+    ``baseline_stats`` is a stats snapshot taken before the caller's first
+    API call; the measured window runs from it to the last fetch, minus the
+    repository-listing pages. When omitted, the builder snapshots at entry
+    (missing pre-builder calls) and records no ``estimate_scope``.
+    """
     errors: dict[str, str] = {}
+    explicit_baseline = baseline_stats is not None
+    if baseline_stats is None:
+        # Best effort for direct/test use: snapshot at entry. Callers pass a
+        # pre-fetch snapshot so the window covers pre-builder calls too.
+        baseline_stats = _api_request_stats(api)
     if account is None:
         account = fetch_account_info(api)
     if rate_limits is None:
         rate_limits = fetch_rate_limits(api)
+    listing_before = _api_request_stats(api)
     repos, truncated = _limited_repos(api, max_repos)
+    listing_after = _api_request_stats(api)
     repos = filter_repos_by_visibility(repos, only_public=only_public, only_private=only_private)
     scanned_repo_count = len(repos)
     repo_count = scanned_repo_count + (1 if truncated else 0)
@@ -356,6 +377,21 @@ def build_legacy_report_data(
         report["lfs_billing"] = get_billing_summary(api, username, "git_lfs")
     except RuntimeError as exc:
         errors["lfs_billing"] = str(exc)
+
+    current = _api_request_stats(api)
+    window_actual, window_by = _subtract_stats(current, baseline_stats)
+    listing_actual, listing_by = _subtract_stats(listing_after, listing_before)
+    by_resource = {
+        res: window_by.get(res, 0) - listing_by.get(res, 0)
+        for res in sorted(set(window_by) | set(listing_by))
+    }
+    report["api_estimate"] = _finalize_api_estimate(
+        report.get("api_estimate") or {},
+        actual=window_actual - listing_actual,
+        by_resource=by_resource,
+        total=_stats_total(current),
+        scope=SCOPE_FULL_REPORT if explicit_baseline else None,
+    )
 
     report["insights"] = get_key_insights(report)
     report["warnings"] = get_warning_state(report, warn_over)

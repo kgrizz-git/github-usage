@@ -100,3 +100,42 @@ class SendEmailTests(unittest.TestCase):
             )
         self.assertEqual(printed, ["Email report sent."])
         self.assertTrue(all("@" not in line for line in printed))
+
+
+class LoadEmailDataCacheTests(unittest.TestCase):
+    def _args(self):
+        import argparse
+
+        return argparse.Namespace(
+            skip_actions=False,
+            skip_copilot=True,
+            skip_lfs=True,
+            include_consumers=False,
+            include_artifact_storage=False,
+            include_release_assets=False,
+            max_repos=10,
+            warn_over=None,
+            timeout=30.0,
+            max_retries=3,
+            refresh=False,
+        )
+
+    def test_cache_hit_annotates_from_cache(self):
+        from github_usage.cli_email_report import _load_or_fetch_email_data
+        from github_usage.report_cache import CacheHit
+
+        cached = {
+            "username": "octocat",
+            "api_estimate": {"actual_requests": 5, "total_requests": 9},
+        }
+        with mock.patch(
+            "github_usage.report_cache.load_cached_report",
+            return_value=(cached, "octocat", CacheHit(from_cache=True)),
+        ):
+            result = _load_or_fetch_email_data(self._args(), "fake-token")
+        assert isinstance(result, tuple)
+        data, username = result
+        self.assertEqual(username, "octocat")
+        self.assertTrue(data["api_estimate"]["from_cache"])
+        self.assertEqual(data["api_estimate"]["actual_requests"], 5)
+        self.assertEqual(data["api_estimate"]["total_requests"], 9)

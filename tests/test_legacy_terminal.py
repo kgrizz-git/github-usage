@@ -147,3 +147,63 @@ class LegacyTerminalTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("Monthly Forecast", output)
         self.assertIn("projected", output)
+
+
+class LegacySessionBaselineTests(unittest.TestCase):
+    def test_fresh_session_baseline_covers_pre_builder_calls(self) -> None:
+        from unittest import mock
+
+        from github_usage import legacy_report
+        from github_usage.report_api_usage import SCOPE_FULL_REPORT
+        from tests._fakes import CountingFakeAPI
+
+        api = CountingFakeAPI(
+            request_responses={
+                ("GET", "/user", ()): {"login": "octocat", "type": "User", "plan": {}},
+                ("GET", "/rate_limit", ()): {
+                    "resources": {"core": {"limit": 5000, "remaining": 5000}}
+                },
+            },
+            pages_responses={"/user/repos": []},
+        )
+        with (
+            mock.patch("github_usage.legacy_report.GitHubAPI", return_value=api),
+            mock.patch("github_usage.legacy_report.resolve_token", return_value="fake-token"),
+            mock.patch("github_usage.legacy_report.print_header"),
+            mock.patch("github_usage.legacy_report.render_legacy_report"),
+        ):
+            code, data, username, _cache = legacy_report.run_legacy_report_session(max_repos=10)
+        self.assertEqual(code, 0)
+        self.assertEqual(username, "octocat")
+        assert data is not None
+        estimate = data["api_estimate"]
+        self.assertEqual(estimate["estimate_scope"], SCOPE_FULL_REPORT)
+        # Pre-builder /user + /rate_limit calls (scope check + fetch each)
+        # fall inside the measured window.
+        self.assertGreaterEqual(estimate["actual_requests_by_resource"].get("user", 0), 2)
+        self.assertGreaterEqual(estimate["actual_requests_by_resource"].get("rate_limit", 0), 2)
+
+    def test_cached_session_marks_from_cache_without_new_calls(self) -> None:
+        from unittest import mock
+
+        from github_usage import legacy_report
+        from github_usage.report_cache import CacheHit
+
+        cached = {
+            "username": "octocat",
+            "api_estimate": {"actual_requests": 5, "total_requests": 9},
+        }
+        with (
+            mock.patch("github_usage.legacy_report.resolve_token", return_value="fake-token"),
+            mock.patch(
+                "github_usage.legacy_report.load_cached_report",
+                return_value=(cached, "octocat", CacheHit(from_cache=True)),
+            ),
+            mock.patch("github_usage.legacy_report.print_header"),
+            mock.patch("github_usage.legacy_report.render_legacy_report"),
+        ):
+            code, data, username, _cache = legacy_report.run_legacy_report_session()
+        self.assertEqual(code, 0)
+        assert data is not None
+        self.assertTrue(data["api_estimate"]["from_cache"])
+        self.assertEqual(data["api_estimate"]["actual_requests"], 5)

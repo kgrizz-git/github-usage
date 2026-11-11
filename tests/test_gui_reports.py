@@ -29,5 +29,24 @@ class LegacyReportBackendTests(unittest.TestCase):
         self.assertIn("Exported", message)
 
 
+class LegacyReportCacheTests(unittest.TestCase):
+    def test_cache_hit_annotates_from_cache(self):
+        from github_usage.report_cache import CacheHit
+
+        cached = {
+            "username": "octocat",
+            "api_estimate": {"actual_requests": 5, "total_requests": 9},
+        }
+        with mock.patch(
+            "github_usage.gui_backend.load_cached_report",
+            return_value=(cached, "octocat", CacheHit(from_cache=True)),
+        ):
+            code, data, username, _cache = run_legacy_report_data(token="fake-token")
+        self.assertEqual(code, 0)
+        assert data is not None
+        self.assertTrue(data["api_estimate"]["from_cache"])
+        self.assertEqual(data["api_estimate"]["actual_requests"], 5)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -9,8 +9,10 @@ from .auth import check_user_scope, resolve_token
 from .legacy_report_data import LEGACY_DEFAULT_MAX_REPOS, build_legacy_report_data
 from .legacy_terminal import render_legacy_report
 from .report_account import fetch_account_info, fetch_rate_limits
+from .report_api_usage import _api_request_stats
 from .report_cache import (
     CacheHit,
+    annotate_cache_hit,
     format_cache_hit_message,
     legacy_cache_params,
     load_cached_report,
@@ -82,6 +84,7 @@ def run_legacy_report_session(
         print_header()
         if cache_hit.age_seconds is not None and cache_hit.max_age_seconds is not None:
             print(format_cache_hit_message(cache_hit.age_seconds, cache_hit.max_age_seconds))
+        cached_data = annotate_cache_hit(cached_data)
         render_legacy_report(
             cached_data,
             include_forecast=include_forecast,
@@ -91,6 +94,9 @@ def run_legacy_report_session(
 
     try:
         api = GitHubAPI(token, timeout=timeout, max_retries=max_retries)
+        # Baseline precedes the first API call so the measured legacy window
+        # covers the pre-builder account and rate-limit fetches below.
+        baseline_stats = _api_request_stats(api)
         if not check_user_scope(api):
             print("Error: Your GitHub token is not valid for this operation.")
             return 1, None, None, CacheHit()
@@ -109,6 +115,7 @@ def run_legacy_report_session(
             only_private=only_private,
             account=account,
             rate_limits=rate_limits,
+            baseline_stats=baseline_stats,
         )
         if max_age > 0:
             store_cached_report(

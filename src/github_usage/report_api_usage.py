@@ -1,11 +1,16 @@
-"""Shared formatters for measured-vs-estimated GitHub REST API usage.
+"""Shared tracking helpers and formatters for measured-vs-estimated GitHub REST API usage.
 
 Both the email renderers and the file exports derive their API-usage rows
 from :func:`api_usage_lines`, matching the existing ``email_actions_table_rows``
-convention (``- Label: value`` bullets feed a shared rows adapter).
+convention (``- Label: value`` bullets feed a shared rows adapter). The merge
+helpers below combine per-getter and window snapshots into report-ready
+``actual`` / ``by_resource`` deltas.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
+from typing import TypeVar
 
 RATE_LIMITS_URL = "https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api"
 
@@ -44,6 +49,64 @@ def _fmt_count(value) -> str:
 def _measured(estimate: dict) -> bool:
     """True when the estimate carries a measurement (vs estimate-only)."""
     return "actual_requests" in estimate or "total_requests" in estimate
+
+
+def _stats_total(stats: dict) -> int:
+    """Return the total request count of a stats snapshot (0 when missing)."""
+    return int(stats.get("actual_requests", 0) or 0)
+
+
+def _subtract_stats(current: dict, baseline: dict) -> tuple[int, dict[str, int]]:
+    """Return ``(actual, by_resource)`` for ``current`` minus ``baseline``.
+
+    Missing keys default to 0 so empty getattr-fallback snapshots work.
+    Counters only increase, so per-bucket deltas are non-negative in practice.
+    """
+    cur_by = current.get("actual_requests_by_resource") or {}
+    base_by = baseline.get("actual_requests_by_resource") or {}
+    by_resource = {
+        res: int(cur_by.get(res, 0) or 0) - int(base_by.get(res, 0) or 0)
+        for res in sorted(set(cur_by) | set(base_by))
+    }
+    return _stats_total(current) - _stats_total(baseline), by_resource
+
+
+def _sum_repo_deltas(deltas: list) -> tuple[int, dict[str, int]]:
+    """Sum ``(before, after)`` stats snapshots into ``(actual, by_resource)``."""
+    actual = 0
+    by_resource: dict[str, int] = {}
+    for before, after in deltas:
+        delta_actual, delta_by = _subtract_stats(after, before)
+        actual += delta_actual
+        for res, qty in delta_by.items():
+            by_resource[res] = by_resource.get(res, 0) + qty
+    return actual, dict(sorted(by_resource.items()))
+
+
+def _finalize_api_estimate(
+    estimate: dict,
+    *,
+    actual: int,
+    by_resource: dict,
+    total: int,
+    scope: str | None,
+) -> dict:
+    """Return ``estimate`` augmented with measured usage fields.
+
+    ``scope`` may be None for best-effort windows; renderers then use the
+    neutral scope label.
+    """
+    merged = dict(estimate)
+    merged["actual_requests"] = actual
+    merged["total_requests"] = total
+    merged["actual_requests_by_resource"] = dict(by_resource)
+    merged["estimate_variance"] = actual - int(
+        estimate.get("estimated_incremental_requests", 0) or 0
+    )
+    if scope is not None:
+        merged["estimate_scope"] = scope
+    merged["from_cache"] = False
+    return merged
 
 
 def api_usage_lines(estimate: dict | None) -> list[str]:
@@ -102,3 +165,39 @@ def api_usage_rows(estimate: dict | None) -> list[tuple[str, str]]:
         label, _, value = line.partition(": ")
         rows.append((label.removeprefix("- "), value))
     return rows
+
+
+def _api_request_stats(api) -> dict[str, object]:
+    """Return the client's request stats, tolerating fakes without counting.
+
+    Clients without ``get_request_stats`` fall back to their
+    ``request_count`` (if any) bucketed under ``"other"`` so the totals
+    still reconcile.
+    """
+    stats = getattr(api, "get_request_stats", None)
+    if callable(stats):
+        result = stats()
+        if isinstance(result, dict):
+            return result
+    count = int(getattr(api, "request_count", 0) or 0)
+    return {
+        "actual_requests": count,
+        "actual_requests_by_resource": {"other": count} if count else {},
+    }
+
+
+_T = TypeVar("_T")
+
+
+def _track_repo_calls(api, func: Callable[[], _T], deltas: list) -> _T:
+    """Run ``func()``, appending its (before, after) stats to ``deltas``.
+
+    The call's return value is passed through. Exceptions propagate after
+    the ``after`` snapshot is recorded, so partial failures still count the
+    calls they made.
+    """
+    before = _api_request_stats(api)
+    try:
+        return func()
+    finally:
+        deltas.append((before, _api_request_stats(api)))

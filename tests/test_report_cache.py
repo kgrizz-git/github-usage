@@ -250,3 +250,24 @@ class ReportCacheTests(unittest.TestCase):
         cached_at = (now - timedelta(minutes=30)).isoformat().replace("+00:00", "Z")
         self.assertTrue(is_cache_fresh(cached_at, 3600, now=now))
         self.assertFalse(is_cache_fresh(cached_at, 900, now=now))
+
+
+class AnnotateCacheHitTests(unittest.TestCase):
+    def test_annotate_cache_hit_sets_flag_and_preserves_counts(self):
+        from github_usage.report_cache import annotate_cache_hit
+
+        data = {
+            "username": "octocat",
+            "api_estimate": {"actual_requests": 5, "total_requests": 9},
+        }
+        result = annotate_cache_hit(data)
+        self.assertIs(result, data)
+        self.assertTrue(result["api_estimate"]["from_cache"])
+        self.assertEqual(result["api_estimate"]["actual_requests"], 5)
+        self.assertEqual(result["api_estimate"]["total_requests"], 9)
+
+    def test_annotate_cache_hit_without_estimate_is_noop(self):
+        from github_usage.report_cache import annotate_cache_hit
+
+        data = {"username": "octocat"}
+        self.assertEqual(annotate_cache_hit(data), {"username": "octocat"})

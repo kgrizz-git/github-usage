@@ -446,3 +446,107 @@ class LegacyReportDataTests(unittest.TestCase):
             rate_limits={"resources": {"core": {"limit": 5000, "remaining": 5000}}},
         )
         self.assertEqual(len(artifact_calls), 1)
+
+
+class LegacyApiUsageMergeTests(unittest.TestCase):
+    def _account(self) -> dict:
+        return {"login": "octocat", "type": "User", "plan": {}}
+
+    def _rate_limits(self) -> dict:
+        return {"resources": {"core": {"limit": 5000, "remaining": 5000}}}
+
+    def test_legacy_merge_excludes_listing_but_includes_account_calls(self) -> None:
+        from github_usage.report_api_usage import SCOPE_FULL_REPORT
+        from tests._fakes import CountingFakeAPI
+
+        repos = [_repo("r1"), _repo("r2")]
+        api = CountingFakeAPI(pages_responses={"/user/repos": repos})
+        report = build_legacy_report_data(
+            api,
+            "octocat",
+            max_repos=10,
+            account=self._account(),
+            rate_limits=self._rate_limits(),
+            baseline_stats={"actual_requests": 0, "actual_requests_by_resource": {}},
+        )
+        estimate = report["api_estimate"]
+        # _limited_repos issues exactly one get_all_pages call, and the merge
+        # carves out precisely the listing calls (so total - actual == 1 here).
+        listing_calls = sum(1 for entry in api.request_log if entry["path"] == "/user/repos")
+        self.assertEqual(listing_calls, 1)
+        self.assertEqual(estimate["total_requests"] - estimate["actual_requests"], 1)
+        self.assertEqual(
+            sum(estimate["actual_requests_by_resource"].values()),
+            estimate["actual_requests"],
+        )
+        self.assertEqual(estimate["estimate_scope"], SCOPE_FULL_REPORT)
+        self.assertEqual(
+            estimate["estimate_variance"],
+            estimate["actual_requests"] - estimate["estimated_incremental_requests"],
+        )
+        self.assertFalse(estimate["from_cache"])
+
+    def test_legacy_caller_baseline_excludes_pre_builder_calls(self) -> None:
+        from github_usage.report_api_usage import SCOPE_FULL_REPORT, _api_request_stats
+        from tests._fakes import CountingFakeAPI
+
+        api = CountingFakeAPI(pages_responses={"/user/repos": [_repo("r1")]})
+        api.request("GET", "/user")
+        api.request("GET", "/rate_limit")
+        baseline = _api_request_stats(api)
+        report = build_legacy_report_data(
+            api,
+            "octocat",
+            max_repos=10,
+            account=self._account(),
+            rate_limits=self._rate_limits(),
+            baseline_stats=baseline,
+        )
+        estimate = report["api_estimate"]
+        # The 2 pre-baseline calls plus the 1 listing call sit outside actual.
+        self.assertEqual(estimate["total_requests"] - estimate["actual_requests"], 3)
+        self.assertEqual(
+            sum(estimate["actual_requests_by_resource"].values()),
+            estimate["actual_requests"],
+        )
+        self.assertEqual(estimate["estimate_scope"], SCOPE_FULL_REPORT)
+
+    def test_legacy_two_page_listing_does_not_move_variance(self) -> None:
+        from tests._fakes import CountingFakeAPI
+
+        def build_with_listing_pages(n: int) -> dict:
+            api = CountingFakeAPI(
+                pages_responses={"/user/repos": [_repo("r1")]},
+                page_counts={"/user/repos": n},
+            )
+            report = build_legacy_report_data(
+                api,
+                "octocat",
+                max_repos=10,
+                account=self._account(),
+                rate_limits=self._rate_limits(),
+                baseline_stats={"actual_requests": 0, "actual_requests_by_resource": {}},
+            )
+            return report["api_estimate"]
+
+        one_page = build_with_listing_pages(1)
+        two_page = build_with_listing_pages(2)
+        # The extra listing page lands in the total but is carved out of the
+        # window, so the variance is identical.
+        self.assertEqual(two_page["total_requests"] - one_page["total_requests"], 1)
+        self.assertEqual(two_page["actual_requests"], one_page["actual_requests"])
+        self.assertEqual(two_page["estimate_variance"], one_page["estimate_variance"])
+
+    def test_legacy_builder_without_baseline_omits_scope(self) -> None:
+        api = FakeAPI(pages_responses={"/user/repos": [_repo("r1")]})
+        report = build_legacy_report_data(
+            api,
+            "octocat",
+            max_repos=10,
+            account=self._account(),
+            rate_limits=self._rate_limits(),
+        )
+        estimate = report["api_estimate"]
+        self.assertNotIn("estimate_scope", estimate)
+        self.assertEqual(estimate["actual_requests"], 0)
+        self.assertEqual(estimate["total_requests"], 0)
