@@ -4,11 +4,51 @@ from __future__ import annotations
 
 import json
 import urllib.parse
+from typing import TypedDict
 
 from . import __version__
 
+
+class RequestStats(TypedDict):
+    """Measured API usage: total logical calls plus a per-resource breakdown."""
+
+    actual_requests: int
+    actual_requests_by_resource: dict[str, int]
+
+
+class _RequestLogEntry(TypedDict):
+    """One counted logical API call; ``status`` is None when no response was observed."""
+
+    method: str
+    path: str
+    status: int | None
+
+
 # GitHub list endpoints that return {total_count, <collection>: [...]} instead of a bare array.
 _COLLECTION_KEYS = ("workflow_runs", "artifacts", "workflows")
+
+# All stats resource buckets, in classification order. Billing paths live
+# under ``/users/...``, so billing is matched by its ``/settings/billing/``
+# segment first (defensive ordering).
+_RESOURCE_BUCKETS = ("billing", "user", "rate_limit", "actions", "repos", "other")
+
+
+# Resource buckets for request stats, evaluated in order: billing paths start
+# with ``/users/...`` so billing must be matched before the user prefix.
+def _classify_request_path(path: str) -> str:
+    """Map a request path to a stats resource bucket."""
+    if "/settings/billing/" in path:
+        return "billing"
+    if path == "/user" or path.startswith("/user/"):
+        return "user"
+    if path.startswith("/rate_limit"):
+        return "rate_limit"
+    if path.startswith("/repos/"):
+        parts = path.split("/")
+        if len(parts) > 4 and parts[4] == "actions":
+            return "actions"
+        return "repos"
+    return "other"
 
 
 class GitHubAPI:
@@ -20,6 +60,11 @@ class GitHubAPI:
         self.max_retries = (
             max_retries if max_retries is not None else http_retry.DEFAULT_MAX_RETRIES
         )
+        # Request accounting for the API-usage report. Single-threaded use
+        # only: reports never share a client across threads (GUI workers each
+        # build their own client; see gui_backend.run_legacy_report_data).
+        self.request_count: int = 0
+        self.request_log: list[_RequestLogEntry] = []
         self.base = "https://api.github.com"
         self.headers = {
             "Accept": "application/vnd.github+json",
@@ -28,10 +73,40 @@ class GitHubAPI:
             "User-Agent": f"github-usage-report/{__version__} (+https://github.com/kgrizz-git/github-usage)",
         }
 
+    def _record_request_start(self, method: str, path: str) -> _RequestLogEntry:
+        """Count one logical API call and open its request-log entry.
+
+        The entry's ``status`` is filled in once a response is observed;
+        ``None`` means no response was observed at this layer (transport
+        failure, or a retryable 5xx that exhausted retries).
+        """
+        self.request_count += 1
+        entry: _RequestLogEntry = {"method": method, "path": path, "status": None}
+        self.request_log.append(entry)
+        return entry
+
+    def get_request_stats(self) -> RequestStats:
+        """Return actual request totals plus a per-resource breakdown.
+
+        ``actual_requests`` is derived from the log so it cannot drift from
+        the breakdown. Only aggregates are exposed: ``request_log`` entries
+        (raw paths) never enter report data, since they would bypass the
+        export redaction layer.
+        """
+        by_resource: dict[str, int] = {bucket: 0 for bucket in _RESOURCE_BUCKETS}
+        for entry in self.request_log:
+            bucket = _classify_request_path(entry["path"])
+            by_resource[bucket] = by_resource.get(bucket, 0) + 1
+        return {
+            "actual_requests": len(self.request_log),
+            "actual_requests_by_resource": by_resource,
+        }
+
     def request(self, method, path, params=None):
         url = path
         if not url.startswith("/"):
             url = "/" + url
+        entry = self._record_request_start(method, url)
 
         if params:
             query = urllib.parse.urlencode(params)
@@ -51,6 +126,7 @@ class GitHubAPI:
             timeout=self.timeout,
             max_retries=self.max_retries,
         )
+        entry["status"] = response.status
 
         data = response.body.decode("utf-8")
         if response.status in (200, 201, 202, 204):
@@ -79,6 +155,7 @@ class GitHubAPI:
         url = path
         if not url.startswith("/"):
             url = "/" + url
+        entry = self._record_request_start(method, url)
 
         if params:
             query = urllib.parse.urlencode(params)
@@ -90,7 +167,7 @@ class GitHubAPI:
         req_headers = {**self.headers}
         from . import http_retry
 
-        return http_retry.request_with_retries(
+        response = http_retry.request_with_retries(
             method,
             url,
             host="api.github.com",
@@ -98,6 +175,8 @@ class GitHubAPI:
             timeout=self.timeout,
             max_retries=self.max_retries,
         )
+        entry["status"] = response.status
+        return response
 
     def get_all_pages(self, path, params=None, limit=None):
         all_items = []

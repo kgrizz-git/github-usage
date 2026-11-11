@@ -4,7 +4,11 @@
 >
 > **Terminology:** user-facing name is **local full report** (CLI/TUI). Code modules still use `legacy_*` until the rename tracked in `TO_DO.md`.
 >
-> **Implementation log:** (none yet)
+> **Implementation log:** Chunk 1 complete 2026-11-11 — `GitHubAPI` request
+> counting (`request_count`, `request_log`, ordered resource buckets) plus
+> `get_request_stats()` and unit tests; reviewed APPROVE with minor findings
+> folded in (structural sum==total, segment-based actions match, TypedDicts,
+> dense zeroed buckets, normalized-path/params/404 tests).
 
 # Track GitHub REST API Calls and Report Usage
 
@@ -408,7 +412,10 @@ which already lists static rate-limit numbers, to include the same docs link.
 
 ## Task breakdown
 
-- [ ] Add `GitHubAPI` request counting + `get_request_stats()`; unit tests.
+- [x] Add `GitHubAPI` request counting + `get_request_stats()`; unit tests.
+  **Done:** 2026-11-11 — counter, per-resource log, and stats merged in
+  `api.py`; 9 unit tests (incl. failure/transport, pagination, buckets);
+  reviewer minors applied (no functional deviations).
 - [ ] Add `report_api_usage.py` (lines + rows adapter); cover the new file's 82%
   coverage gate.
 - [ ] Merge repo-level-delta actual usage into `api_estimate` in both builders
