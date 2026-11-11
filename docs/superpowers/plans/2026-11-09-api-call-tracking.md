@@ -158,6 +158,12 @@ Matching windows (baseline capture points):
   equivalent snapshot or rely on the default. When `baseline_stats` is None,
   the builder snapshots at entry and records the narrower scope
   (`estimate_scope`) so the variance stays honest.
+  Carve `_limited_repos()` out of `actual_requests`: snapshot the counter
+  around that call (`legacy_report_data.py:234`) and subtract those
+  repository-listing page fetches from the delta while retaining them in
+  `total_requests`. Neither estimate models listing pagination, so a second
+  `/user/repos` page at 101+ repos must not move the variance. (The email
+  builder needs no carve-out: its baseline is already post-listing.)
 
 Merge points (must be after the last fetch):
 - `build_report_data`: immediately before
@@ -168,8 +174,11 @@ Merge points (must be after the last fetch):
 
 Add derived fields to `api_estimate`:
 
-- `actual_requests`: repo-level-only measured delta over the estimate's
-  matching window (the only figure compared against the estimate).
+- `actual_requests`: measured delta over the estimate's matching window —
+  repo-level-only for the email builder, account-level-inclusive for the
+  legacy builder (each matching what its estimate covers). The only figure
+  compared against the estimate; `estimate_scope` says which window applies,
+  so renderers must never label legacy measurements as repo-level-only.
 - `total_requests`: raw client total for original-fetch messages (not
   comparable to the estimate).
 - `actual_requests_by_resource`: per-resource repo-level deltas over the same
@@ -223,13 +232,16 @@ Suggested content (compact):
 
 ```
 REST API Usage
-- Repo-level requests (estimate scope): 123 (estimated 120)
+- Requests in estimate scope: 123 (estimated 120)
 - Total requests this fetch: 130
 - Core quota remaining before: 4,877 / 5,000
 - Core rate limit: 5,000 requests/hour (authenticated) — https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
 - By resource (estimate scope): billing 20, repos 1, actions 100, rate_limit 1, other 1
 - Source: live fetch
 ```
+
+The scope label comes from `estimate_scope`: email renderers qualify it as
+repo-level scope, legacy renderers as account-level-inclusive scope.
 
 On a cache hit: `- Source: cached report (0 new API requests; 130 total during the original fetch)`.
 
@@ -328,8 +340,11 @@ which already lists static rate-limit numbers, to include the same docs link.
   (`CacheVersionTests.test_cache_version_is_3`) from 3 to 4 alongside the
   bump, or `scripts/check` fails.
 - `tests/test_api.py` (or the new module's test): cover the `getattr` fallback
-  path (client without `get_request_stats`), the no-estimate case, and the
-  `estimate_variance` sign / zero-estimate cases.
+  path (client without `get_request_stats`), the no-estimate case, the
+  `estimate_variance` sign / zero-estimate cases, and the listing carve-out:
+  a two-page `_limited_repos()` fetch must change `total_requests` while
+  leaving the variance against `estimate_legacy_api_request_count()`
+  untouched.
 - Fixtures `tests/fixtures/email_report_data.json:78` and
   `tests/fixtures/export_report_data.json:97` lack the new keys; render with
   `.get()` defaults so existing `assertIn`-style tests
