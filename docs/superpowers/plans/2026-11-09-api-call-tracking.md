@@ -152,12 +152,19 @@ Matching windows (baseline capture points):
   (`fetch_account_info` / `fetch_rate_limits`, `legacy_report.py:99-101`).
   A builder-entry baseline would miss them while the estimate counts them.
   So: add an optional `baseline_stats: dict | None = None` parameter;
-  `run_legacy_report_session` captures the snapshot before its first fetch
-  and passes it in. The GUI path (`gui_backend.run_legacy_report_data`,
-  `gui_backend.py:361-368`) makes no pre-builder fetches, so it may pass an
-  equivalent snapshot or rely on the default. When `baseline_stats` is None,
-  the builder snapshots at entry and records the narrower scope
-  (`estimate_scope`) so the variance stays honest.
+  `run_legacy_report_session` captures the snapshot before its first
+  API-calling operation (`check_user_scope`, which GETs `/user` when no user
+  payload is passed) and passes it in. The GUI path
+  (`gui_backend.run_legacy_report_data`, `gui_backend.py:361-368`) shares
+  `_init_github_api`, which issues its own pre-builder `GET /user` on the
+  fresh client (`cli_email_report.py:83`) — so a builder-entry default
+  snapshot would exclude that call while the CLI window includes its
+  pre-builder calls. The GUI caller must therefore supply a baseline
+  captured before initialization (a fresh-client zero snapshot is
+  equivalent), never the entry default, preserving comparable counts with
+  the CLI. When `baseline_stats` is None (direct builder use), the builder
+  snapshots at entry and records the narrower scope (`estimate_scope`) so
+  the variance stays honest.
   Carve `_limited_repos()` out of `actual_requests`: snapshot the counter
   around that call (`legacy_report_data.py:234`) and subtract those
   repository-listing page fetches from the delta — including from
