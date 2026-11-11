@@ -265,6 +265,7 @@ def _format_workflow_breakdown_section(data: dict) -> list[str]:
 
 
 def _format_artifact_storage_section(data: dict) -> list[str]:
+    """Format the Actions Artifact Storage section, including per-repo scan errors."""
     artifact_storage = data.get("artifact_storage")
     if not artifact_storage:
         return []

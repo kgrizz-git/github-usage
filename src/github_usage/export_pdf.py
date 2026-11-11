@@ -223,6 +223,7 @@ def _write_sources_page(add_section: AddSectionFn, data: dict) -> None:
 
 
 def _write_artifact_storage_page(add_section: AddSectionFn, data: dict) -> None:
+    """Write the Artifact Storage page, including per-repo scan errors."""
     artifacts = data.get("artifact_storage") or {}
     artifact_repos = artifacts.get("top_repos") or []
     # Error rows first: add_section renders only rows[:_MAX_SECTION_ROWS], and

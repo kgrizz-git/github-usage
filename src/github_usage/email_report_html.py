@@ -77,6 +77,7 @@ def _format_html_actions_section(data: dict) -> list[str]:
 
 
 def _format_html_copilot_section(data: dict) -> list[str]:
+    """Format the Copilot usage section as HTML."""
     copilot = data.get("copilot")
     if not copilot:
         return []
@@ -253,6 +254,7 @@ def _html_artifact_error_rows(errors: dict) -> list[str]:
 
 
 def _format_html_artifact_storage_section(data: dict) -> list[str]:
+    """Format the Actions Artifact Storage section as HTML, including per-repo errors."""
     artifact_storage = data.get("artifact_storage")
     if not artifact_storage:
         return []
