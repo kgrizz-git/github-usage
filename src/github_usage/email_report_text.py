@@ -16,6 +16,7 @@ from .copilot_metering import (
     copilot_usage_summary_lines,
 )
 from .repo_consumers import private_list_is_redundant
+from .report_api_usage import api_usage_lines
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
 from .report_helpers import fmt_price
 from .visibility import (
@@ -447,9 +448,13 @@ def format_report_email(
             lines.extend(formatter(data))
 
     estimate = data.get("api_estimate") or {}
+    usage = api_usage_lines(estimate)
     notes = estimate.get("notes") or []
-    if notes:
-        lines.extend(["REST API Quota Notes", *[f"- {note}" for note in notes], ""])
+    if usage or notes:
+        lines.append("REST API Usage")
+        lines.extend(usage)
+        lines.extend(f"- {note}" for note in notes)
+        lines.append("")
 
     sources = data.get("sources") or {}
     if sources:

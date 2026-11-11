@@ -285,6 +285,33 @@ class ExportPdfTests(unittest.TestCase):
         self.assertIn("linux_4_core *", text)
         self.assertIn("larger runner", text.lower())
 
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_api_usage_page_renders_measured_usage(self) -> None:
+        self.data["api_estimate"] = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "core_limit": 5000,
+            "core_remaining": 4877,
+            "actual_requests_by_resource": {"billing": 120, "user": 1, "rate_limit": 1},
+            "estimate_scope": "repo-sections-only",
+            "from_cache": False,
+            "notes": [],
+        }
+        text = _extract_text(self._save())
+        self.assertIn("API Usage", text)
+        self.assertIn("123 (estimated 120)", text)
+        self.assertIn("Core rate limit", text)
+        self.assertIn(
+            "docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api", text
+        )
+        self.assertIn("Rate-limit docs", text)
+
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_api_usage_page_omitted_without_measurement(self) -> None:
+        text = _extract_text(self._save())
+        self.assertNotIn("API Usage", text)
+
 
 if __name__ == "__main__":
     unittest.main()

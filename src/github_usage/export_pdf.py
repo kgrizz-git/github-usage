@@ -23,6 +23,7 @@ from .export_visibility import (
     storage_summary_label_values,
     visibility_summary_label_values,
 )
+from .report_api_usage import api_usage_rows
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
 from .usage_split import classify_actions_sku
 from .visibility import repo_visibility, visibility_label
@@ -88,6 +89,27 @@ def _write_cover_page(pdf, data: dict) -> None:
     ]:
         pdf.cell(40, 7, f"{label}:", new_x=XPos.END)
         pdf.cell(0, 7, str(value), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+
+def _write_api_usage_page(add_section: AddSectionFn, data: dict) -> None:
+    """Write a REST API Usage page with measured-vs-estimated request counts.
+
+    The docs URL rides on its own row: fixed-width ``pdf.cell`` calls cannot
+    wrap long values, and the full rate-limit line runs past the A4 edge.
+    """
+    estimate = data.get("api_estimate") or {}
+    rows = list(api_usage_rows(estimate))
+    if not rows:
+        return
+    split: list[tuple[str, str]] = []
+    for label, value in rows:
+        if label == "Core rate limit" and "https://" in value:
+            head, _, url = value.partition(" https://")
+            split.append((label, head))
+            split.append(("Rate-limit docs", "https://" + url))
+        else:
+            split.append((label, value))
+    add_section("REST API Usage", split)
 
 
 def _write_actions_page(add_section: AddSectionFn, data: dict) -> None:
@@ -294,6 +316,7 @@ def _write_forecast_page(
 
 
 _SECTION_PAGES = (
+    _write_api_usage_page,
     _write_actions_page,
     _write_copilot_page,
     _write_git_lfs_page,

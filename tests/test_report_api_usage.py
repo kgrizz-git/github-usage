@@ -31,7 +31,7 @@ class ApiUsageLinesTests(unittest.TestCase):
             api_usage_lines(_estimate()),
             [
                 "- Repo requests in estimate scope: 123 (estimated 120)",
-                "- Total requests this fetch: 130",
+                "- Total requests this fetch (retries excluded): 130",
                 "- Core quota remaining before: 4,877 / 5,000",
                 "- Core rate limit: 5,000 requests/hour (authenticated) - "
                 "https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api",
@@ -93,7 +93,7 @@ class ApiUsageLinesTests(unittest.TestCase):
 
     def test_cache_hit_reports_zero_new_requests_with_original_total(self):
         lines = api_usage_lines(_estimate(from_cache=True))
-        self.assertIn("- Total requests (original fetch): 130", lines)
+        self.assertIn("- Total requests (original fetch, retries excluded): 130", lines)
         self.assertIn(
             "- Source: cached report (0 new API requests; 130 total during the original fetch)",
             lines,
@@ -102,7 +102,7 @@ class ApiUsageLinesTests(unittest.TestCase):
     def test_non_numeric_counts_fall_back_to_zero(self):
         lines = api_usage_lines(_estimate(actual_requests="many", total_requests=None))
         self.assertTrue(lines[0].startswith("- Repo requests in estimate scope: 0 "))
-        self.assertEqual(lines[1], "- Total requests this fetch: 0")
+        self.assertEqual(lines[1], "- Total requests this fetch (retries excluded): 0")
 
 
 class ApiUsageRowsTests(unittest.TestCase):
@@ -112,7 +112,7 @@ class ApiUsageRowsTests(unittest.TestCase):
             rows[0],
             ("Repo requests in estimate scope", "123 (estimated 120)"),
         )
-        self.assertEqual(rows[1], ("Total requests this fetch", "130"))
+        self.assertEqual(rows[1], ("Total requests this fetch (retries excluded)", "130"))
         self.assertEqual(rows[-1], ("Source", "live fetch"))
 
     def test_rows_cover_every_line(self):

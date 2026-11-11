@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .copilot_metering import copilot_by_model_quantity_header, copilot_export_primary_row
 from .export_visibility import (
     annotated_sku_breakdown,
     per_visibility_sku_rows,
@@ -22,8 +23,8 @@ from .export_visibility import (
     storage_analysis_export_rows,
     visibility_summary_rows,
 )
+from .report_api_usage import api_usage_rows
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
-from .copilot_metering import copilot_by_model_quantity_header, copilot_export_primary_row
 from .visibility import repo_visibility
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
@@ -282,6 +283,13 @@ def _write_errors_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
         write_sheet("Errors", "Unavailable Data", [[k, v] for k, v in errors.items()])
 
 
+def _write_api_usage_sheet(write_sheet: WriteSheetFn, data: dict) -> None:
+    """Write an API Usage sheet with measured-vs-estimated request counts."""
+    rows = [[label, value] for label, value in api_usage_rows(data.get("api_estimate") or {})]
+    if rows:
+        write_sheet("REST API Usage", "REST API Usage", rows)
+
+
 def _write_forecast_sheet(
     write_sheet: WriteSheetFn, data: dict, *, premium_requests_limit: float | None = None
 ) -> None:
@@ -305,6 +313,7 @@ def _write_forecast_sheet(
 
 _SECTION_WRITERS = (
     _write_metadata_sheet,
+    _write_api_usage_sheet,
     _write_actions_sheet,
     _write_private_usage_sheet,
     _write_copilot_sheet,

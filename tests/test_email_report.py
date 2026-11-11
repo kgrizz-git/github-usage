@@ -704,6 +704,53 @@ class EmailReportTests(unittest.TestCase):
         self.assertIn("Actions Artifact Storage", text)
         self.assertIn("- org/bad: skipped (API error 403)", text)
 
+    def test_api_usage_lines_shown_above_quota_notes_text(self):
+        from github_usage.email_report_text import format_report_email
+
+        estimate = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "estimate_scope": "repo-sections-only",
+            "core_limit": 5000,
+            "core_remaining": 4877,
+            "actual_requests_by_resource": {"billing": 120, "user": 1, "rate_limit": 1},
+            "notes": ["Optional repo-level sections may use about 120 REST API requests."],
+        }
+        body = format_report_email({"api_estimate": estimate}, include_forecast=False)
+        self.assertIn("REST API Usage", body)
+        self.assertIn("- Repo requests in estimate scope: 123 (estimated 120)", body)
+        self.assertIn(
+            "- Core rate limit: 5,000 requests/hour (authenticated) - https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api",
+            body,
+        )
+        self.assertIn("may use about 120 REST API requests", body)
+        # Usage lines precede the quota notes within the section.
+        self.assertLess(body.index("Repo requests in estimate scope"), body.index("may use about"))
+
+    def test_api_usage_section_hidden_without_measurement_or_notes_text(self):
+        from github_usage.email_report_text import format_report_email
+
+        body = format_report_email(
+            {"api_estimate": {"estimated_incremental_requests": 5, "notes": []}},
+            include_forecast=False,
+        )
+        self.assertNotIn("REST API Usage", body)
+
+    def test_cached_report_labels_original_fetch_total_text(self):
+        from github_usage.email_report_text import format_report_email
+
+        estimate = {
+            "actual_requests": 50,
+            "total_requests": 60,
+            "estimated_incremental_requests": 55,
+            "from_cache": True,
+            "notes": [],
+        }
+        body = format_report_email({"api_estimate": estimate}, include_forecast=False)
+        self.assertIn("Total requests (original fetch, retries excluded): 60", body)
+        self.assertIn("0 new API requests", body)
+
     def test_artifact_storage_grouped_by_visibility_html(self):
         from github_usage.email_report_html import _format_html_artifact_storage_section
 
@@ -748,6 +795,37 @@ class EmailReportTests(unittest.TestCase):
         self.assertIn("<h2>Actions Artifact Storage</h2>", joined)
         self.assertIn("<li>org/bad: skipped (API error 403)</li>", joined)
         self.assertNotIn("<ul></ul>", joined)
+
+    def test_api_usage_lines_shown_above_quota_notes_html(self):
+        from github_usage.email_report_html import format_html_report
+
+        estimate = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "estimate_scope": "repo-sections-only",
+            "core_limit": 5000,
+            "core_remaining": 4877,
+            "actual_requests_by_resource": {"billing": 120, "user": 1, "rate_limit": 1},
+            "notes": ["Optional repo-level sections may use about 120 REST API requests."],
+        }
+        html_body = format_html_report({"api_estimate": estimate}, include_forecast=False)
+        self.assertIn("<h2>REST API Usage</h2>", html_body)
+        self.assertIn("<li>Repo requests in estimate scope: 123 (estimated 120)</li>", html_body)
+        self.assertIn("may use about 120 REST API requests", html_body)
+        self.assertLess(
+            html_body.index("Repo requests in estimate scope"),
+            html_body.index("may use about"),
+        )
+
+    def test_api_usage_section_hidden_without_measurement_or_notes_html(self):
+        from github_usage.email_report_html import format_html_report
+
+        html_body = format_html_report(
+            {"api_estimate": {"estimated_incremental_requests": 5, "notes": []}},
+            include_forecast=False,
+        )
+        self.assertNotIn("REST API Usage", html_body)
 
     def test_release_assets_grouped_by_visibility_text(self):
         from github_usage.email_report_text import _format_release_assets_section

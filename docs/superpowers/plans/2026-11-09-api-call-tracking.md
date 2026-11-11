@@ -21,6 +21,8 @@
 > multi-page `page_counts`, GUI test placement); applied the remainder —
 > fallback non-dict/count-combined tests, section-level abort coverage,
 > redaction assertions, `_track_repo_calls`/`deltas` typing, legacy docstring.
+> Chunk 4 in progress — email text/HTML quota blocks, legacy terminal
+> renderer, CSV/XLSX/PDF sections, GUI detail rows; 15 new tests.
 
 # Track GitHub REST API Calls and Report Usage
 
@@ -260,7 +262,7 @@ Suggested content (compact):
 ```
 REST API Usage
 - Repo requests in estimate scope: 123 (estimated 120)
-- Total requests this fetch: 130
+- Total requests this fetch (retries excluded): 130
 - Core quota remaining before: 4,877 / 5,000
 - Core rate limit: 5,000 requests/hour (authenticated) - https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
 - By resource (estimate scope): actions 100, billing 20, repos 1
@@ -472,12 +474,16 @@ which already lists static rate-limit numbers, to include the same docs link.
   abort path tested with fallback re-run; `annotate_cache_hit` covered at all
   three call sites via integration tests; `_track_repo_calls`/`deltas` typed;
   monotonicity documented; GUI test module ordering fixed.
+  **Review 3 (chunk 4):** deepseek verdict pending — chunk-4 review requested.
 - [ ] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
   GUI legacy detail rows; add the rate-limit reference line + docs link;
   tests. Chunk-4 decisions (locked): keep the cached scope line as the original
   measurement (only the total line is relabeled); gate the extended quota
   block on `notes or usage lines` so measured reports with zero notes still
-  render; label totals as requests-issued (retries excluded).
+  render; label totals as requests-issued (retries excluded); HTML docs URL
+  stays plain text (matches text body; mail clients autolink); terminal keeps
+  both quota lines (usage block stays self-contained); PDF splits the docs URL
+  onto its own row (fixed-width cells can't wrap).
 - [ ] Docs (`docs/reports.md`, `docs/email-reports.md`), changelog,
   `scripts/check`, and a final review.
 

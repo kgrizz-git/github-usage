@@ -50,6 +50,39 @@ class LegacyTerminalTests(unittest.TestCase):
         ):
             self.assertIn(heading, output)
 
+    def test_render_api_usage_section_with_measurement(self) -> None:
+        from github_usage.legacy_terminal import render_api_usage
+
+        estimate = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "core_limit": 5000,
+            "core_remaining": 4877,
+            "actual_requests_by_resource": {"billing": 120, "user": 1, "rate_limit": 1},
+            "estimate_scope": "repo-sections-only",
+            "from_cache": False,
+        }
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            render_api_usage(estimate)
+        output = buffer.getvalue()
+        self.assertIn("REST API Usage", output)
+        self.assertIn("123 (estimated 120)", output)
+        self.assertIn("Core rate limit", output)
+        self.assertIn(
+            "docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api", output
+        )
+
+    def test_render_api_usage_silent_without_measurement(self) -> None:
+        from github_usage.legacy_terminal import render_api_usage
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            render_api_usage({})
+            render_api_usage(None)
+        self.assertEqual(buffer.getvalue(), "")
+
     def test_render_forecast_includes_projected_minutes(self) -> None:
         from datetime import date
 

@@ -156,9 +156,9 @@ def api_usage_lines(estimate: dict | None) -> list[str]:
     estimated = estimate.get("estimated_incremental_requests") or 0
     total = estimate.get("total_requests") or 0
     if estimate.get("from_cache"):
-        total_label = "Total requests (original fetch)"
+        total_label = "Total requests (original fetch, retries excluded)"
     else:
-        total_label = "Total requests this fetch"
+        total_label = "Total requests this fetch (retries excluded)"
     lines = [
         f"- {_scope_label(estimate)}: {_fmt_count(actual)} (estimated {_fmt_count(estimated)})",
         f"- {total_label}: {_fmt_count(total)}",

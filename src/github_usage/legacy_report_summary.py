@@ -6,6 +6,7 @@ from typing import Any
 
 from .copilot_metering import _effective_metering
 from .repo_consumers import private_list_is_redundant
+from .report_api_usage import api_usage_rows
 from .report_forecast_data import build_report_forecast
 from .report_helpers import fmt_price
 from .visibility import repo_visibility, visibility_label
@@ -253,7 +254,9 @@ def _forecast_rows(
             premium_line += f" ({premium['projected'] / premium_requests_limit * 100:.1f}%)"
         rows.append((f"Projected {copilot_label.lower()} at month end", premium_line))
     else:
-        rows.append((f"Projected {copilot_label.lower()} at month end", f"{premium['projected']:.1f}"))
+        rows.append(
+            (f"Projected {copilot_label.lower()} at month end", f"{premium['projected']:.1f}")
+        )
 
     return rows
 
@@ -442,6 +445,14 @@ def _repo_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     return rows
 
 
+def _api_usage_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
+    """API usage rows (section header + label/value rows, empty when unmeasured)."""
+    rows = api_usage_rows(data.get("api_estimate") or {})
+    if not rows:
+        return []
+    return [_section("REST API Usage"), *rows]
+
+
 def _tail_rows(data: dict[str, Any]) -> list[tuple[str, str]]:
     """Copilot, LFS, insights, warnings, and section-error rows."""
     rows: list[tuple[str, str]] = []
@@ -510,6 +521,7 @@ def legacy_report_detail_rows(
             reference_date=reference_date,
         ),
         *_repo_rows(data),
+        *_api_usage_rows(data),
         *_tail_rows(data),
     ]
 
