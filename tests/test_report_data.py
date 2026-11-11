@@ -355,7 +355,11 @@ class ReportDataTests(unittest.TestCase):
                     "/users/octocat/settings/billing/usage/summary",
                     (("product", "Copilot"),),
                 ): {"usageItems": []},
-                ("GET", "/users/octocat/settings/billing/ai_credit/usage", (("product", "copilot"),)): {
+                (
+                    "GET",
+                    "/users/octocat/settings/billing/ai_credit/usage",
+                    (("product", "copilot"),),
+                ): {
                     "usageItems": [
                         {
                             "model": "gpt-4.1",
