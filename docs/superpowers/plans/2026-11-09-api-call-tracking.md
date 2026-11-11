@@ -8,7 +8,10 @@
 > counting (`request_count`, `request_log`, ordered resource buckets) plus
 > `get_request_stats()` and unit tests; reviewed APPROVE with minor findings
 > folded in (structural sum==total, segment-based actions match, TypedDicts,
-> dense zeroed buckets, normalized-path/params/404 tests).
+> dense zeroed buckets, normalized-path/params/404 tests). Chunk 2 complete
+> 2026-11-11 — `report_api_usage.py` shared lines/rows formatters with scope
+> labels, rate-limit reference line, and cache-hit message; 9 unit tests at
+> 100% file coverage.
 
 # Track GitHub REST API Calls and Report Usage
 
@@ -238,25 +241,31 @@ Add a shared formatter module `src/github_usage/report_api_usage.py` with one
 pure lines function plus a shared rows adapter, matching the existing
 `email_actions_table_rows` convention (`_email_report_common.py:30-39`):
 
-- `api_usage_lines(estimate: dict) -> list[str]`
-- `api_usage_rows(estimate: dict) -> list[tuple[str, str]]` derived from the
+- `api_usage_lines(estimate: dict | None) -> list[str]`
+- `api_usage_rows(estimate: dict | None) -> list[tuple[str, str]]` derived from the
   lines (label/value pairs for HTML tables, CSV, XLSX, PDF).
 
 Suggested content (compact):
 
 ```
 REST API Usage
-- Requests in estimate scope: 123 (estimated 120)
+- Repo requests in estimate scope: 123 (estimated 120)
 - Total requests this fetch: 130
 - Core quota remaining before: 4,877 / 5,000
-- Core rate limit: 5,000 requests/hour (authenticated) — https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
-- By resource (estimate scope): billing 20, repos 1, actions 100, rate_limit 1, other 1
+- Core rate limit: 5,000 requests/hour (authenticated) - https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
+- By resource (estimate scope): actions 100, billing 20, repos 1
 - Source: live fetch
 ```
 
-The scope label comes from `estimate_scope`: email renderers qualify it as
-repo-level scope (`Repo-level requests in estimate scope:`), legacy renderers
-as account-level-inclusive scope.
+The scope label comes from `estimate_scope`: email renderers show
+`Repo requests in estimate scope:`, legacy renderers show
+`All requests in estimate scope:`, and unknown scopes fall back to the
+neutral `Requests in estimate scope:`. Scope strings live as
+`SCOPE_REPO_SECTIONS` / `SCOPE_FULL_REPORT` constants in
+`report_api_usage.py` so builders import them instead of re-typing.
+Formatters return no lines when the estimate carries no measurement keys,
+zero-count buckets are omitted from the breakdown, and all strings are
+ASCII-only (the PDF writer uses core Helvetica, which has no em dash).
 
 On a cache hit: `- Source: cached report (0 new API requests; 130 total during the original fetch)`.
 
@@ -416,13 +425,20 @@ which already lists static rate-limit numbers, to include the same docs link.
   **Done:** 2026-11-11 — counter, per-resource log, and stats merged in
   `api.py`; 9 unit tests (incl. failure/transport, pagination, buckets);
   reviewer minors applied (no functional deviations).
-- [ ] Add `report_api_usage.py` (lines + rows adapter); cover the new file's 82%
+- [x] Add `report_api_usage.py` (lines + rows adapter); cover the new file's 82%
   coverage gate.
+  **Done:** 2026-11-11 — shared `api_usage_lines`/`api_usage_rows` with scope
+  labels, quota/rate-limit/breakdown/source lines; 9 unit tests at 100% file
+  coverage.
+  **Review:** deepseek APPROVE with follow-ups applied — ASCII-only strings
+  (PDF-safe), absent-measurement gate returning no lines, zero-bucket filter,
+  cached total label, shared `SCOPE_*` constants, shorter PDF-safe labels.
 - [ ] Merge repo-level-delta actual usage into `api_estimate` in both builders
-  (email: per-getter snapshots around repo-level getters; legacy:
-  caller-passed `baseline_stats` full-snapshot subtraction incl. per-resource);
-  bump `CACHE_VERSION` (plus the test pin); add `annotate_cache_hit()` at all
-  three sites; tests.
+  (email: per-getter snapshots around repo-level getters, using the shared
+  `SCOPE_*` constants for `estimate_scope`; legacy: caller-passed
+  `baseline_stats` full-snapshot subtraction incl. per-resource, minus the
+  `_limited_repos` listing calls); bump `CACHE_VERSION` (plus the test pin);
+  add `annotate_cache_hit()` at all three sites; tests.
 - [ ] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
   GUI legacy detail rows; add the rate-limit reference line + docs link;
   tests.
