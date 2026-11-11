@@ -1,4 +1,4 @@
-> **Status:** IN PROGRESS
+> **Status:** COMPLETE
 
 > Line numbers cited below are accurate as of 2026-11-09; relocate by anchor (function / section title / dict key) if they drift.
 >
@@ -21,8 +21,14 @@
 > multi-page `page_counts`, GUI test placement); applied the remainder —
 > fallback non-dict/count-combined tests, section-level abort coverage,
 > redaction assertions, `_track_repo_calls`/`deltas` typing, legacy docstring.
-> Chunk 4 in progress — email text/HTML quota blocks, legacy terminal
-> renderer, CSV/XLSX/PDF sections, GUI detail rows; 15 new tests.
+> Chunk 4 complete 2026-11-11 — email text/HTML quota blocks, legacy terminal
+> renderer, CSV/XLSX/PDF sections, GUI detail rows; 15 new tests; deepseek
+> APPROVE with follow-ups applied. Grok pre-PR review (high, plan mode):
+> REQUEST CHANGES with one major (PDF label-column overprint — fixed with
+> label/value split rows) and one minor (static rate-limit list docs link —
+> fixed); committed as follow-up. Docs complete 2026-11-11 —
+> `reports.md`, `email-reports.md`, CHANGELOG `Added` entry, full
+> `scripts/check` green; plan archived.
 
 # Track GitHub REST API Calls and Report Usage
 
@@ -494,8 +500,12 @@ which already lists static rate-limit numbers, to include the same docs link.
   empty label/value rows) and one minor (static `render_what_else`
   rate-limit list missing the docs link — fixed). Nits recorded as
   follow-ups, not blockers.
-- [ ] Docs (`docs/reports.md`, `docs/email-reports.md`), changelog,
+- [x] Docs (`docs/reports.md`, `docs/email-reports.md`), changelog,
   `scripts/check`, and a final review.
+  **Done:** 2026-11-11 — REST API Usage section documented in `reports.md`
+  (JSON `api_estimate` fields enumerated), rate-limit troubleshooting pointer
+  in `email-reports.md`, CHANGELOG `Added` entry under `[Unreleased]`;
+  `scripts/check` and `scripts/docs-check` green.
 
 ## Related follow-ups (out of scope here)
 

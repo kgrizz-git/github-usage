@@ -8,6 +8,8 @@ After [authenticating](setup.md#authentication), run a local full report with `.
 
 `--include-consumers`, `--include-artifact-storage`, and `--include-release-assets` add repo-level API calls. They consume GitHub REST API request quota, not Actions minutes, Actions storage, Copilot requests, Git LFS quota, or billable GitHub usage. Use monthly schedules and conservative `--max-repos` values for accounts with many repositories.
 
+Every report also measures its own REST API footprint. Email quota blocks, terminal output, CSV/XLSX/PDF exports, and TUI detail rows carry a **REST API Usage** section, and the JSON `api_estimate` object carries the same data: measured requests in the estimate scope vs the pre-fetch estimate, total requests issued (retries excluded), core quota remaining at report start, the core rate limit (live limit when available, else GitHub's documented 5,000/hour) with a link to [GitHub's rate-limit docs](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), a per-resource breakdown, and the source (live fetch, or cached report with the original-fetch total). Counts are logical requests issued, not raw HTTP attempts — retries are excluded.
+
 With `--include-consumers` (local full report and email), the **repo consumers** sections rank repositories by Actions usage alongside the existing combined top-by-minutes and top-by-cost lists:
 
 - **Overall top-by-storage** — billed Actions storage ranked by average MB (`storage_avg_mb` from the billing API).
@@ -62,7 +64,10 @@ exporting). Export redaction is partial; see [Privacy](#privacy) before sharing 
 - **CSV** writes a UTF-8 BOM at the start of the file for Excel-on-Windows
   compatibility.
 - **JSON** preserves the full `ReportData` dict, including the `api_estimate`
-  metadata. Datetime values are emitted as ISO-8601 strings.
+  metadata (measured `actual_requests` / `total_requests`,
+  `actual_requests_by_resource`, `estimate_variance`, `estimate_scope` when
+  the window is explicit, `from_cache`). Datetime values are emitted as
+  ISO-8601 strings.
 - **XLSX** uses one sheet per major report section. Sheet names are truncated
   to 31 characters (Excel limit). Values starting with `=`, `+`, `-`, or `@`
   are prefixed with a single quote to prevent Excel formula injection.

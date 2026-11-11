@@ -135,7 +135,7 @@ The email command supports the options below. Run `./start.sh email-report --hel
 - Missing GitHub `user` scope: billing endpoints may return 404. Fix GitHub CLI auth with `gh auth refresh -h github.com -s user`, or use a PAT with the `user` scope.
 - GitHub Actions token confusion: use `GH_USAGE_TOKEN`, not the automatic `GITHUB_TOKEN`.
 - Resend domain unverified: set `RESEND_FROM` to an address on a verified Resend domain.
-- Rate limiting: reduce frequency, lower `--max-repos`, avoid repo-level options, or use skip flags.
+- Rate limiting: reduce frequency, lower `--max-repos`, avoid repo-level options, or use skip flags. The report's REST API Usage section shows how many requests each run issued; see [Reports and exports](reports.md).
 - Consumer breakdown truncation: increase `--max-repos` cautiously.
 - Artifact storage request cost: `--include-artifact-storage` can add roughly one REST API request per scanned repository.
 - Release asset inventory: `--include-release-assets` can add roughly one REST API request per scanned repository and requires explicit confirmation.
