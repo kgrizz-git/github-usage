@@ -304,6 +304,30 @@ class RequestCountingTests(unittest.TestCase):
             sum(stats["actual_requests_by_resource"].values()), stats["actual_requests"]
         )
 
+    def test_request_logs_bare_path_but_transmits_inline_query(self):
+        from github_usage.api import GitHubAPI
+
+        for caller in ("request", "request_raw"):
+            with self.subTest(caller=caller):
+                api = GitHubAPI("fake-token")
+                conn = self._conn()
+                with mock.patch(
+                    "github_usage.http_retry.http.client.HTTPSConnection",
+                    return_value=conn,
+                ):
+                    getattr(api, caller)("GET", "/user/repos?per_page=100")
+
+                # The log (and therefore the stats buckets) sees the bare
+                # path, so the listing still classifies as repos with an
+                # inline query string — and never double-counts as user.
+                self.assertEqual(api.request_log[0]["path"], "/user/repos")
+                by_resource = api.get_request_stats()["actual_requests_by_resource"]
+                self.assertEqual(by_resource["repos"], 1)
+                self.assertEqual(by_resource["user"], 0)
+                # The wire keeps the original URL byte-identical.
+                _, url = conn.request.call_args.args[:2]
+                self.assertEqual(url, "/user/repos?per_page=100")
+
     def test_not_found_records_status(self):
         from github_usage.api import GitHubAPI
 

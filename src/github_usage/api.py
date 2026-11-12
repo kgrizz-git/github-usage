@@ -33,6 +33,14 @@ _COLLECTION_KEYS = ("workflow_runs", "artifacts", "workflows")
 _RESOURCE_BUCKETS = ("billing", "user", "rate_limit", "actions", "repos", "other")
 
 
+def _loggable_path(url: str) -> str:
+    """Return the bare path for request logging (stats buckets match on paths).
+
+    Any inline query string is stripped; the full URL is still transmitted.
+    """
+    return url.split("?", 1)[0]
+
+
 # Resource buckets for request stats, evaluated in order: billing paths start
 # with ``/users/...`` so billing must be matched before the user prefix.
 def _classify_request_path(path: str) -> str:
@@ -108,7 +116,7 @@ class GitHubAPI:
         url = path
         if not url.startswith("/"):
             url = "/" + url
-        entry = self._record_request_start(method, url)
+        entry = self._record_request_start(method, _loggable_path(url))
 
         if params:
             query = urllib.parse.urlencode(params)
@@ -157,7 +165,7 @@ class GitHubAPI:
         url = path
         if not url.startswith("/"):
             url = "/" + url
-        entry = self._record_request_start(method, url)
+        entry = self._record_request_start(method, _loggable_path(url))
 
         if params:
             query = urllib.parse.urlencode(params)
