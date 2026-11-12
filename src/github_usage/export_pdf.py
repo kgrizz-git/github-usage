@@ -60,7 +60,7 @@ def _make_pdf_writer(pdf):
         for label, value in rows[:_MAX_SECTION_ROWS]:
             if not label:
                 pdf.cell(0, 7, str(value), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            elif not value:
+            elif value == "" or value is None:
                 pdf.cell(0, 7, f"{label}:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             else:
                 pdf.cell(60, 7, f"{label}:", new_x=XPos.END)

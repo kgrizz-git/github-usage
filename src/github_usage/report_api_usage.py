@@ -150,7 +150,7 @@ def api_usage_lines(estimate: dict | None) -> list[str]:
     Returns no lines when the estimate carries no measurement, so
     pre-measurement reports render nothing rather than zeros.
     """
-    if not estimate or not _measured(estimate):
+    if not isinstance(estimate, dict) or not _measured(estimate):
         return []
     actual = estimate.get("actual_requests") or 0
     estimated = estimate.get("estimated_incremental_requests") or 0

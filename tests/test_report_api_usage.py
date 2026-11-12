@@ -1,4 +1,5 @@
 import unittest
+from typing import Any
 
 from github_usage.report_api_usage import (
     _finalize_api_estimate,
@@ -53,6 +54,13 @@ class ApiUsageLinesTests(unittest.TestCase):
         # as measured zeros.
         self.assertEqual(api_usage_lines({}), [])
         self.assertEqual(api_usage_lines(None), [])
+
+    def test_non_dict_estimate_renders_no_lines(self):
+        # Invalid estimate payloads (e.g. a stale-cache str/int) render
+        # nothing rather than raising on `in`/`get`.
+        for bad in (5, "estimate", ["actual_requests"]):
+            estimate: Any = bad
+            self.assertEqual(api_usage_lines(estimate), [])
         self.assertEqual(
             api_usage_lines(
                 {

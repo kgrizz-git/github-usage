@@ -335,6 +335,21 @@ class ExportPdfTests(unittest.TestCase):
         self.assertIn("130", values)
 
     @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_add_section_renders_numeric_zero_value(self) -> None:
+        from fpdf import FPDF
+
+        from github_usage.export_pdf import _make_pdf_writer
+
+        pdf = FPDF()
+        add_section, _fmt = _make_pdf_writer(pdf)
+        add_section("T", [("Count", 0)])
+        buf = io.BytesIO()
+        pdf.output(buf)
+        text = _extract_text(buf.getvalue())
+        self.assertIn("Count:", text)
+        self.assertIn("0", text)
+
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
     def test_api_usage_page_omitted_without_measurement(self) -> None:
         text = _extract_text(self._save())
         self.assertNotIn("API Usage", text)
