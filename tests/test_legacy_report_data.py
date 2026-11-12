@@ -462,12 +462,13 @@ class LegacyApiUsageMergeTests(unittest.TestCase):
 
         repos = [_repo("r1"), _repo("r2")]
         api = CountingFakeAPI(pages_responses={"/user/repos": repos})
+        # No account/rate_limits passed: the builder fetches GET /user and
+        # GET /rate_limit itself, so those calls must land in the measured
+        # buckets (not just in the total via arithmetic).
         report = build_legacy_report_data(
             api,
             "octocat",
             max_repos=10,
-            account=self._account(),
-            rate_limits=self._rate_limits(),
             baseline_stats={"actual_requests": 0, "actual_requests_by_resource": {}},
         )
         estimate = report["api_estimate"]
@@ -476,6 +477,9 @@ class LegacyApiUsageMergeTests(unittest.TestCase):
         listing_calls = sum(1 for entry in api.request_log if entry["path"] == "/user/repos")
         self.assertEqual(listing_calls, 1)
         self.assertEqual(estimate["total_requests"] - estimate["actual_requests"], 1)
+        by_resource = estimate["actual_requests_by_resource"]
+        self.assertEqual(by_resource["user"], 1)
+        self.assertEqual(by_resource["rate_limit"], 2)
         self.assertEqual(
             sum(estimate["actual_requests_by_resource"].values()),
             estimate["actual_requests"],

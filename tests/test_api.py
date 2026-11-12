@@ -418,6 +418,7 @@ class RequestCountingTests(unittest.TestCase):
         paths = [
             "/user",
             "/user/repos",
+            "/user/repos/octocat",
             "/rate_limit",
             "/users/octocat/settings/billing/usage/summary",
             "/repos/octocat/repo/actions/artifacts",
@@ -432,17 +433,19 @@ class RequestCountingTests(unittest.TestCase):
                 api.request("GET", path)
 
         stats = api.get_request_stats()
-        self.assertEqual(stats["actual_requests"], 7)
+        self.assertEqual(stats["actual_requests"], 8)
         # Billing lives under /users/ but buckets by its /settings/billing/
         # segment; the billing branch stays first as defensive ordering.
+        # The repository listing (/user/repos, incl. sub-paths) buckets as
+        # repos, not user.
         self.assertEqual(
             stats["actual_requests_by_resource"],
             {
-                "user": 2,
+                "user": 1,
                 "rate_limit": 1,
                 "billing": 1,
                 "actions": 1,
-                "repos": 1,
+                "repos": 3,
                 "other": 1,
             },
         )

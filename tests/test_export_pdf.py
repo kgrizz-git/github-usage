@@ -308,25 +308,31 @@ class ExportPdfTests(unittest.TestCase):
 
     def test_api_usage_page_splits_labels_from_values(self) -> None:
         from github_usage.export_pdf import _write_api_usage_page
+        from github_usage.report_api_usage import api_usage_rows
 
+        estimate = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "estimate_scope": "repo-sections-only",
+        }
         rows: list = []
         _write_api_usage_page(
             lambda title, section_rows: rows.extend(section_rows),
-            {
-                "api_estimate": {
-                    "actual_requests": 123,
-                    "total_requests": 130,
-                    "estimate_scope": "repo-sections-only",
-                }
-            },
+            {"api_estimate": estimate},
         )
+        # Every entry renders as a label line followed by its value line,
+        # with the value preserved (not dropped) on its own row.
+        expected: list = []
+        for label, value in api_usage_rows(estimate):
+            expected.append((label, ""))
+            expected.append(("", value))
+        self.assertEqual(rows, expected)
         labels = [label for label, _value in rows]
         self.assertIn("Repo requests in estimate scope", labels)
-        # Every entry renders as a label line followed by its value line.
-        self.assertEqual(len(rows) % 2, 0)
-        for label_row, value_row in zip(rows[::2], rows[1::2], strict=False):
-            self.assertEqual(value_row[0], "")
-            self.assertEqual(label_row[1], "")
+        values = [value for _label, value in rows]
+        self.assertIn("123 (estimated 120)", values)
+        self.assertIn("130", values)
 
     @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
     def test_api_usage_page_omitted_without_measurement(self) -> None:

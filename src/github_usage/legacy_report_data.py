@@ -214,6 +214,41 @@ def premium_from_copilot(copilot: dict | None) -> dict | None:
     }
 
 
+def _fetch_legacy_billing_sections(
+    api: GitHubAPIClient, username: str, report: dict, errors: dict
+) -> None:
+    """Fetch monthly costs, Copilot premium/billing, and LFS billing sections.
+
+    Mutates ``report`` and ``errors`` in place. Split out of
+    :func:`build_legacy_report_data` to keep that builder readable.
+    """
+    try:
+        report["monthly_costs"] = get_monthly_costs(api, username)
+    except RuntimeError as exc:
+        errors["monthly_costs"] = str(exc)
+        report["monthly_costs"] = {
+            "actions": _empty_cost(),
+            "copilot": _empty_cost(),
+            "git_lfs": _empty_cost(),
+            "total": _empty_cost(),
+        }
+
+    try:
+        report["copilot_premium"] = get_premium_request_usage(api, username)
+    except RuntimeError as exc:
+        errors["copilot_premium"] = str(exc)
+
+    try:
+        report["copilot_billing"] = get_billing_summary(api, username, "Copilot")
+    except RuntimeError as exc:
+        errors["copilot_billing"] = str(exc)
+
+    try:
+        report["lfs_billing"] = get_billing_summary(api, username, "git_lfs")
+    except RuntimeError as exc:
+        errors["lfs_billing"] = str(exc)
+
+
 def build_legacy_report_data(
     api: GitHubAPIClient,
     username: str,
@@ -346,31 +381,7 @@ def build_legacy_report_data(
         report["storage_summary"] = storage_summary
     report["sources"] = dict(REPORT_SOURCES)
 
-    try:
-        report["monthly_costs"] = get_monthly_costs(api, username)
-    except RuntimeError as exc:
-        errors["monthly_costs"] = str(exc)
-        report["monthly_costs"] = {
-            "actions": _empty_cost(),
-            "copilot": _empty_cost(),
-            "git_lfs": _empty_cost(),
-            "total": _empty_cost(),
-        }
-
-    try:
-        report["copilot_premium"] = get_premium_request_usage(api, username)
-    except RuntimeError as exc:
-        errors["copilot_premium"] = str(exc)
-
-    try:
-        report["copilot_billing"] = get_billing_summary(api, username, "Copilot")
-    except RuntimeError as exc:
-        errors["copilot_billing"] = str(exc)
-
-    try:
-        report["lfs_billing"] = get_billing_summary(api, username, "git_lfs")
-    except RuntimeError as exc:
-        errors["lfs_billing"] = str(exc)
+    _fetch_legacy_billing_sections(api, username, report, errors)
 
     report["api_estimate"] = _merge_legacy_api_estimate(
         report.get("api_estimate") or {},

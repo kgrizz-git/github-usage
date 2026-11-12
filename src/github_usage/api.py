@@ -27,9 +27,9 @@ class _RequestLogEntry(TypedDict):
 # GitHub list endpoints that return {total_count, <collection>: [...]} instead of a bare array.
 _COLLECTION_KEYS = ("workflow_runs", "artifacts", "workflows")
 
-# All stats resource buckets, in classification order. Billing paths live
-# under ``/users/...``, so billing is matched by its ``/settings/billing/``
-# segment first (defensive ordering).
+# All stats resource buckets with zeroed counts. Billing paths live under
+# ``/users/...`` and the repository listing lives under ``/user/repos``,
+# so both are matched before the general ``/user`` prefix below.
 _RESOURCE_BUCKETS = ("billing", "user", "rate_limit", "actions", "repos", "other")
 
 
@@ -39,6 +39,8 @@ def _classify_request_path(path: str) -> str:
     """Map a request path to a stats resource bucket."""
     if "/settings/billing/" in path:
         return "billing"
+    if path == "/user/repos" or path.startswith("/user/repos/"):
+        return "repos"
     if path == "/user" or path.startswith("/user/"):
         return "user"
     if path.startswith("/rate_limit"):
@@ -93,7 +95,7 @@ class GitHubAPI:
         (raw paths) never enter report data, since they would bypass the
         export redaction layer.
         """
-        by_resource: dict[str, int] = {bucket: 0 for bucket in _RESOURCE_BUCKETS}
+        by_resource: dict[str, int] = dict.fromkeys(_RESOURCE_BUCKETS, 0)
         for entry in self.request_log:
             bucket = _classify_request_path(entry["path"])
             by_resource[bucket] = by_resource.get(bucket, 0) + 1

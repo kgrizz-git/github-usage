@@ -99,7 +99,7 @@ class CountingFakeAPI(FakeAPI):
         return super().get_all_pages(path, params, limit)
 
     def get_request_stats(self):
-        by_resource = {bucket: 0 for bucket in _RESOURCE_BUCKETS}
+        by_resource: dict[str, int] = dict.fromkeys(_RESOURCE_BUCKETS, 0)
         for entry in self.request_log:
             bucket = _classify_request_path(entry["path"])
             by_resource[bucket] = by_resource.get(bucket, 0) + 1

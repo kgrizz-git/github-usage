@@ -298,9 +298,13 @@ def _fetch_sections(
     report: dict,
     errors: dict,
     runs_cache: dict,
-    repo_deltas: list,
-) -> None:
-    """Populate the per-section keys on ``report`` and record errors. Mutates both dicts in place."""
+) -> list[tuple[dict, dict]]:
+    """Populate the per-section keys on ``report`` and record errors.
+
+    Mutates both dicts in place. Returns the per-getter (before, after)
+    stats snapshots for the API-usage merge.
+    """
+    repo_deltas: list[tuple[dict, dict]] = []
     for key, enabled, getter in [
         ("actions", include_actions, lambda: get_actions_usage(api, username)),
         ("copilot", include_copilot, lambda: get_copilot_usage(api, username)),
@@ -368,6 +372,8 @@ def _fetch_sections(
             repo_deltas,
         )
 
+    return repo_deltas
+
 
 def build_report_data(
     api: GitHubAPIClient,
@@ -432,8 +438,7 @@ def build_report_data(
     }
 
     runs_cache: dict = {}
-    repo_deltas: list = []
-    _fetch_sections(
+    repo_deltas = _fetch_sections(
         api,
         username,
         repos,
@@ -447,7 +452,6 @@ def build_report_data(
         report=report,
         errors=errors,
         runs_cache=runs_cache,
-        repo_deltas=repo_deltas,
     )
 
     if include_actions and report.get("actions") is not None:
