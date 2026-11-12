@@ -26,6 +26,7 @@ from .copilot_metering import (
     copilot_usage_summary_lines,
 )
 from .repo_consumers import private_list_is_redundant
+from .report_api_usage import api_usage_rows
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
 from .report_helpers import fmt_price
 from .visibility import (
@@ -447,11 +448,14 @@ def _html_warning_block(warnings: list) -> list[str]:
     return parts
 
 
-def _html_api_notes_block(estimate: dict) -> list[str]:
+def _html_api_usage_block(estimate: dict) -> list[str]:
+    usage = api_usage_rows(estimate)
     notes = estimate.get("notes") or []
-    if not notes:
+    if not usage and not notes:
         return []
-    parts = ["<h2>REST API Quota Notes</h2>", "<ul>"]
+    parts = ["<h2>REST API Usage</h2>", "<ul>"]
+    for label, value in usage:
+        parts.append(f"<li>{html.escape(label)}: {html.escape(value)}</li>")
     for note in notes:
         parts.append(f"<li>{html.escape(note)}</li>")
     parts.append(_UL_CLOSE)
@@ -508,7 +512,7 @@ def format_html_report(
             )
         else:
             parts.extend(formatter(data))
-    parts.extend(_html_api_notes_block(data.get("api_estimate") or {}))
+    parts.extend(_html_api_usage_block(data.get("api_estimate") or {}))
     parts.extend(_html_sources_block(data.get("sources") or {}))
     parts.append(_HTML_DOCUMENT_TAIL)
     return "".join(parts)

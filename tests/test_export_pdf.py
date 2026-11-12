@@ -285,6 +285,75 @@ class ExportPdfTests(unittest.TestCase):
         self.assertIn("linux_4_core *", text)
         self.assertIn("larger runner", text.lower())
 
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_api_usage_page_renders_measured_usage(self) -> None:
+        self.data["api_estimate"] = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "core_limit": 5000,
+            "core_remaining": 4877,
+            "actual_requests_by_resource": {"billing": 120, "user": 1, "rate_limit": 1},
+            "estimate_scope": "repo-sections-only",
+            "from_cache": False,
+            "notes": [],
+        }
+        text = _extract_text(self._save())
+        self.assertIn("API Usage", text)
+        self.assertIn("123 (estimated 120)", text)
+        self.assertIn("Core rate limit", text)
+        self.assertIn(
+            "docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api", text
+        )
+
+    def test_api_usage_page_splits_labels_from_values(self) -> None:
+        from github_usage.export_pdf import _write_api_usage_page
+        from github_usage.report_api_usage import api_usage_rows
+
+        estimate = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "estimate_scope": "repo-sections-only",
+        }
+        rows: list = []
+        _write_api_usage_page(
+            lambda title, section_rows: rows.extend(section_rows),
+            {"api_estimate": estimate},
+        )
+        # Every entry renders as a label line followed by its value line,
+        # with the value preserved (not dropped) on its own row.
+        expected: list = []
+        for label, value in api_usage_rows(estimate):
+            expected.append((label, ""))
+            expected.append(("", value))
+        self.assertEqual(rows, expected)
+        labels = [label for label, _value in rows]
+        self.assertIn("Repo requests in estimate scope", labels)
+        values = [value for _label, value in rows]
+        self.assertIn("123 (estimated 120)", values)
+        self.assertIn("130", values)
+
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_add_section_renders_numeric_zero_value(self) -> None:
+        from fpdf import FPDF
+
+        from github_usage.export_pdf import _make_pdf_writer
+
+        pdf = FPDF()
+        add_section, _fmt = _make_pdf_writer(pdf)
+        add_section("T", [("Count", 0)])
+        buf = io.BytesIO()
+        pdf.output(buf)
+        text = _extract_text(buf.getvalue())
+        self.assertIn("Count:", text)
+        self.assertIn("0", text)
+
+    @unittest.skipUnless(_has_pypdf(), "pypdf not installed (text checks skipped)")
+    def test_api_usage_page_omitted_without_measurement(self) -> None:
+        text = _extract_text(self._save())
+        self.assertNotIn("API Usage", text)
+
 
 if __name__ == "__main__":
     unittest.main()

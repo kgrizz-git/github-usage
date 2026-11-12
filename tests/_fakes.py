@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import subprocess
 
+from github_usage.api import _RESOURCE_BUCKETS, _classify_request_path
+
 
 class FakeSleeper:
     def __init__(self):
@@ -55,6 +57,56 @@ class FakeAPI:
         del limit  # tests return preconfigured pages regardless of limit
         self.requests.append(("PAGES", path, params or {}))
         return self._pages_responses.get(path, [])
+
+
+class CountingFakeAPI(FakeAPI):
+    """FakeAPI that counts logical calls like GitHubAPI.
+
+    Counts every ``request`` and every ``get_all_pages`` page (via
+    ``page_counts`` for multi-page listings) and exposes
+    ``get_request_stats()`` with the same per-resource buckets as the real
+    client, so builder merge math can be tested with deterministic
+    positive counts.
+    """
+
+    def __init__(self, request_responses=None, pages_responses=None, page_counts=None):
+        """Optionally pass ``page_counts`` mapping a path to the number of
+        paginated calls ``get_all_pages`` should record for it, modelling a
+        multi-page listing against a single payload."""
+        super().__init__(request_responses, pages_responses)
+        self._page_counts = page_counts or {}
+        self.request_count = 0
+        self.request_log: list = []
+
+    def _record(self, method, path):
+        entry = {"method": method, "path": path, "status": 200}
+        self.request_count += 1
+        self.request_log.append(entry)
+        return entry
+
+    def request(self, method, path, params=None):
+        entry = self._record(method, path)
+        try:
+            return super().request(method, path, params)
+        except Exception:
+            entry["status"] = None
+            raise
+
+    def get_all_pages(self, path, params=None, limit=None):
+        # Mirror the real client's per-page counting: one log entry per page.
+        for _ in range(self._page_counts.get(path, 1)):
+            self._record("GET", path)
+        return super().get_all_pages(path, params, limit)
+
+    def get_request_stats(self):
+        by_resource: dict[str, int] = dict.fromkeys(_RESOURCE_BUCKETS, 0)
+        for entry in self.request_log:
+            bucket = _classify_request_path(entry["path"])
+            by_resource[bucket] = by_resource.get(bucket, 0) + 1
+        return {
+            "actual_requests": self.request_count,
+            "actual_requests_by_resource": by_resource,
+        }
 
 
 class FakeGit:

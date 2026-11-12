@@ -192,6 +192,41 @@ class LegacyReportSummaryTests(unittest.TestCase):
         metrics = [metric for metric, _value in rows]
         self.assertNotIn("── Forecast ──", metrics)
 
+    def test_detail_rows_include_api_usage_section(self) -> None:
+        data = {
+            "monthly_costs": {"total": {"net": 0.0}},
+            "api_estimate": {
+                "actual_requests": 123,
+                "total_requests": 130,
+                "estimated_incremental_requests": 120,
+                "core_limit": 5000,
+                "core_remaining": 4877,
+                "actual_requests_by_resource": {"billing": 120, "user": 1, "rate_limit": 1},
+                "estimate_scope": "repo-sections-only",
+                "from_cache": False,
+                "notes": [],
+            },
+            "errors": {},
+        }
+        rows = legacy_report_detail_rows(data, "octocat")
+        metrics = [metric for metric, _value in rows]
+        self.assertIn("── REST API Usage ──", metrics)
+        by_label = dict(rows)
+        self.assertEqual(by_label.get("Repo requests in estimate scope"), "123 (estimated 120)")
+        self.assertEqual(by_label.get("Total requests this fetch (retries excluded)"), "130")
+        self.assertIn(
+            "docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api",
+            by_label.get("Core rate limit", ""),
+        )
+
+    def test_detail_rows_omit_api_usage_without_measurement(self) -> None:
+        rows = legacy_report_detail_rows(
+            {"api_estimate": {"estimated_incremental_requests": 5, "notes": []}},
+            "octocat",
+        )
+        metrics = [metric for metric, _value in rows]
+        self.assertNotIn("── REST API Usage ──", metrics)
+
     def test_summary_rows_private_first_when_split_present(self) -> None:
         data = {
             "monthly_costs": {

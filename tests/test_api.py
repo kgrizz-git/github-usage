@@ -265,3 +265,231 @@ class ApiTests(unittest.TestCase):
             result = api.get_all_pages("/repos/octocat/api/actions/runs")
 
         self.assertEqual(result, [])
+
+
+class RequestCountingTests(unittest.TestCase):
+    """request_count / request_log / get_request_stats on GitHubAPI."""
+
+    def _conn(self, status=200, body=b"{}"):
+        import http.client
+
+        conn = mock.Mock()
+        resp = mock.Mock(status=status)
+        resp.headers = http.client.HTTPMessage()
+        resp.read.return_value = body
+        conn.getresponse.return_value = resp
+        return conn
+
+    def test_request_counts_and_logs_success(self):
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        with mock.patch(
+            "github_usage.http_retry.http.client.HTTPSConnection",
+            return_value=self._conn(),
+        ):
+            api.request("GET", "/user")
+            api.request("GET", "/meta")
+
+        self.assertEqual(api.request_count, 2)
+        self.assertEqual(
+            [(e["method"], e["path"], e["status"]) for e in api.request_log],
+            [("GET", "/user", 200), ("GET", "/meta", 200)],
+        )
+        stats = api.get_request_stats()
+        self.assertEqual(stats["actual_requests"], 2)
+        self.assertEqual(stats["actual_requests_by_resource"]["user"], 1)
+        self.assertEqual(stats["actual_requests_by_resource"]["other"], 1)
+        self.assertEqual(
+            sum(stats["actual_requests_by_resource"].values()), stats["actual_requests"]
+        )
+
+    def test_request_logs_bare_path_but_transmits_inline_query(self):
+        from github_usage.api import GitHubAPI
+
+        for caller in ("request", "request_raw"):
+            with self.subTest(caller=caller):
+                api = GitHubAPI("fake-token")
+                conn = self._conn()
+                with mock.patch(
+                    "github_usage.http_retry.http.client.HTTPSConnection",
+                    return_value=conn,
+                ):
+                    getattr(api, caller)("GET", "/user/repos?per_page=100")
+
+                # The log (and therefore the stats buckets) sees the bare
+                # path, so the listing still classifies as repos with an
+                # inline query string — and never double-counts as user.
+                self.assertEqual(api.request_log[0]["path"], "/user/repos")
+                by_resource = api.get_request_stats()["actual_requests_by_resource"]
+                self.assertEqual(by_resource["repos"], 1)
+                self.assertEqual(by_resource["user"], 0)
+                # The wire keeps the original URL byte-identical.
+                _, url = conn.request.call_args.args[:2]
+                self.assertEqual(url, "/user/repos?per_page=100")
+
+    def test_not_found_records_status(self):
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        with (
+            mock.patch(
+                "github_usage.http_retry.http.client.HTTPSConnection",
+                return_value=self._conn(status=404, body=b'{"message": "nope"}'),
+            ),
+            self.assertRaisesRegex(RuntimeError, "API error 404"),
+        ):
+            api.request("GET", "/user")
+
+        self.assertEqual(api.request_count, 1)
+        self.assertEqual(api.request_log[0]["status"], 404)
+
+    def test_logged_path_is_normalized_and_excludes_query_params(self):
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        with mock.patch(
+            "github_usage.http_retry.http.client.HTTPSConnection",
+            return_value=self._conn(),
+        ):
+            api.request("GET", "user", {"page": 1, "per_page": 100})
+
+        entry = api.request_log[0]
+        self.assertEqual(entry["method"], "GET")
+        self.assertEqual(entry["path"], "/user")
+        self.assertEqual(api.get_request_stats()["actual_requests_by_resource"]["user"], 1)
+
+    def test_failed_request_still_counts_with_response_status(self):
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        with (
+            mock.patch(
+                "github_usage.http_retry.http.client.HTTPSConnection",
+                return_value=self._conn(status=403, body=b'{"message": "x"}'),
+            ),
+            self.assertRaisesRegex(RuntimeError, "API error 403"),
+        ):
+            api.request("GET", "/user")
+
+        self.assertEqual(api.request_count, 1)
+        self.assertEqual(api.request_log[0]["status"], 403)
+        stats = api.get_request_stats()
+        self.assertEqual(stats["actual_requests"], 1)
+        self.assertEqual(sum(stats["actual_requests_by_resource"].values()), 1)
+
+    def test_transport_failure_keeps_none_status_but_still_counts(self):
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        with (
+            mock.patch(
+                "github_usage.http_retry.request_with_retries",
+                side_effect=RuntimeError("boom"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "boom"),
+        ):
+            api.request("GET", "/user")
+
+        self.assertEqual(api.request_count, 1)
+        self.assertIsNone(api.request_log[0]["status"])
+        self.assertEqual(api.get_request_stats()["actual_requests"], 1)
+
+    def test_request_raw_counts_each_call(self):
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        with mock.patch(
+            "github_usage.http_retry.http.client.HTTPSConnection",
+            return_value=self._conn(),
+        ):
+            api.request_raw("GET", "/user")
+            api.request_raw("GET", "/rate_limit")
+
+        self.assertEqual(api.request_count, 2)
+        self.assertEqual(
+            api.get_request_stats()["actual_requests_by_resource"],
+            {"billing": 0, "user": 1, "rate_limit": 1, "actions": 0, "repos": 0, "other": 0},
+        )
+
+    def test_get_all_pages_counts_each_page(self):
+        import http.client
+
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        first = http.client.HTTPMessage()
+        first["Link"] = '<https://api.github.com/resource?page=2>; rel="next"'
+        conn = mock.Mock()
+        resp1 = mock.Mock(status=200)
+        resp1.headers = first
+        resp1.read.return_value = b'[{"id": 1}]'
+        resp2 = mock.Mock(status=200)
+        resp2.headers = http.client.HTTPMessage()
+        resp2.read.return_value = b'[{"id": 2}]'
+        conn.getresponse.side_effect = [resp1, resp2]
+
+        with mock.patch("github_usage.http_retry.http.client.HTTPSConnection", return_value=conn):
+            result = api.get_all_pages("/resource")
+
+        self.assertEqual(result, [{"id": 1}, {"id": 2}])
+        self.assertEqual(api.request_count, 2)
+
+    def test_get_request_stats_classifies_paths_into_buckets(self):
+        from github_usage.api import GitHubAPI
+
+        api = GitHubAPI("fake-token")
+        paths = [
+            "/user",
+            "/user/repos",
+            "/user/repos/octocat",
+            "/rate_limit",
+            "/users/octocat/settings/billing/usage/summary",
+            "/repos/octocat/repo/actions/artifacts",
+            "/repos/octocat/repo/releases",
+            "/meta",
+        ]
+        with mock.patch(
+            "github_usage.http_retry.http.client.HTTPSConnection",
+            return_value=self._conn(),
+        ):
+            for path in paths:
+                api.request("GET", path)
+
+        stats = api.get_request_stats()
+        self.assertEqual(stats["actual_requests"], 8)
+        # Billing lives under /users/ but buckets by its /settings/billing/
+        # segment; the billing branch stays first as defensive ordering.
+        # The repository listing (/user/repos, incl. sub-paths) buckets as
+        # repos, not user.
+        self.assertEqual(
+            stats["actual_requests_by_resource"],
+            {
+                "user": 1,
+                "rate_limit": 1,
+                "billing": 1,
+                "actions": 1,
+                "repos": 3,
+                "other": 1,
+            },
+        )
+        self.assertEqual(
+            sum(stats["actual_requests_by_resource"].values()), stats["actual_requests"]
+        )
+
+    def test_stats_start_at_zero_for_fresh_client(self):
+        from github_usage.api import GitHubAPI
+
+        stats = GitHubAPI("fake-token").get_request_stats()
+        self.assertEqual(stats["actual_requests"], 0)
+        self.assertEqual(
+            stats["actual_requests_by_resource"],
+            {
+                "billing": 0,
+                "user": 0,
+                "rate_limit": 0,
+                "actions": 0,
+                "repos": 0,
+                "other": 0,
+            },
+        )

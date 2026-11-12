@@ -1,10 +1,34 @@
-> **Status:** IN PROGRESS
+> **Status:** COMPLETE
 
 > Line numbers cited below are accurate as of 2026-11-09; relocate by anchor (function / section title / dict key) if they drift.
 >
 > **Terminology:** user-facing name is **local full report** (CLI/TUI). Code modules still use `legacy_*` until the rename tracked in `TO_DO.md`.
 >
-> **Implementation log:** (none yet)
+> **Implementation log:** Chunk 1 complete 2026-11-11 — `GitHubAPI` request
+> counting (`request_count`, `request_log`, ordered resource buckets) plus
+> `get_request_stats()` and unit tests; reviewed APPROVE with minor findings
+> folded in (structural sum==total, segment-based actions match, TypedDicts,
+> dense zeroed buckets, normalized-path/params/404 tests). Chunk 2 complete
+> 2026-11-11 — `report_api_usage.py` shared lines/rows formatters with scope
+> labels, rate-limit reference line, and cache-hit message; 9 unit tests at
+> 100% file coverage. Chunk 3 complete 2026-11-11 — builder merge with
+> per-getter tracking, caller-passed legacy baselines with listing carve-out,
+> `annotate_cache_hit` at all three cache sites, `CACHE_VERSION` 4, and
+> CountingFakeAPI + builder/helper/cache-hit tests (831 tests green).
+> Chunk-3 review (deepseek, APPROVE, no blockers): most findings were already
+> satisfied by the implementation (caller-baseline and session tests, fallback
+> `other`-bucket, extracted `_merge_legacy_api_estimate`, sorted buckets,
+> multi-page `page_counts`, GUI test placement); applied the remainder —
+> fallback non-dict/count-combined tests, section-level abort coverage,
+> redaction assertions, `_track_repo_calls`/`deltas` typing, legacy docstring.
+> Chunk 4 complete 2026-11-11 — email text/HTML quota blocks, legacy terminal
+> renderer, CSV/XLSX/PDF sections, GUI detail rows; 15 new tests; deepseek
+> APPROVE with follow-ups applied. Grok pre-PR review (high, plan mode):
+> REQUEST CHANGES with one major (PDF label-column overprint — fixed with
+> label/value split rows) and one minor (static rate-limit list docs link —
+> fixed); committed as follow-up. Docs complete 2026-11-11 —
+> `reports.md`, `email-reports.md`, CHANGELOG `Added` entry, full
+> `scripts/check` green; plan archived.
 
 # Track GitHub REST API Calls and Report Usage
 
@@ -163,8 +187,9 @@ Matching windows (baseline capture points):
   captured before initialization (a fresh-client zero snapshot is
   equivalent), never the entry default, preserving comparable counts with
   the CLI. When `baseline_stats` is None (direct builder use), the builder
-  snapshots at entry and records the narrower scope (`estimate_scope`) so
-  the variance stays honest.
+  snapshots at entry and records no scope, so renderers use the neutral
+  scope label instead of implying full-report coverage (the entry window is
+  narrower than the full estimate span).
   Carve `_limited_repos()` out of `actual_requests`: snapshot the counter
   around that call (`legacy_report_data.py:234`) and subtract those
   repository-listing page fetches from the delta — including from
@@ -234,27 +259,37 @@ Add a shared formatter module `src/github_usage/report_api_usage.py` with one
 pure lines function plus a shared rows adapter, matching the existing
 `email_actions_table_rows` convention (`_email_report_common.py:30-39`):
 
-- `api_usage_lines(estimate: dict) -> list[str]`
-- `api_usage_rows(estimate: dict) -> list[tuple[str, str]]` derived from the
+- `api_usage_lines(estimate: dict | None) -> list[str]`
+- `api_usage_rows(estimate: dict | None) -> list[tuple[str, str]]` derived from the
   lines (label/value pairs for HTML tables, CSV, XLSX, PDF).
 
 Suggested content (compact):
 
 ```
 REST API Usage
-- Requests in estimate scope: 123 (estimated 120)
-- Total requests this fetch: 130
+- Repo requests in estimate scope: 123 (estimated 120)
+- Total requests this fetch (retries excluded): 130
 - Core quota remaining before: 4,877 / 5,000
-- Core rate limit: 5,000 requests/hour (authenticated) — https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
-- By resource (estimate scope): billing 20, repos 1, actions 100, rate_limit 1, other 1
+- Core rate limit: 5,000 requests/hour (authenticated) - https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
+- By resource (estimate scope): actions 100, billing 20, repos 1
 - Source: live fetch
 ```
 
-The scope label comes from `estimate_scope`: email renderers qualify it as
-repo-level scope (`Repo-level requests in estimate scope:`), legacy renderers
-as account-level-inclusive scope.
+The scope label comes from `estimate_scope`: email renderers show
+`Repo requests in estimate scope:`, legacy renderers show
+`All requests in estimate scope:`, and unknown scopes fall back to the
+neutral `Requests in estimate scope:`. Scope strings live as
+`SCOPE_REPO_SECTIONS` / `SCOPE_FULL_REPORT` constants in
+`report_api_usage.py` so builders import them instead of re-typing.
+Formatters return no lines when the estimate carries no measurement keys,
+zero-count buckets are omitted from the breakdown, and all strings are
+ASCII-only (the PDF writer uses core Helvetica, which has no em dash).
 
 On a cache hit: `- Source: cached report (0 new API requests; 130 total during the original fetch)`.
+
+Cached rendering keeps the original measurement on the scope line; only the
+total line is relabeled. (Recorded 2026-11-11: do not zero the scope line —
+chunk 4 must preserve this.)
 
 Surface-by-surface:
 
@@ -408,19 +443,69 @@ which already lists static rate-limit numbers, to include the same docs link.
 
 ## Task breakdown
 
-- [ ] Add `GitHubAPI` request counting + `get_request_stats()`; unit tests.
-- [ ] Add `report_api_usage.py` (lines + rows adapter); cover the new file's 82%
+- [x] Add `GitHubAPI` request counting + `get_request_stats()`; unit tests.
+  **Done:** 2026-11-11 — counter, per-resource log, and stats merged in
+  `api.py`; 9 unit tests (incl. failure/transport, pagination, buckets);
+  reviewer minors applied (no functional deviations).
+- [x] Add `report_api_usage.py` (lines + rows adapter); cover the new file's 82%
   coverage gate.
-- [ ] Merge repo-level-delta actual usage into `api_estimate` in both builders
-  (email: per-getter snapshots around repo-level getters; legacy:
-  caller-passed `baseline_stats` full-snapshot subtraction incl. per-resource);
-  bump `CACHE_VERSION` (plus the test pin); add `annotate_cache_hit()` at all
-  three sites; tests.
-- [ ] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
+  **Done:** 2026-11-11 — shared `api_usage_lines`/`api_usage_rows` with scope
+  labels, quota/rate-limit/breakdown/source lines; 9 unit tests at 100% file
+  coverage.
+  **Review:** deepseek APPROVE with follow-ups applied — ASCII-only strings
+  (PDF-safe), absent-measurement gate returning no lines, zero-bucket filter,
+  cached total label, shared `SCOPE_*` constants, shorter PDF-safe labels.
+- [x] Merge repo-level-delta actual usage into `api_estimate` in both builders
+  (email: per-getter snapshots around repo-level getters, using the shared
+  `SCOPE_*` constants for `estimate_scope`; legacy: caller-passed
+  `baseline_stats` full-snapshot subtraction incl. per-resource, minus the
+  `_limited_repos` listing calls); bump `CACHE_VERSION` (plus the test pin);
+  add `annotate_cache_hit()` at all three sites; tests.
+  **Done:** 2026-11-11 — per-getter `_track_repo_calls` + `_sum_repo_deltas`
+  merge in both builders; legacy caller-passed `baseline_stats` with listing
+  carve-out and omitted scope on entry fallback; `annotate_cache_hit` at all
+  three cache sites; `CACHE_VERSION` 4 + pin update; CountingFakeAPI (incl.
+  multi-page listings) + builder/helper/cache-hit integration tests (incl.
+  caller-baseline, 2-page invariance, session coverage, section-failure
+  fallback).
+  **Review:** deepseek APPROVE with follow-ups folded in — `_api_request_stats`
+  fallback buckets unknowns under `other`; merge helpers consolidated in
+  `report_api_usage.py` (report_data.py stays under the 500-line budget);
+  non-dict snapshots tolerated; exact-bucket test assertions kept where they
+  pin the dense contract; legacy None-baseline omits (rather than invents) a
+  scope value.
+  **Review 2:** deepseek APPROVE (no blockers) with minors applied — caller-
+  baseline test proves pre-builder inclusion; `_merge_legacy_api_estimate`
+  extracted to `report_api_usage.py` (~163→~140-line builder); section-level
+  abort path tested with fallback re-run; `annotate_cache_hit` covered at all
+  three call sites via integration tests; `_track_repo_calls`/`deltas` typed;
+  monotonicity documented; GUI test module ordering fixed.
+- [x] Extend the email text/HTML quota blocks; legacy terminal; CSV/XLSX/PDF;
   GUI legacy detail rows; add the rate-limit reference line + docs link;
-  tests.
-- [ ] Docs (`docs/reports.md`, `docs/email-reports.md`), changelog,
+  tests. Chunk-4 decisions (locked): keep the cached scope line as the original
+  measurement (only the total line is relabeled); gate the extended quota
+  block on `notes or usage lines` so measured reports with zero notes still
+  render; label totals as requests-issued (retries excluded); HTML docs URL
+  stays plain text (matches text body; mail clients autolink); terminal keeps
+  both quota lines (usage block stays self-contained); PDF renders every entry
+  as a label line followed by its value line (fixed-width cells can't wrap).
+  **Review:** deepseek APPROVE with follow-ups applied — ruff-format fixes,
+  per-surface docs-link assertions, uniform PDF label/value split (no
+  overprint), shared "REST API Usage" naming, `_track_repo_calls` typing,
+  moved GUI cache test above the `__main__` guard.
+  **Pre-PR review (grok 4.7 high, plan mode):** REQUEST CHANGES with one
+  major (PDF 60 mm label column overprints the total-request counts —
+  fixed by rendering every API-usage entry as a label line followed by a
+  full-width value line, plus `add_section` full-width handling for
+  empty label/value rows) and one minor (static `render_what_else`
+  rate-limit list missing the docs link — fixed). Nits recorded as
+  follow-ups, not blockers.
+- [x] Docs (`docs/reports.md`, `docs/email-reports.md`), changelog,
   `scripts/check`, and a final review.
+  **Done:** 2026-11-11 — REST API Usage section documented in `reports.md`
+  (JSON `api_estimate` fields enumerated), rate-limit troubleshooting pointer
+  in `email-reports.md`, CHANGELOG `Added` entry under `[Unreleased]`;
+  `scripts/check` and `scripts/docs-check` green.
 
 ## Related follow-ups (out of scope here)
 

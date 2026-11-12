@@ -19,6 +19,7 @@ from .cli_email_report import _init_github_api
 from .cli_runs import list_local_runs
 from .report_cache import (
     CacheHit,
+    annotate_cache_hit,
     legacy_cache_params,
     load_cached_report,
     resolve_cache_max_age,
@@ -356,7 +357,7 @@ def run_legacy_report_data(
         refresh=refresh,
     )
     if cache_hit.from_cache and cached_data is not None and cached_username:
-        return 0, cached_data, cached_username, cache_hit
+        return 0, annotate_cache_hit(cached_data), cached_username, cache_hit
 
     api_result = _init_github_api(resolved, timeout, max_retries)
     if isinstance(api_result, int):
@@ -371,6 +372,9 @@ def run_legacy_report_data(
             max_repos=100,
             warn_over=None,
             include_release_assets=False,
+            # Fresh-client equivalent: _init_github_api's /user call must fall
+            # inside the measured window, as in the CLI path.
+            baseline_stats={"actual_requests": 0, "actual_requests_by_resource": {}},
         )
         if max_age > 0:
             store_cached_report(

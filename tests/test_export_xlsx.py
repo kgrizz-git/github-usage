@@ -310,6 +310,35 @@ class ExportXlsxTests(unittest.TestCase):
         keys = {str(r[0]) for r in rows if r and r[0]}
         self.assertIn("actions_billing", keys)
 
+    def test_api_usage_sheet_present(self) -> None:
+        self.data["api_estimate"] = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "core_limit": 5000,
+            "core_remaining": 4877,
+            "actual_requests_by_resource": {"billing": 120, "user": 1, "rate_limit": 1},
+            "estimate_scope": "repo-sections-only",
+            "from_cache": False,
+            "notes": [],
+        }
+        wb = self._open()
+        self.assertIn("REST API Usage", wb.sheetnames)
+        rows = list(wb["REST API Usage"].iter_rows(values_only=True))
+        flat = [(str(r[0]), str(r[1])) for r in rows if r and r[0]]
+        self.assertIn(("Repo requests in estimate scope", "123 (estimated 120)"), flat)
+        self.assertIn(("Total requests this fetch (retries excluded)", "130"), flat)
+        rate_limit = dict(flat).get("Core rate limit", "")
+        self.assertIn(
+            "docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api",
+            rate_limit,
+        )
+
+    def test_api_usage_sheet_omitted_without_measurement(self) -> None:
+        self.data["api_estimate"] = {"estimated_incremental_requests": 5, "notes": []}
+        wb = self._open()
+        self.assertNotIn("REST API Usage", wb.sheetnames)
+
     def test_larger_runner_sku_marked(self) -> None:
         self.data["actions"]["sku_breakdown"] = {
             "linux_4_core": {

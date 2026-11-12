@@ -108,6 +108,44 @@ class ExportCsvTests(unittest.TestCase):
         minutes_row = next(r for r in rows[actions_idx + 1 :] if r and r[0] == "minutes")
         self.assertEqual(minutes_row, ["minutes", ""])
 
+    def test_writes_api_usage_section(self):
+        self.data["api_estimate"] = {
+            "actual_requests": 123,
+            "total_requests": 130,
+            "estimated_incremental_requests": 120,
+            "core_limit": 5000,
+            "core_remaining": 4877,
+            "actual_requests_by_resource": {"billing": 120, "user": 1, "rate_limit": 1},
+            "estimate_scope": "repo-sections-only",
+            "from_cache": False,
+            "notes": [],
+        }
+        rows = self._rows()
+        idx = rows.index(["### REST API Usage ###"])
+        # Collect rows until the next section header.
+        body = []
+        for row in rows[idx + 1 :]:
+            if row and row[0].startswith("###"):
+                break
+            if row:
+                body.append(row)
+        labels = [r[0] for r in body]
+        self.assertIn("Repo requests in estimate scope", labels)
+        self.assertIn("Total requests this fetch (retries excluded)", labels)
+        values = dict(body)
+        self.assertEqual(values["Repo requests in estimate scope"], "123 (estimated 120)")
+        self.assertEqual(values["Total requests this fetch (retries excluded)"], "130")
+        self.assertIn("Core rate limit", values)
+        self.assertIn(
+            "docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api",
+            values["Core rate limit"],
+        )
+
+    def test_omits_api_usage_section_without_measurement(self):
+        self.data["api_estimate"] = {"estimated_incremental_requests": 5, "notes": []}
+        rows = self._rows()
+        self.assertNotIn(["### REST API Usage ###"], rows)
+
     def test_none_section_coalesced_to_empty(self):
         self.data["copilot"] = None
         self.data["git_lfs"] = None

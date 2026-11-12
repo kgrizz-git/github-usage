@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import csv
 
+from .copilot_metering import copilot_by_model_quantity_header
 from .export_visibility import (
     VISIBILITY_SPLIT_KEYS,
     annotated_sku_breakdown,
@@ -25,8 +26,8 @@ from .export_visibility import (
     storage_analysis_export_rows,
     visibility_summary_rows,
 )
+from .report_api_usage import api_usage_rows
 from .report_forecast_data import build_report_forecast, forecast_metric_rows
-from .copilot_metering import copilot_by_model_quantity_header
 from .visibility import repo_visibility
 
 
@@ -72,6 +73,7 @@ def _write_sections(
         _write_forecast_section(writer, data, premium_requests_limit=premium_requests_limit)
 
     _write_warnings_section(writer, data)
+    _write_api_usage_section(writer, data)
     _write_actions_section(writer, data)
     _write_storage_summary_section(writer, data)
     _write_copilot_section(writer, data)
@@ -90,6 +92,16 @@ def _write_warnings_section(writer, data: dict) -> None:  # type: ignore[type-ar
     _write_section_header(writer, "Warnings")
     for warning in data.get("warnings") or []:
         writer.writerow([warning])
+
+
+def _write_api_usage_section(writer, data: dict) -> None:  # type: ignore[type-arg]
+    """Write measured-vs-estimated REST API usage as label/value rows."""
+    rows = api_usage_rows(data.get("api_estimate") or {})
+    if not rows:
+        return
+    _write_section_header(writer, "REST API Usage")
+    for label, value in rows:
+        writer.writerow([label, value])
 
 
 def _write_actions_section(writer, data: dict) -> None:  # type: ignore[type-arg]

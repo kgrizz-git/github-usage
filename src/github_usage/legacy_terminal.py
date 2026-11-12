@@ -10,6 +10,7 @@ from .report_actions import (
     render_limits_summary,
     render_repo_actions_table,
 )
+from .report_api_usage import api_usage_lines
 from .report_forecast import render_forecast
 from .report_products import (
     render_base_costs,
@@ -22,12 +23,24 @@ from .report_sources import print_report_sources_footer
 from .report_storage import render_artifact_storage_section
 from .report_summary import render_final_summary_from_data
 from .report_workflow_minutes import render_workflow_breakdown
+from .terminal import print_sep
 
 
 def _print_section_error(label: str, errors: dict, key: str) -> None:
     message = errors.get(key)
     if message:
         print(f"  ({label} unavailable: {message})")
+
+
+def render_api_usage(estimate: dict | None) -> None:
+    """Print measured-vs-estimated REST API usage (no-op without measurements)."""
+    lines = api_usage_lines(estimate or {})
+    if not lines:
+        return
+    print_sep("REST API Usage")
+    for line in lines:
+        print(f"  {line}")
+    print()
 
 
 def render_legacy_report(
@@ -42,6 +55,7 @@ def render_legacy_report(
 
     render_account_info(data.get("account") or {})
     render_rate_limits(data.get("rate_limits") or {})
+    render_api_usage(data.get("api_estimate"))
 
     if data.get("actions") is None and errors.get("actions"):
         _print_section_error("Actions", errors, "actions")

@@ -203,6 +203,7 @@ def _load_or_fetch_email_data(
 ) -> tuple[dict, str] | int:
     """Load cached email data or fetch fresh; return ``(data, username)`` or exit code."""
     from .report_cache import (
+        annotate_cache_hit,
         email_cache_params,
         format_cache_hit_message,
         load_cached_report,
@@ -240,7 +241,7 @@ def _load_or_fetch_email_data(
     if cache_hit.from_cache and cached_data is not None:
         if cache_hit.age_seconds is not None and cache_hit.max_age_seconds is not None:
             print(format_cache_hit_message(cache_hit.age_seconds, cache_hit.max_age_seconds))
-        return cached_data, cached_username or "unknown"
+        return annotate_cache_hit(cached_data), cached_username or "unknown"
 
     api_result = _init_github_api(token, args.timeout, args.max_retries)
     if isinstance(api_result, int):

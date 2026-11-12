@@ -24,7 +24,7 @@ from .export_json import _DatetimeEncoder
 from .setup_config import SetupPaths
 
 DEFAULT_CACHE_MAX_AGE_SECONDS = 3600
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 
 
 def cache_disabled() -> bool:
@@ -161,6 +161,19 @@ def format_cache_hit_message(age_seconds: float, max_age_seconds: int) -> str:
         f"Using cached report data ({age_min} min old, TTL {ttl}). "
         "Pass --refresh to fetch fresh data."
     )
+
+
+def annotate_cache_hit(data: dict[str, Any]) -> dict[str, Any]:
+    """Mark a cached report dict as served from cache (mutates and returns it).
+
+    The original fetch's measured counts are preserved; renderers report
+    0 new requests alongside the original-fetch total. No-op when the dict
+    carries no ``api_estimate`` block.
+    """
+    estimate = data.get("api_estimate")
+    if isinstance(estimate, dict):
+        estimate["from_cache"] = True
+    return data
 
 
 def load_cached_report(

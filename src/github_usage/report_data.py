@@ -7,6 +7,14 @@ from typing import Protocol
 
 from .copilot_usage_fetch import resolve_copilot_usage_sources
 from .report_actions import fetch_repo_actions_table
+from .report_api_usage import (
+    SCOPE_REPO_SECTIONS,
+    _api_request_stats,
+    _finalize_api_estimate,
+    _stats_total,
+    _sum_repo_deltas,
+    _track_repo_calls,
+)
 from .report_helpers import fmt_price, gb_hours_to_avg_mb, sanitize_item_amounts
 from .report_optional import (
     estimate_api_request_count,
@@ -290,8 +298,13 @@ def _fetch_sections(
     report: dict,
     errors: dict,
     runs_cache: dict,
-) -> None:
-    """Populate the per-section keys on ``report`` and record errors. Mutates both dicts in place."""
+) -> list[tuple[dict, dict]]:
+    """Populate the per-section keys on ``report`` and record errors.
+
+    Mutates both dicts in place. Returns the per-getter (before, after)
+    stats snapshots for the API-usage merge.
+    """
+    repo_deltas: list[tuple[dict, dict]] = []
     for key, enabled, getter in [
         ("actions", include_actions, lambda: get_actions_usage(api, username)),
         ("copilot", include_copilot, lambda: get_copilot_usage(api, username)),
@@ -312,36 +325,54 @@ def _fetch_sections(
         }
 
     if include_consumers:
-        _try_section(
-            report,
-            errors,
-            "repo_consumers",
-            lambda: get_repo_consumers(api, repos, max_repos=max_repos),
+        _track_repo_calls(
+            api,
+            lambda: _try_section(
+                report,
+                errors,
+                "repo_consumers",
+                lambda: get_repo_consumers(api, repos, max_repos=max_repos),
+            ),
+            repo_deltas,
         )
     if include_artifact_storage:
-        _try_section(
-            report,
-            errors,
-            "artifact_storage",
-            lambda: get_artifact_storage_details(api, repos, max_repos),
+        _track_repo_calls(
+            api,
+            lambda: _try_section(
+                report,
+                errors,
+                "artifact_storage",
+                lambda: get_artifact_storage_details(api, repos, max_repos),
+            ),
+            repo_deltas,
         )
     if include_release_assets:
-        _try_section(
-            report,
-            errors,
-            "release_assets",
-            lambda: get_release_asset_details(api, repos, max_repos),
+        _track_repo_calls(
+            api,
+            lambda: _try_section(
+                report,
+                errors,
+                "release_assets",
+                lambda: get_release_asset_details(api, repos, max_repos),
+            ),
+            repo_deltas,
         )
 
     if include_consumers and report.get("repo_consumers"):
-        _try_section(
-            report,
-            errors,
-            "workflow_breakdown",
-            lambda: workflow_breakdown_for_top_private(
-                api, report["repo_consumers"], runs_cache=runs_cache
+        _track_repo_calls(
+            api,
+            lambda: _try_section(
+                report,
+                errors,
+                "workflow_breakdown",
+                lambda: workflow_breakdown_for_top_private(
+                    api, report["repo_consumers"], runs_cache=runs_cache
+                ),
             ),
+            repo_deltas,
         )
+
+    return repo_deltas
 
 
 def build_report_data(
@@ -407,7 +438,7 @@ def build_report_data(
     }
 
     runs_cache: dict = {}
-    _fetch_sections(
+    repo_deltas = _fetch_sections(
         api,
         username,
         repos,
@@ -432,11 +463,23 @@ def build_report_data(
                 report, consumers_rows, only_public=only_public, only_private=only_private
             )
         else:
-            rows, fetch_errors = fetch_repo_actions_table(api, repos)
+            rows, fetch_errors = _track_repo_calls(
+                api, lambda: fetch_repo_actions_table(api, repos), repo_deltas
+            )
             errors.update(fetch_errors)
             attach_actions_visibility_split(
                 report, rows, only_public=only_public, only_private=only_private
             )
+
+    actual, by_resource = _sum_repo_deltas(repo_deltas)
+    current = _api_request_stats(api)
+    report["api_estimate"] = _finalize_api_estimate(
+        report.get("api_estimate") or {},
+        actual=actual,
+        by_resource=by_resource,
+        total=_stats_total(current),
+        scope=SCOPE_REPO_SECTIONS,
+    )
 
     report["insights"] = get_key_insights(report)
     report["warnings"] = get_warning_state(report, warn_over)

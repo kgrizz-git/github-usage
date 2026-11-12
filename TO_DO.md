@@ -29,9 +29,9 @@
 
 - [ ] Refactor `src/github_usage/setup_config.py` (507 lines, over the 500-line limit per `scripts/check-sizes`). Extract a focused submodule — e.g. profile schema/loading (`load_report_profiles`, `find_profile`, `ensure_profiles`, `_default_profile`) and/or the TOML writer helpers (`_emit_*_block`, `write_config`) — to bring the file back under the threshold. Also watch `setup_wizard.py` (461 lines) and the `_manage_profiles()`/`_run_email_report()` functions, which are approaching their limits.
 - [ ] Rename internal `legacy_*` modules/symbols to “local full report” naming (`legacy_report_data` → e.g. `local_report_data`, cache `kind="legacy"`, CLI/TUI internals, tests). User-facing copy already says “local full report”; this is the code rename. Keep a thin `legacy` compatibility shim if external imports still need it.
+- [ ] Extract the remaining API-usage tracking orchestration from the report builders (`report_data.py` 487 lines, `legacy_report_data.py` 395 lines — both at/over the early-extraction threshold). Keep the merge math in `report_api_usage.py`; move section-fetch orchestration (`_fetch_sections`, `_fetch_legacy_billing_sections`) into a focused submodule so the builders stay thin. Flagged in review on PR #39; deferred to keep that PR's diff small.
 
 - [ ] Add tests to raise overall src coverage from the current ~76% to 80%. Update `scripts/coverage-check` default from `COVERAGE_TOTAL_MIN=75` to `80` once achieved.
-- [ ] Port the manual `pip install -e .` comment + `# NOSONAR` in `.github/workflows/email-report.yml` into `email-report.yml.template` so the next setup regeneration does not silently drop the Sonar suppression.
 
 ## Configuration & Setup
 
