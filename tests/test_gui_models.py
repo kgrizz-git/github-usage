@@ -64,6 +64,19 @@ class RouteEntryTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         run_tui.assert_called_once()
 
+    def test_dashed_argv_on_tty_skips_tui(self) -> None:
+        argv = ["--export", "json", "--no-interactive"]
+        with (
+            mock.patch("github_usage.cli_gui.run_tui", return_value=0) as run_tui,
+            mock.patch("sys.stdin.isatty", return_value=True),
+            mock.patch("sys.stdout.isatty", return_value=True),
+            mock.patch.dict(os.environ, {}, clear=True),
+        ):
+            result = route_entry(argv)
+        self.assertFalse(result.handled)
+        self.assertEqual(result.argv, argv)
+        run_tui.assert_not_called()
+
     def test_missing_gui_message_contains_venv_python(self) -> None:
         self.assertIn("uv pip install --python .venv -e '.[gui]'", _MISSING_GUI_MESSAGE)
 
