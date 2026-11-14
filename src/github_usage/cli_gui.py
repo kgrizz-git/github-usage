@@ -76,7 +76,7 @@ def route_entry(argv: Sequence[str]) -> RouteResult:
     if cli_mode:
         return RouteResult(handled=False, argv=stripped)
 
-    if sys.stdin.isatty() and sys.stdout.isatty():
+    if not stripped and sys.stdin.isatty() and sys.stdout.isatty():
         return RouteResult(handled=True, argv=[], exit_code=run_tui())
 
     if not stripped:

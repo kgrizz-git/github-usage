@@ -15,7 +15,7 @@ TOTAL_MIN="${COVERAGE_TOTAL_MIN:-75}"
 FILE_MIN="${COVERAGE_FILE_MIN:-82}"
 
 echo "==> Running tests under coverage (src only)"
-PYTHONPATH=src scripts/python -m coverage run --source="$SRC" -m unittest discover -s tests
+PYTHONPATH=src scripts/python -m coverage run --source="$SRC" -m unittest discover -s tests </dev/null
 
 echo "==> Coverage report"
 PYTHONPATH=src scripts/python -m coverage report
