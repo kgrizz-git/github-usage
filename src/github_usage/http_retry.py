@@ -11,8 +11,11 @@ from dataclasses import dataclass
 
 # Rate Limit and 403 Policy:
 # - The helper retries any status in RETRYABLE_STATUSES (408, 429, 500, 502, 503, 504) unconditionally.
-# - It also retries 403 IF AND ONLY IF `Retry-After` or `x-ratelimit-reset`
-#   is present in the response headers. It does not retry 401, 404, or other 4xx.
+# - It retries a 403 only when the response itself signals throttling: `Retry-After`
+#   is present, `x-ratelimit-remaining` is `0`, or the body mentions a rate limit.
+#   Every GitHub response carries `x-ratelimit-reset`, including plain permission
+#   failures, so header presence alone must not select the retry path.
+#   It does not retry 401, 404, or other 4xx.
 # - The legacy 403+Retry-After branch in api.py is deleted since this helper
 #   natively handles 403 rate limits.
 
@@ -60,6 +63,27 @@ def parse_rate_limit_headers(headers: http.client.HTTPMessage) -> float | None:
     return None
 
 
+# Bodies GitHub uses for primary/secondary throttling; permission 403s say
+# "Resource not accessible by ..." instead.
+_RATE_LIMIT_MARKERS = ("rate limit", "abuse detection", "secondary rate")
+
+
+def is_rate_limit_403(headers: http.client.HTTPMessage, body: bytes) -> bool:
+    """Return True when a 403 response represents throttling, not a permission denial.
+
+    GitHub attaches ``x-ratelimit-reset`` to ordinary 403s too, so the header's
+    presence alone is not a rate-limit signal. A 403 counts as throttling when it
+    carries ``Retry-After``, reports ``x-ratelimit-remaining: 0``, or names a rate
+    limit in its body.
+    """
+    if headers.get("Retry-After") is not None:
+        return True
+    if (headers.get("x-ratelimit-remaining") or "").strip() == "0":
+        return True
+    text = body.decode("utf-8", errors="replace").lower()
+    return any(marker in text for marker in _RATE_LIMIT_MARKERS)
+
+
 def backoff_seconds(attempt: int, retry_after: float | None = None) -> float:
     """Calculate the number of seconds to sleep before the next retry."""
     if retry_after is not None:
@@ -99,13 +123,11 @@ def request_with_retries(
             retry_after_val = None
             needs_retry = False
 
-            if response.status in RETRYABLE_STATUSES:
+            if response.status in RETRYABLE_STATUSES or (
+                response.status == 403 and is_rate_limit_403(response.headers, response.body)
+            ):
                 needs_retry = True
                 retry_after_val = parse_rate_limit_headers(response.headers)
-            elif response.status == 403:
-                retry_after_val = parse_rate_limit_headers(response.headers)
-                if retry_after_val is not None:
-                    needs_retry = True
 
             if not needs_retry:
                 return response

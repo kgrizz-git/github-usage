@@ -111,6 +111,134 @@ class HttpRetryTests(unittest.TestCase):
         self.assertEqual(conn.request.call_count, 2)
         self.assertEqual(self.sleeper.calls, [])
 
+    @mock.patch("time.time", return_value=1000000.0)
+    @mock.patch("http.client.HTTPSConnection")
+    def test_does_not_retry_permission_403_that_carries_ratelimit_reset(
+        self, mock_conn_class, mock_time
+    ):
+        """A permission 403 must not be retried just because GitHub sent rate-limit headers.
+
+        Regression: every GitHub response carries ``x-ratelimit-reset``, so the retry
+        helper slept ~30s per attempt on inaccessible private repos and turned a
+        ~4 minute email report into a ~40 minute one.
+        """
+        conn = mock.Mock()
+        mock_conn_class.return_value = conn
+
+        headers = http.client.HTTPMessage()
+        headers["x-ratelimit-reset"] = "1000010"
+        headers["x-ratelimit-remaining"] = "4823"
+        err_resp = mock.Mock(status=403, headers=headers)
+        err_resp.read.return_value = (
+            b'{"message":"Resource not accessible by personal access token"}'
+        )
+        conn.getresponse.return_value = err_resp
+
+        response = http_retry.request_with_retries(
+            "GET", "/foo", host="api.github.com", headers={}, sleep=self.sleeper
+        )
+        self.assertEqual(response.status, 403)
+        self.assertEqual(self.sleeper.calls, [])
+        self.assertEqual(conn.request.call_count, 1)
+
+    @mock.patch("time.time", return_value=1000000.0)
+    @mock.patch("http.client.HTTPSConnection")
+    def test_does_not_retry_saml_sso_403(self, mock_conn_class, mock_time):
+        """SAML/SSO enforcement 403s carry rate-limit headers but are not throttling."""
+        conn = mock.Mock()
+        mock_conn_class.return_value = conn
+
+        headers = http.client.HTTPMessage()
+        headers["x-ratelimit-reset"] = "1000010"
+        headers["x-ratelimit-remaining"] = "4823"
+        err_resp = mock.Mock(status=403, headers=headers)
+        err_resp.read.return_value = (
+            b'{"message":"Resource protected by organization SAML enforcement. '
+            b'You must grant your personal access token access to this organization."}'
+        )
+        conn.getresponse.return_value = err_resp
+
+        response = http_retry.request_with_retries(
+            "GET", "/foo", host="api.github.com", headers={}, sleep=self.sleeper
+        )
+        self.assertEqual(response.status, 403)
+        self.assertEqual(self.sleeper.calls, [])
+        self.assertEqual(conn.request.call_count, 1)
+
+    def test_is_rate_limit_403_classification(self):
+        """Pin the classification rules, including markers far into the body."""
+
+        def headers(**values):
+            message = http.client.HTTPMessage()
+            for key, value in values.items():
+                message[key.replace("_", "-")] = value
+            return message
+
+        cases = [
+            (headers(Retry_After="5"), b"", True),
+            (headers(**{"x_ratelimit_remaining": "0"}), b"", True),
+            (headers(), b'{"message":"API rate limit exceeded"}', True),
+            (headers(), b"You have exceeded a secondary rate limit.", True),
+            (headers(), b"abuse detection mechanism", True),
+            (headers(), b"x" * 600 + b" API rate limit exceeded", True),
+            (headers(), b'{"message":"Resource not accessible by personal access token"}', False),
+            (headers(**{"x_ratelimit_remaining": "4823"}), b'{"message":"Forbidden"}', False),
+            (headers(), b"", False),
+            (headers(), b"\xff\xfe not utf-8", False),
+        ]
+        for case_headers, body, expected in cases:
+            with self.subTest(body=body[:40], expected=expected):
+                self.assertIs(
+                    http_retry.is_rate_limit_403(case_headers, body),
+                    expected,
+                )
+
+    @mock.patch("time.time", return_value=1000000.0)
+    @mock.patch("http.client.HTTPSConnection")
+    def test_retries_primary_rate_limit_403_when_remaining_is_zero(
+        self, mock_conn_class, mock_time
+    ):
+        conn = mock.Mock()
+        mock_conn_class.return_value = conn
+
+        headers = http.client.HTTPMessage()
+        headers["x-ratelimit-reset"] = "1000010"
+        headers["x-ratelimit-remaining"] = "0"
+        err_resp = mock.Mock(status=403, headers=headers)
+        err_resp.read.return_value = b'{"message":"API rate limit exceeded"}'
+        succ_resp = mock.Mock(status=200, headers=http.client.HTTPMessage())
+        succ_resp.read.return_value = b"Success"
+
+        conn.getresponse.side_effect = [err_resp, succ_resp]
+
+        response = http_retry.request_with_retries(
+            "GET", "/foo", host="api.github.com", headers={}, sleep=self.sleeper
+        )
+        self.assertEqual(response.status, 200)
+        self.assertEqual(self.sleeper.calls, [10.0])
+
+    @mock.patch("http.client.HTTPSConnection")
+    def test_retries_secondary_rate_limit_403_by_body_marker(self, mock_conn_class):
+        conn = mock.Mock()
+        mock_conn_class.return_value = conn
+
+        headers = http.client.HTTPMessage()
+        headers["Retry-After"] = "3"
+        err_resp = mock.Mock(status=403, headers=headers)
+        err_resp.read.return_value = (
+            b"You have exceeded a secondary rate limit. Please wait a few minutes."
+        )
+        succ_resp = mock.Mock(status=200, headers=http.client.HTTPMessage())
+        succ_resp.read.return_value = b"Success"
+
+        conn.getresponse.side_effect = [err_resp, succ_resp]
+
+        response = http_retry.request_with_retries(
+            "GET", "/foo", host="api.github.com", headers={}, sleep=self.sleeper
+        )
+        self.assertEqual(response.status, 200)
+        self.assertEqual(self.sleeper.calls, [3.0])
+
     @mock.patch("http.client.HTTPSConnection")
     def test_retries_on_remote_disconnected(self, mock_conn_class):
         conn = mock.Mock()
