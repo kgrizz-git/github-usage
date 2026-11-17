@@ -217,6 +217,29 @@ class HttpRetryTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertEqual(self.sleeper.calls, [10.0])
 
+    @mock.patch("time.time", return_value=1000000.0)
+    @mock.patch("http.client.HTTPSConnection")
+    def test_retries_body_only_rate_limit_403(self, mock_conn_class, mock_time):
+        """The body marker alone selects the retry path, with no Retry-After and quota left."""
+        conn = mock.Mock()
+        mock_conn_class.return_value = conn
+
+        headers = http.client.HTTPMessage()
+        headers["x-ratelimit-reset"] = "1000010"
+        headers["x-ratelimit-remaining"] = "4823"
+        err_resp = mock.Mock(status=403, headers=headers)
+        err_resp.read.return_value = b"You have exceeded a secondary rate limit."
+        succ_resp = mock.Mock(status=200, headers=http.client.HTTPMessage())
+        succ_resp.read.return_value = b"Success"
+
+        conn.getresponse.side_effect = [err_resp, succ_resp]
+
+        response = http_retry.request_with_retries(
+            "GET", "/foo", host="api.github.com", headers={}, sleep=self.sleeper
+        )
+        self.assertEqual(response.status, 200)
+        self.assertEqual(self.sleeper.calls, [10.0])
+
     @mock.patch("http.client.HTTPSConnection")
     def test_retries_secondary_rate_limit_403_by_body_marker(self, mock_conn_class):
         conn = mock.Mock()
