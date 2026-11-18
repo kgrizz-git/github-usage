@@ -128,6 +128,14 @@ Security workflow:
 - Add Dependabot config for both Python dependencies and GitHub Actions.
 - Consider an Actions workflow linter such as `zizmor` once workflows become non-trivial.
 
+CodeQL alert handling:
+
+- This repo uses code scanning **default setup**; there is no checked-in CodeQL workflow.
+- In-source `# codeql[query-id]` comments are **not applied** by GitHub code scanning here. A correctly placed comment (alone on the line immediately above the flagged line, which is the documented shape) still produces an open alert on every analysis — verified on `main` after PR #42. Keep the comments: they record intent for CLI/IDE readers and are correct CodeQL syntax, but do not expect them to close an alert.
+- Dismiss alerts from the Security tab, or via the REST API: `PATCH /repos/{owner}/{repo}/code-scanning/alerts/{n}` with `state=dismissed`, `dismissed_reason=won't fix`, and `dismissed_comment` (max 280 characters). A classic token with `repo` is accepted by this endpoint even though the REST docs list `security_events`.
+- `py/clear-text-logging-sensitive-data` fires on the report print helpers (`report_sources.py`, `report_products.py`, `report_summary.py`). They print derived billing figures for a local terminal report — no credentials, tokens, or raw API payloads — so the standing decision is to dismiss as `won't fix` with that rationale on the alert.
+- Making in-source suppression effective would require the `advanced-security/dismiss-alerts` action reading a SARIF artifact, which in turn means advanced setup instead of default setup. Not adopted; revisit only if the alert volume becomes unmanageable.
+
 Suggested `scripts/security` contents:
 
 ```sh
