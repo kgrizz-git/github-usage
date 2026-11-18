@@ -353,7 +353,8 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [  # type: ignore[type-arg
             "data for the report sections you enable (classic `repo` + `user`, or "
             "fine-grained with `Metadata: Read-only`, `Actions: Read-only`, the "
             "account permission `Plan: Read-only`, and `Contents: Read-only` for "
-            "release inventory). Requires `gh` CLI auth."
+            "release inventory; select all repositories for account-wide "
+            "coverage). Requires `gh` CLI auth."
         ),
         _ci_only,
     ),

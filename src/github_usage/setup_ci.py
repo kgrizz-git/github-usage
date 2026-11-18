@@ -23,7 +23,8 @@ CI_ACTIONS_ENTRIES = (
             "GitHub PAT that can read your personal repos, billing, and Actions "
             "data (classic: `repo` + `user`; fine-grained: `Metadata: Read-only`, "
             "`Actions: Read-only`, `Contents: Read-only` for release inventory, "
-            "plus `Plan: Read-only` on your user account)"
+            "plus `Plan: Read-only` on your user account; select all repositories "
+            "for account-wide coverage)"
         ),
     ),
     ("RESEND_API_KEY", "Resend API key"),
