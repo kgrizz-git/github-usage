@@ -10,8 +10,8 @@ from .copilot_metering import (
     copilot_model_detail_line,
     copilot_usage_summary_lines,
 )
-from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .report_data import get_copilot_usage
+from .report_helpers import fmt_price, gb_hours_to_avg_mb
 from .report_sources import print_premium_request_model_breakdown
 from .terminal import print_section
 
@@ -75,6 +75,7 @@ def _print_copilot_by_model_block(copilot: dict, premium_by_model: dict | None) 
         for model, data in sorted(
             by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
         ):
+            # codeql[py/clear-text-logging-sensitive-data]
             print(copilot_model_detail_line(model, data, metering="ai_credits"))
         print()
         return
@@ -89,9 +90,12 @@ def _print_copilot_by_model_block(copilot: dict, premium_by_model: dict | None) 
     for model, data in sorted(
         by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
     ):
+        # codeql[py/clear-text-logging-sensitive-data]
         print(f"    {model}:")
+        # codeql[py/clear-text-logging-sensitive-data]
         print(f"      Total requests: {data.get('requests', 0):.2f}")
         print(
+            # codeql[py/clear-text-logging-sensitive-data]
             f"      Gross: {fmt_price(data.get('gross', 0))} | "
             f"Discount: {fmt_price(data.get('discount', 0))} | "
             f"Net: {fmt_price(data.get('net', 0))}"
@@ -238,8 +242,8 @@ def show_monthly_costs(repo_data, username, api):
 
     if total_discount > 0:
         savings_pct = (total_discount / total_gross * 100) if total_gross > 0 else 0
-        # codeql[py/clear-text-logging-sensitive-data]
         print(
+            # codeql[py/clear-text-logging-sensitive-data]
             f"  You're saving {fmt_price(total_discount)} ({savings_pct:.1f}% discount) this month!"
         )
         print()

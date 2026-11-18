@@ -20,9 +20,11 @@ CI_ACTIONS_ENTRIES = (
     (
         "GH_USAGE_TOKEN",
         (
-            "GitHub PAT that can read your personal repos and billing "
-            "(classic: `repo` scope; fine-grained: `Metadata: Read-only` + "
-            "`Plan: Read-only` on your user account)"
+            "GitHub PAT that can read your personal repos, billing, and Actions "
+            "data (classic: `repo` + `user`; fine-grained: `Metadata: Read-only`, "
+            "`Actions: Read-only`, `Contents: Read-only` for release inventory, "
+            "plus `Plan: Read-only` on your user account; select all repositories "
+            "for account-wide coverage)"
         ),
     ),
     ("RESEND_API_KEY", "Resend API key"),

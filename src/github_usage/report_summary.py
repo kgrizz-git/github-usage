@@ -265,6 +265,7 @@ def _print_copilot_ai_credits_by_model(copilot: dict | None) -> None:
         by_model.items(), key=lambda x: x[1].get("requests", 0), reverse=True
     ):
         qty = float(data.get("requests", 0.0))
+        # codeql[py/clear-text-logging-sensitive-data]
         print(f"      {model:<30} {qty:>10.2f} credits (gross qty)")
     print()
 
@@ -285,8 +286,8 @@ def _print_copilot_premium_requests_by_model(premium_by_model) -> None:
             if pp > 0:
                 price = pp
                 break
-        # codeql[py/clear-text-logging-sensitive-data]
         print(
+            # codeql[py/clear-text-logging-sensitive-data]
             f"      {model:<30} {data['total_requests']:>10.0f} reqs  @ {fmt_price(price)}/req  = {fmt_price(data['total_net'])}"
         )
     print()
