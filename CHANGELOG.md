@@ -40,6 +40,7 @@ This project follows the structure from Keep a Changelog and intends to use Sema
 
 ### Changed
 
+- **Setup help lists the full token permissions:** the interactive secrets help and the `GH_USAGE_TOKEN` description now match `docs/setup.md` — fine-grained tokens need `Metadata: Read-only`, `Actions: Read-only`, `Contents: Read-only` for release inventory, and the account permission `Plan: Read-only`; classic tokens need `repo` + `user`. The old text omitted Actions and Contents (and `user` for classic tokens), so following it produced `skipped (403 …)` repos in artifact storage and workflow breakdown.
 - **Email report repo cap in GitHub Actions:** raised the scheduled workflow's `--max-repos` from 50 to 100 so repo-level sections cover more of the account (aligning with the CLI/config default). Repos beyond the previous cap were excluded from the private/public Actions split and top-repository rankings; the cap still applies above 100 repos, and repo-level sections now make roughly twice as many REST calls (about 210 of the 5,000/hr core quota with consumers + artifact storage).
 - **Shorter README:** focused the landing page on getting started and scheduled delivery; moved setup, email configuration, report/export reference, runs/drift, and development details into linked user guides under `docs/`.
 

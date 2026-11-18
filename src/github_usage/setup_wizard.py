@@ -349,9 +349,11 @@ _MENU_OPTIONS: list[tuple[str, str, str, callable]] = [  # type: ignore[type-arg
         (
             "Push secrets to this repository with `gh secret set` so the scheduled "
             "GitHub Actions workflow can send the report. The GitHub token must be "
-            "able to read your personal repos and user-billing endpoints "
-            "(classic `repo`, or fine-grained with `Metadata: Read-only` and the "
-            "account permission `Plan: Read-only`). Requires `gh` CLI auth."
+            "able to read your personal repos, user-billing endpoints, and Actions "
+            "data for the report sections you enable (classic `repo` + `user`, or "
+            "fine-grained with `Metadata: Read-only`, `Actions: Read-only`, the "
+            "account permission `Plan: Read-only`, and `Contents: Read-only` for "
+            "release inventory). Requires `gh` CLI auth."
         ),
         _ci_only,
     ),
