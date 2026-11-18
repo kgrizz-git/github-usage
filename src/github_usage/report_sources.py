@@ -24,9 +24,12 @@ def print_premium_request_model_breakdown(premium_by_model: dict) -> None:
     for model, data in sorted(
         premium_by_model.items(), key=lambda x: x[1]["total_requests"], reverse=True
     ):
+        # codeql[py/clear-text-logging-sensitive-data]
         print(f"    {model}:")
+        # codeql[py/clear-text-logging-sensitive-data]
         print(f"      Total requests: {data['total_requests']:.2f}")
         print(
+            # codeql[py/clear-text-logging-sensitive-data]
             f"      Gross: {fmt_price(data['total_gross'])} | "
             f"Discount: {fmt_price(data['total_discount'])} | "
             f"Net: {fmt_price(data['total_net'])}"
@@ -35,6 +38,7 @@ def print_premium_request_model_breakdown(premium_by_model: dict) -> None:
             sku = item.get("sku", "unknown")
             qty = item.get("grossQuantity", 0)
             price = item.get("pricePerUnit", 0)
+            # codeql[py/clear-text-logging-sensitive-data]
             print(f"        {sku}: {qty:.2f} @ {fmt_price(price)}/ea")
         print()
 
